@@ -59,23 +59,27 @@
 
 (defun hexdump (add len)
   (assert-address add)
-  (loop 
-     for i from add to (min (+ add len) 65535)
-     for j from 1 do
-       (when (= 1 (rem j 16))
-	 (format t "~4,'0X " i))
-       (format t "~2,'0X" (peek-byte i))
-       (when (zerop (rem j 2))
-	 (format t " "))
-       (when (zerop (rem j 16))
-	 (loop for k from i downto (- i 16) do
-	      (format t "~c" (let ((c (peek-byte i)))
-			       (if (and (> c 31)
-					(< c 128))
-				   (code-char c)
-				   #\.))))
-	 (terpri)))
-  (values))
+  (flet ((peek (add)
+	   (if (< add 65536)
+	       (peek-byte add)
+	       0)))
+    (loop 
+       for i from add to (+ add (1- (* 16 (ceiling len 16))))
+       for j from 1 do
+	 (when (= 1 (rem j 16))
+	   (format t "~4,'0X " i))
+	 (format t "~2,'0X" (peek i))
+	 (when (zerop (rem j 2))
+	   (format t " "))
+	 (when (zerop (rem j 16))
+	   (loop for k from (- i 15) to i do
+		(format t "~c" (let ((byte (peek k)))
+				 (if (and (> byte 31)
+					  (< byte 128))
+				     (code-char byte)
+				     #\.))))
+	   (terpri)))
+  (values)))
 
 (defun assert-byte (byte)
   (assert (>= byte 0))
@@ -116,6 +120,23 @@
 	(assert (= add *compiler-ptr*)) ;labels must be the same
 	(setf (gethash obj *compiler-labels*) *compiler-ptr*))))
 
+(defun db (label &rest bytes)
+  (when label (label label))
+  (dolist (byte bytes)
+    (push-byte byte)))
+
+(defun dw (label &rest words)
+  (when label (label label))
+  (dolist (word words)
+    (push-address word)))
+
+;; Compressed string is going to be so much better
+
+(defun ds (label string)
+  (when label (label label))
+  (loop for c across string do
+       (push-byte (char-code c))))
+
 ;; 6502 instructions by mode
 
 (defun imp (op)
@@ -147,5 +168,7 @@
     (imp 'CLD)
     (label :the-future)
     (imp 'CLD)
-    *compiler-buffer*)
-  (hexdump #x600 100))
+
+    (ds nil "Tetradic Chronisms")
+
+  (hexdump #x600 100)))

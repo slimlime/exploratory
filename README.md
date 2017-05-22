@@ -2,7 +2,7 @@
 
 ## Assembler
 
-A 6502 assembler with a syntax suitable for Lisp. For simplicity the addressing modes are explicit rather than based on syntax. All lisp constructs are allowed- each 6502 instruction maps to a lisp function each of which emits bytes into a buffer.
+A 6502 assembler for Lisp. For simplicity the addressing modes are explicit rather than based on syntax. Syntax is dull. All lisp constructs are allowed- each 6502 instruction maps to a lisp function each of which emits bytes into a buffer.
 
 Compilation requires (at least) two passes. The same code executes the same way for each pass, except that a flag can be set to ensure that all labels have been resolved. 
 

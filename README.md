@@ -2,11 +2,11 @@
 
 ## Assembler
 
-A 6502 assembler for Lisp. For simplicity the addressing modes are explicit rather than based on syntax. Syntax is dull. All lisp constructs are allowed- each 6502 instruction maps to a lisp function each of which emits bytes into a buffer.
+A 6502 assembler for Lisp. For simplicity the addressing modes are explicit rather than based on syntax. Syntax is dull. All lisp constructs are allowed- each 6502 instruction maps to a Lisp function each of which emits bytes into a buffer.
 
 Compilation requires (at least) two passes. The same code executes the same way for each pass, except that a flag can be set to ensure that all labels have been resolved. 
 
-Perhaps a third pass can be added e.g. to convert long branches to jmps. This is under the user's control, as the assembler is a library of functions rather than a monolith.
+Perhaps a third pass can be added e.g. to convert long branches to jmps. This is under the user's control, as the assembler is a library of functions rather than a monolith. Just keep looping over and over again, if you feel it helps. Of course, using some macrology and lambdas and whatnot, this could all be done in one pass, using delayed evaluation. But where would the environment be? What values would the variables take? I'm sure it could be done in Scheme with continuations. But then, you couldn't take advantage of the output of the first run. This is why two or more simple but inefficient passes are better than one incredibly complex but inefficient pass.
 
 ~~~~
     (org #x0000)
@@ -39,7 +39,7 @@ Perhaps a third pass can be added e.g. to convert long branches to jmps. This is
 
 ## Disassembler
 
-Maybe it will be useful. Print it on fan-fold for the full effect.
+I did think this was going to be YAGNI, but the output looks nice and not everything in life has to be necessary. Maybe it will be useful. Print it on fan-fold for the full effect.
 
 ~~~~
 
@@ -71,7 +71,7 @@ THE-FUTUR 0604 D8      CLD
 
 ## Hexdump
 
-The hexdump function is definitely useful
+The hexdump function is definitely useful. I used this to check the output of the assembler against that of Skilldrick who has made an excellent page at https://skilldrick.github.io/easy6502/
 
 ~~~~
 

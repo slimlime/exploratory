@@ -39,7 +39,7 @@ Perhaps a third pass can be added e.g. to convert long branches to jmps. This is
 
 ## Disassembler
 
-Maybe it will be useful.
+Maybe it will be useful. Print it on fan-fold for the full effect.
 
 ~~~~
 

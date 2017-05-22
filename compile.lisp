@@ -1,16 +1,19 @@
 ;; 6502 assembler library
 
 (defparameter *opcodes* (make-hash-table :test 'equal))
+(defparameter *reverse-opcodes* (make-hash-table))
 
 (defparameter *compiler-ptr* nil)
 (defparameter *compiler-buffer* nil)
 (defparameter *compiler-labels* nil)
-(defparameter *compiler-pass* 0)
+(defparameter *compiler-ensure-labels-resolve* nil)
 
 (defmacro defop (byte opcode &optional (mode :imp))
   (let ((todo nil))
-    (push `(setf (gethash (cons ',opcode ,mode) *opcodes*)
-		 ,byte) todo)
+    (push `(setf (gethash ,byte *reverse-opcodes*) (cons  ',opcode ,mode))
+	  todo)
+    (push `(setf (gethash (cons ',opcode ,mode) *opcodes*) ,byte)
+	  todo)
     ;rel, imp don't have competing addressing modes
     (cond ((eq mode :imp)
 	   (push `(defun ,opcode () (imp ',opcode)) todo))
@@ -79,9 +82,6 @@
   (push-byte byte))
 
 (defun push-address (add)
-  (when (and (= *compiler-pass* 0)
-	     (null add))
-    (setf add 0))
   (assert-address add)
   (push-byte (logand add #xFF))  ;little end
   (push-byte (ash add -8)))      ;big end
@@ -105,7 +105,7 @@
       arg
       (let ((addr (gethash arg *compiler-labels*)))
 ; on the first pass only, allow labels to be 0
-	(if (and (= 0 *compiler-pass*)
+	(if (and (not *compiler-ensure-labels-resolve*)
 		 (null addr))
 	     (values 0 nil)
 	     (values addr t)))))
@@ -138,6 +138,12 @@
   (loop for c across string do
        (push-byte (char-code c)))
   (push-byte 0))
+
+(defun hi (addr)
+  (ash (resolve addr) -8))
+
+(defun lo (addr)
+  (logand #xFF (resolve addr)))
 
 ;; 6502 instructions by mode
 
@@ -209,7 +215,7 @@
 
 (defun reset-compiler (&optional (buffer-size 65536))
   (setf *compiler-ptr* 0)
-  (setf *compiler-pass* 0)
+  (setf *compiler-ensure-labels-resolve* nil)
   (setf *compiler-labels* (make-hash-table :test 'equal))
   (setf *compiler-buffer* (make-array buffer-size
 				      :element-type '(unsigned-byte 8)
@@ -218,11 +224,63 @@
 
 (reset-compiler)
 
+
+;;;; Disassembler
+
+(defun disassemble-6502 (buffer start len)
+  (let ((lab (make-hash-table)))
+    ;invert the label table
+    (maphash #'(lambda (k v) (setf (gethash v lab) k))
+	     *compiler-labels*)
+    (loop for i from start to (+ start (1- len)) do
+	 (let* ((opcode (gethash (aref buffer i) *reverse-opcodes*))
+		(mode (cdr opcode))
+		(op (car opcode)))
+	   (let* ((label (gethash i lab))
+		  (str (if label 
+			   (subseq (format nil "~a~a" label "         ") 0 9)
+			   "         ")))
+	     (format t "~a ~4,'0X ~2,'0X" str i (aref buffer i)))
+	   (case mode 
+	     (:imm (format t "~2,'0X    ~a #$~2,'0X"
+			   (aref buffer (incf i))
+			   op 
+			   (aref buffer i)))
+	     (:rel (format t "~2,'0X    ~a $~4,'0X"
+			   (aref buffer (incf i))
+			   op 
+			   (+ i 1 (aref buffer i))))
+	     (:imp (format t "      ~a" op))
+	     (:ab (format t "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X"
+			  (aref buffer (incf i))
+			  (aref buffer (incf i))
+			  op
+			  (aref buffer i)
+			  (aref buffer (1- i))))
+	     (:zp (format t "~2,'0X    ~a $~2,'0X"
+			  (aref buffer (incf i))
+			  op
+			  (aref buffer i)))
+	     (:ind (format t "~2,'0X~2,'0X  ~a ($~2,'0X~2,'0X)"
+			   (aref buffer (incf i))
+			   (aref buffer (incf i))
+			   op
+			   (aref buffer i)
+			   (aref buffer (1- i))))))
+	 (terpri))
+    (values)))
+	       
+	       
+			  
+	 
+
+
+
 (defun test ()
   (reset-compiler)
 
   (dotimes (pass 2)
-    (setf *compiler-pass* pass)
+    (setf *compiler-ensure-labels-resolve* (= pass 1))
 
 ;; the code
 
@@ -234,6 +292,7 @@
     (org #x0600)
 
     (label :start)
+
     (BCC :the-future)
     (CLD)
     (CLD)
@@ -242,10 +301,18 @@
     (STA.ZP :another-variable)
     (STA.AB :a-non-zpg-variable)
     (JMP :start)
+    (RTS)
+    (ds nil "X")
+    (LDA.IMM (lo :start))
+    (PHA)
+    (LDA.IMM (hi :start))
+    (PHA)
+    (RTS)
+    
     (ds nil "Tetradic Chronisms")
     (db :a-non-zpg-variable #x55))
-
-;;
-
+  
+  ;;
+  
   (hexdump #x0000 #x100)
   (hexdump #x0600 #x100))

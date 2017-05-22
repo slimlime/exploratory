@@ -82,3 +82,34 @@ The hexdump function is definitely useful. I used this to check the output of th
 0620 4368 726F 6E69 736D 7300 5500 0000 0000 Chronisms.U.....
 0630 0000 0000 0000 0000 0000 0000 0000 0000 ................
 ~~~~
+
+## Shannon-Fano
+
+When I was a teenager I used to while away the long hot summers chasing ever better compression ratios for storing games on 720K floppies. Then I learned about the pigeon-hole principle and my dreams were shattered. Also, it turned out that a couple of chaps called Lempel and Ziv had already figured this stuff out.
+
+For this adventure game we will need to compress text. I decided that Huffman, with a bit of bang in the form of multiple character symbols would do. The text will be compressed at compilation stage, then a tree of 6502 branch instructions and a couple of RORs will decompress.
+
+~~~~
+
+e 1500  00
+t 1000  01    
+a 700   10
+i 32    110
+o 12    111
+
+~~~~~
+
+So the algorithm is as follows
+
+- Split the symbols in half, based on frequency
+- Half will get 0, the other half will get 1
+- Repeat, for each half, splitting furiously until we can split no more
+
+Except it turns out this algorithm is called Shannon-Fano and not Huffman. Huffman starts at the least frequent symbols and joins them together, Shannon at the most frequent. Also, Shannon-Fano is less efficient than Huffman. Its cooler name more than makes up for it though.
+
+
+
+
+
+
+

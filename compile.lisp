@@ -17,16 +17,10 @@
 	  ((eq mode :rel)
 	   (push `(defun ,opcode (label) (rel ',opcode label)) todo))
 	  (t (let ((param (case mode 
-			       (:ab 'label)
-			       (:izx 'zpg-label)
-			       (:zp 'zpg-label)
-			       (:izy 'zpg-label)
-			       (:abx 'addr-label)
-			       (:imm 'byte)
-			       (:aby 'label)
-			       (:zpx 'zpg-label)
-			       (:zpy 'zpg-label)
-			       (:ind 'label))))
+			    (:aby 'addr) (:abx 'addr) (:ab  'addr)
+			    (:zp  'zpg)  (:zpx 'zpg)  (:zpy 'zpg)
+			    (:izx 'zpg)  (:izy 'zpg)
+			    (:imm 'byte) (:ind 'addr))))
 	       (push `(defun ,(intern
 			       (format nil "~a.~a"
 				       (string opcode)
@@ -74,10 +68,6 @@
   (assert (>= byte 0))
   (assert (< byte 256)))
 
-(defun org (add)
-  (assert-address add)
-  (setf *compiler-ptr* add))
-
 (defun push-byte (byte)
   (assert-byte byte)
   (setf (aref *compiler-buffer* *compiler-ptr*) byte)
@@ -102,16 +92,36 @@
 	    (format nil "Opcode:~a Addressing Mode:~a is invalid" op mode))
     (push-byte byte)))
 
-(defun label-address (obj)
-  (gethash obj *compiler-labels*))
+(defun push-zpg-op (op mode zpg)
+  (push-op op mode)
+  (push-byte (resolve zpg)))
+
+(defun push-addr-op (op mode addr)
+  (push-op op mode)
+  (push-address (resolve addr)))
+
+(defun resolve (arg)
+  (if (numberp arg)
+      arg
+      (let ((addr (gethash arg *compiler-labels*)))
+; on the first pass only, allow labels to be 0
+	(if (and (= 0 *compiler-pass*)
+		 (null addr))
+	     (values 0 nil)
+	     (values addr t)))))
 
 ;; assembler instructions
 
-(defun label (obj)
-  (let ((add (label-address obj)))
+(defun org (add)
+  (assert-address add)
+  (setf *compiler-ptr* add))
+
+(defun label (label)
+  (assert (not (numberp label)))
+  (let ((add (gethash label *compiler-labels*)))
     (if add
-	(assert (= add *compiler-ptr*)) ;labels must be the same
-	(setf (gethash obj *compiler-labels*) *compiler-ptr*))))
+	(assert (= add *compiler-ptr*)) ;changing the value of a label is wrong
+	(setf (gethash label *compiler-labels*) *compiler-ptr*))))
 
 (defun db (label &rest bytes)
   (when label (label label))
@@ -123,8 +133,6 @@
   (dolist (word words)
     (push-address word)))
 
-;; Compressed string is going to be so much better
-
 (defun ds (label string)
   (when label (label label))
   (loop for c across string do
@@ -133,62 +141,28 @@
 
 ;; 6502 instructions by mode
 
-(defun imp (op)
-  (push-op op :imp))
-
-(defun rel (op label)
-  (push-op op :rel)
-  (let ((add (label-address label)))
-    (push-sbyte (if add (- add
-			   (1+ *compiler-ptr*))
-		    0))))
+(defun imp (op)      (push-op      op :imp))
+(defun zp  (op zpg)  (push-zpg-op op :zp  zpg))
+(defun ind (op addr) (push-addr-op op :ind addr))
+(defun ab  (op addr) (push-addr-op op :ab  addr))
+(defun abx (op addr) (push-addr-op op :abx addr))
+(defun aby (op addr) (push-addr-op op :aby addr))
+(defun izx (op zpg)  (push-zpg-op op :izx zpg))
+(defun izy (op zpg)  (push-zpg-op op :izy zpg))
+(defun zpx (op zpg)  (push-zpg-op op :zpx zpg))
+(defun zpy (op zpg)  (push-zpg-op op :zpy zpg))
 
 (defun imm (op byte)
   (push-op op :imm)
   (push-byte byte))
 
-(defun zp (op zpg-label)
-  (push-op op :zp)
-  (let ((add (label-address zpg-label)))
-    (push-byte (if add add 0))))
+(defun rel (op label)
+  (push-op op :rel)
+  (multiple-value-bind (addr resolved) (resolve label)
+    (push-sbyte (if resolved (- addr (1+ *compiler-ptr*))
+		    0))))
 
-(defun ind (op label)
-  (push-op op :ind)
-  (push-address (label-address label)))
-
-(defun ab (op label)
-  (push-op op :ab)
-  (push-address (label-address label)))
-
-(defun abx (op label)
-  (push-op op :abx)
-  (push-address (label-address label)))
-
-(defun aby (op label)
-  (push-op op :aby)
-  (push-address (label-address label)))
-
-(defun izx (op zpg-label) 
-  (push-op op :izx)
-  (let ((add (label-address zpg-label)))
-    (push-byte add)))
-
-(defun izy (op zpg-label) 
-  (push-op op :izy)
-  (let ((add (label-address zpg-label)))
-    (push-byte add))) 
-
-(defun zpx (op zpg-label) 
-  (push-op op :zpx)
-  (let ((add (label-address zpg-label)))
-    (push-byte add)))
-
-(defun zpy (op zpg-label) 
-  (push-op op :zpy)
-  (let ((add (label-address zpg-label)))
-    (push-byte add)))
-    
-;; Opcodes
+;; opcodes
 
 (defop #x00 BRK)      (defop #x01 ORA :izx) (defop #x05 ORA :zp)  (defop #x06 ASL :zp)
 (defop #x08 PHP)      (defop #x09 ORA :imm) (defop #x0A ASL)      (defop #x0D ORA :ab)
@@ -229,6 +203,10 @@
 (defop #xF1 SBC :izy) (defop #xF5 SBC :zpx) (defop #xF6 INC :zpx) (defop #xF8 SED)
 (defop #xF9 SBC :aby) (defop #xFD SBC :abx) (defop #xFE INC :abx)
 
+; default addressing modes
+
+(defun JMP (addr) (JMP.AB addr))
+
 (defun reset-compiler (&optional (buffer-size 65536))
   (setf *compiler-ptr* 0)
   (setf *compiler-pass* 0)
@@ -246,10 +224,16 @@
   (dotimes (pass 2)
     (setf *compiler-pass* pass)
 
+;; the code
+
     (org #x0000)
+
     (db :variable 0)
     (db :another-variable 1)
+
     (org #x0600)
+
+    (label :start)
     (BCC :the-future)
     (CLD)
     (CLD)
@@ -257,9 +241,11 @@
     (CLD)
     (STA.ZP :another-variable)
     (STA.AB :a-non-zpg-variable)
+    (JMP :start)
     (ds nil "Tetradic Chronisms")
     (db :a-non-zpg-variable #x55))
 
+;;
+
   (hexdump #x0000 #x100)
   (hexdump #x0600 #x100))
-

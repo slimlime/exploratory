@@ -141,7 +141,7 @@
 
 (defun db (label &rest bytes)
   (add-hint (length bytes)
-	    (format nil "DB ~{~2,'0X~^, ~}" bytes))
+	    (format nil "DB ~{$~2,'0X~^, ~}" bytes))
   (when label (label label))
   (dolist (byte bytes)
     (push-byte byte)))
@@ -151,7 +151,7 @@
 
 (defun dw (label &rest words)
   (add-hint (* 2 (length words))
-	    (format nil "DW ~{~4,'0X~^, ~}" words))
+	    (format nil "DW ~{$~4,'0X~^, ~}" words))
   (when label (label label))
   (dolist (word words)
     (push-address word)))
@@ -245,7 +245,8 @@
 (defun disassemble-6502 (buffer start end)
   (setf start (resolve start))
   (setf end (resolve end))
-  (let ((lab (make-hash-table)))					;invert the label table
+  (let ((lab (make-hash-table)))		
+					;invert the label table
     (maphash #'(lambda (k v) (setf (gethash v lab) k))
 	     *compiler-labels*)
     (loop for i from start to end do
@@ -259,7 +260,7 @@
 	     (format t "~a ~4,'0X ~2,'0X" str i (aref buffer i)))
 	   (let ((hint (gethash i *compiler-disassembler-hints*)))
 	     (if hint (progn
-			(incf i (car hint))
+			(incf i (1- (car hint)))
 			(format t "      ~a" (cdr hint)))
 		 (case mode
 		   (:imm (format t "~2,'0X    ~a #$~2,'0X"
@@ -354,7 +355,9 @@
     (STA.AB :a-non-zpg-variable)
     (JMP :start)
     (RTS)
-    (ds nil "X")
+    (dw :words #x1234 #x5678 #xABCD)
+    (db :bytes #x01 #x02 #x03)
+    (BRK)
     (LDA.IMM (lo :start))
     (PHA)
     (LDA.IMM (hi :start))

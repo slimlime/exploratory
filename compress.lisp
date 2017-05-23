@@ -419,6 +419,3 @@
   (let ((size 0))
 	(encode-tunstall str words #'(lambda (x) (incf size)))
     size))
-	      
-	     
-    

@@ -59,6 +59,13 @@
 ;; t->hea*             This tree would have a subset, and a branch back to *
 ;; e-> e*              This tree would have a subset, and a branch back to *
 
+;; Tunstall
+;;
+;; word size  2  643232
+;;            3  632928 <- This is the best so far
+;;            4  636744
+;;            5  642800
+
 (defun file2str (file)
   (with-open-file (stream file)
     (let ((str (make-string (file-length stream))))
@@ -374,3 +381,44 @@
 ;; this? Perhaps if the frequencies for the top n are sufficiently different
 ;; than for the main distribution? I imagine it would be for a . where it almost
 ;; certainly is followed by a space or a closing quote
+
+;; Method 3 - Tunstall
+;; Tunstall is a very simple method that assigns symbols to fixed length codes
+;; A byte is a fixed length, so let us create a table with 256 entries
+;; All single characters have to appear. If we are clever then they
+;; can appear in the position they would occupy in the ascii table...
+;; I would call that Stable Tunstall.
+
+(defun tunstall (str max-word-size)
+  (let ((letters (make-hash-table)))
+    (loop for i from 0 to (1- (length str)) do
+	 (setf (gethash (aref str i) letters) t))
+    ;Now build a symbol table
+    (let ((symbols (make-array 256 :initial-element "?"))
+	  (index -1))
+      (maphash #'(lambda (k v) (setf (aref symbols (incf index)) (string k))) letters)
+      (let ((words (sort (filter-table (word-freq str max-word-size) (- 255 index) nil)
+			 #'< :key #'(lambda (s) (/ (fourth s) (lenc (first s)))))))
+	(loop for i from 0 to (1- (length words)) do
+	     (setf (aref symbols (+ 1 index i))
+		   (first (aref words i)))))
+      (sort symbols #'> :key #'length))))
+
+(defun encode-tunstall (str words emit)
+  (let ((strend (1- (length str))))
+    (loop for i from 0 to strend do
+	 (loop for j from 0 to 255 do
+	      (let ((word (aref words j)))
+		(when (and (<= (+ i -1 (length word)) strend)
+			   (equal word (subseq str i (+ i (length word)))))
+		  (funcall emit j)
+		  (incf i (1- (length word)))
+		  (return)))))))
+
+(defun encode-tunstall-size (str words)
+  (let ((size 0))
+	(encode-tunstall str words #'(lambda (x) (incf size)))
+    size))
+	      
+	     
+    

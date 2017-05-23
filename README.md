@@ -9,15 +9,27 @@ Compilation requires (at least) two passes. The same code executes the same way 
 Perhaps a third pass can be added e.g. to convert long branches to jmps. This is under the user's control, as the assembler is a library of functions rather than a monolith. Just keep looping over and over again, if you feel it helps. Of course, using some macrology and lambdas and whatnot, this could all be done in one pass, using delayed evaluation. But where would the environment be? What values would the variables take? I'm sure it could be done in Scheme with continuations. But then, you couldn't take advantage of the output of the first run. This is why two or more simple but inefficient passes are better than one incredibly complex but inefficient pass.
 
 ~~~~
+
     (org #x0000)
 
     (db :variable 0)
     (db :another-variable 1)
-
-    (org #x0600)
+    (db :lbl1)
     
+    (org #x0600)
+
     (label :start)
+    
+    (ORA.IZX :lbl1)
+    (ORA.IZY :lbl1)
+    (ROR)
+    (LSR)
+    (ROL)
+    (ASL)
     (BCC :the-future)
+    (JMP :over-some-text)
+    (DS nil "Scrozzbot")
+    (label :over-some-text)
     (CLD)
     (CLD)
     (label :the-future)
@@ -26,7 +38,9 @@ Perhaps a third pass can be added e.g. to convert long branches to jmps. This is
     (STA.AB :a-non-zpg-variable)
     (JMP :start)
     (RTS)
-    (ds nil "X")
+    (dw :words #x1234 #x5678 #xABCD)
+    (db :bytes #x01 #x02 #x03)
+    (BRK)
     (LDA.IMM (lo :start))
     (PHA)
     (LDA.IMM (hi :start))
@@ -34,39 +48,55 @@ Perhaps a third pass can be added e.g. to convert long branches to jmps. This is
     (RTS)
     
     (ds nil "Tetradic Chronisms")
-    (db :a-non-zpg-variable #x55))
+    (db :a-non-zpg-variable #x55)
+    (NOP)
+    (label :end)
+
 ~~~~
+
+I wouldn't read to much into that particular listing, it's mostly nonsense.
 
 ## Disassembler
 
 I did think this was going to be YAGNI, but the output looks nice and not everything in life has to be necessary. Maybe it will be useful. Print it on fan-fold for the full effect.
 
+- Labels are in the left column
+- Hints can be supplied by the compiler so db, dw, ds etc can be recovered. User can apply hints with the function apply-hint Open for extension, open for modification.
+- I'm not adding anything else to this except maybe labels in the right hand column
+
 ~~~~
 
-(disassemble-6502 buffer #x600 32)
+(disassemble-6502 buffer :start :end)
 
-START     0600 9002    BCC $0604
-          0602 D8      CLD
-          0603 D8      CLD
-THE-FUTUR 0604 D8      CLD
-          0605 8501    STA $01
-          0607 8D2A06  STA $062A
-          060A 4C0006  JMP $0600
-          060D 60      RTS
-          060E 58      CLI
-          060F 00      BRK
-          0610 A900    LDA #$00
-          0612 48      PHA
-          0613 A906    LDA #$06
-          0615 48      PHA
-          0616 60      RTS
-          0617 54
-          0618 6574    ADC $74
-          061A 72
-          061B 61
-          061C 64
-          061D 6963    ADC #$63
-          061F 204368  JSR $6843
+START     0600 0102    ORA ($02,X)
+          0602 1102    ORA ($02),Y
+          0604 6A      ROR
+          0605 4A      LSR
+          0606 2A      ROL
+          0607 0A      ASL
+          0608 900F    BCC $0619
+          060A 4C1706  JMP $0617
+          060D 53      DS "Scrozzbot"
+OVER-SOME 0617 D8      CLD
+          0618 D8      CLD
+THE-FUTUR 0619 D8      CLD
+          061A 8501    STA $01
+          061C 8D4706  STA $0647
+          061F 4C0006  JMP $0600
+          0622 60      RTS
+WORDS     0623 34      DW $1234, $5678, $ABCD
+BYTES     0629 01      DB $01, $02, $03
+          062C 00      BRK
+          062D A900    LDA #$00
+          062F 48      PHA
+          0630 A906    LDA #$06
+          0632 48      PHA
+          0633 60      RTS
+          0634 54      DS "Tetradic Chronisms"
+A-NON-ZPG 0647 55      DB $55
+          0648 EA      NOP
+END       0649 00      BRK
+
 ~~~~
 
 ## Hexdump
@@ -105,7 +135,25 @@ So the algorithm is as follows
 - Half will get 0, the other half will get 1
 - Repeat, for each half, splitting furiously until we can split no more
 
-Except it turns out this algorithm is called Shannon-Fano and not Huffman. Huffman starts at the least frequent symbols and joins them together, Shannon at the most frequent. Also, Shannon-Fano is less efficient than Huffman. Its cooler name more than makes up for it though.
+Except it turns out this algorithm is called Shannon-Fano and not Huffman. Huffman starts at the least frequent symbols and joins them together, Shannon at the most frequent. Shannon-Fano is less efficient than Huffman but its cooler name more than makes up for it.
+
+## Tunstall
+
+Clearly still bitten by the bug of implementing jet-age compression algorithms in a sixties language compiling to a seventies chip for the purposes of building an eighties text adventure, I tried one more routine Tunstall. Tunstall is a fixed length code, with a table of words. A byte is a fixed length code, so I tried that.
+
+~~~~
+
+(tunstall "Clearly still bitten.... " 3)
+
+$00 "ge " $01 "ent" $02 "ing" $03 "of " $04 "he " $05 " co" $06 " a " $07 "ven"
+$08 " th" $09 "es " $0A "a s" $0B "age" $0C "ies" $0D "the" $0E "n a" $0F "tie"
+$10 " of" $11 "ng " $12 "e c" $13 "omp" $14 "com" $15 " bu" $16 "nti" $17 "it"
+...
+$F7 "s"   $F8 "?"   $F9 "?"   $FA "a"   $FB "?"   $FC "?"   $FD "?"   $FE "l"
+
+Tunstall gets the best results for maximum word size of three, no surprise really because it is the forerunner to LZW. LZ as in Lempel-Ziv. And so Tunsstall is the winner as it is so simple.
+
+~~~~
 
 
 

@@ -139,7 +139,7 @@ Except it turns out this algorithm is called Shannon-Fano and not Huffman. Huffm
 
 ## Tunstall
 
-Clearly still bitten by the bug of implementing jet-age compression algorithms in a sixties language compiling to a seventies chip for the purposes of building an eighties text adventure, I tried one more routine Tunstall. Tunstall is a fixed length code, with a table of words. A byte is a fixed length code, so I tried that.
+Clearly still bitten by the bug of implementing jet-age compression algorithms in a sixties language compiling to a seventies chip for the purposes of building an eighties text adventure, I tried one more routine. Tunstall, a fixed length code, with a table of words. A byte is a fixed length code, so I tried that.
 
 ~~~~
 
@@ -153,7 +153,7 @@ $F7 "s"   $F8 "?"   $F9 "?"   $FA "a"   $FB "?"   $FC "?"   $FD "?"   $FE "l"
 
 ~~~~
 
-Tunstall gets the best results for maximum word size of three, no surprise really because it is the forerunner to LZW. LZ as in Lempel-Ziv. As I said, those guys had it all figured out (along with Welch in this instance). And so Tunsstall is the winner as it is so simple.
+Tunstall gets the best results for maximum word size of three, no surprise really because it is the forerunner to LZW. LZ as in Lempel-Ziv. As I said, those guys had it all figured out (along with Welch in this instance). And so Tunstall is the winner as it is so simple.
 
 
 

@@ -4,9 +4,21 @@
 (defparameter *reverse-opcodes* (make-hash-table))
 
 (defparameter *compiler-ptr* nil)
+(defparameter *compiler-disassembler-hints* nil)
 (defparameter *compiler-buffer* nil)
 (defparameter *compiler-labels* nil)
 (defparameter *compiler-ensure-labels-resolve* nil)
+
+
+(defun reset-compiler (&optional (buffer-size 65536))
+  (setf *compiler-ptr* 0)
+  (setf *compiler-disassembler-hints* (make-hash-table))
+  (setf *compiler-ensure-labels-resolve* nil)
+  (setf *compiler-labels* (make-hash-table :test 'equal))
+  (setf *compiler-buffer* (make-array buffer-size
+				      :element-type '(unsigned-byte 8)
+				      :initial-element 0))
+  (values))
 
 (defmacro defop (byte opcode &optional (mode :imp))
   (let ((todo nil))
@@ -14,7 +26,6 @@
 	  todo)
     (push `(setf (gethash (cons ',opcode ,mode) *opcodes*) ,byte)
 	  todo)
-    ;rel, imp don't have competing addressing modes
     (cond ((eq mode :imp)
 	   (push `(defun ,opcode () (imp ',opcode)) todo))
 	  ((eq mode :rel)
@@ -66,6 +77,11 @@
 				     #\.))))
 	   (terpri)))
   (values)))
+
+(defun add-hint (size str)
+  (setf (gethash *compiler-ptr*
+		 *compiler-disassembler-hints*)
+	(cons size str)))
 
 (defun assert-byte (byte)
   (assert (>= byte 0))
@@ -124,16 +140,25 @@
 	(setf (gethash label *compiler-labels*) *compiler-ptr*))))
 
 (defun db (label &rest bytes)
+  (add-hint (length bytes)
+	    (format nil "DB ~{~2,'0X~^, ~}" bytes))
   (when label (label label))
   (dolist (byte bytes)
     (push-byte byte)))
 
+;; TODO LOOKUP DEFINITION OF DW FROM COMMON ASSEMBLERS-
+;; I TAKE IT THEY DO IT LO-HI
+
 (defun dw (label &rest words)
+  (add-hint (* 2 (length words))
+	    (format nil "DW ~{~4,'0X~^, ~}" words))
   (when label (label label))
   (dolist (word words)
     (push-address word)))
 
 (defun ds (label string)
+  (add-hint (1+ (length string))
+	    (format nil "DS ~s" string))
   (when label (label label))
   (loop for c across string do
        (push-byte (char-code c)))
@@ -213,26 +238,17 @@
 
 (defun JMP (addr) (JMP.AB addr))
 
-(defun reset-compiler (&optional (buffer-size 65536))
-  (setf *compiler-ptr* 0)
-  (setf *compiler-ensure-labels-resolve* nil)
-  (setf *compiler-labels* (make-hash-table :test 'equal))
-  (setf *compiler-buffer* (make-array buffer-size
-				      :element-type '(unsigned-byte 8)
-				      :initial-element 0))
-  (values))
-
 (reset-compiler)
-
 
 ;;;; Disassembler
 
-(defun disassemble-6502 (buffer start len)
-  (let ((lab (make-hash-table)))
-    ;invert the label table
+(defun disassemble-6502 (buffer start end)
+  (setf start (resolve start))
+  (setf end (resolve end))
+  (let ((lab (make-hash-table)))					;invert the label table
     (maphash #'(lambda (k v) (setf (gethash v lab) k))
 	     *compiler-labels*)
-    (loop for i from start to (+ start (1- len)) do
+    (loop for i from start to end do
 	 (let* ((opcode (gethash (aref buffer i) *reverse-opcodes*))
 		(mode (cdr opcode))
 		(op (car opcode)))
@@ -241,41 +257,67 @@
 			   (subseq (format nil "~a~a" label "         ") 0 9)
 			   "         ")))
 	     (format t "~a ~4,'0X ~2,'0X" str i (aref buffer i)))
-	   (case mode 
-	     (:imm (format t "~2,'0X    ~a #$~2,'0X"
-			   (aref buffer (incf i))
-			   op 
-			   (aref buffer i)))
-	     (:rel (format t "~2,'0X    ~a $~4,'0X"
-			   (aref buffer (incf i))
-			   op 
-			   (+ i 1 (aref buffer i))))
-	     (:imp (format t "      ~a" op))
-	     (:ab (format t "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X"
-			  (aref buffer (incf i))
-			  (aref buffer (incf i))
-			  op
-			  (aref buffer i)
-			  (aref buffer (1- i))))
-	     (:zp (format t "~2,'0X    ~a $~2,'0X"
-			  (aref buffer (incf i))
-			  op
-			  (aref buffer i)))
-	     (:ind (format t "~2,'0X~2,'0X  ~a ($~2,'0X~2,'0X)"
-			   (aref buffer (incf i))
-			   (aref buffer (incf i))
-			   op
-			   (aref buffer i)
-			   (aref buffer (1- i))))))
+	   (let ((hint (gethash i *compiler-disassembler-hints*)))
+	     (if hint (progn
+			(incf i (car hint))
+			(format t "      ~a" (cdr hint)))
+		 (case mode
+		   (:imm (format t "~2,'0X    ~a #$~2,'0X"
+				 (aref buffer (incf i))
+				 op 
+				 (aref buffer i)))
+		   (:rel (format t "~2,'0X    ~a $~4,'0X"
+				 (aref buffer (incf i))
+				 op 
+				 (+ i 1 (aref buffer i))))
+		   (:imp (format t "      ~a" op))
+		   (:ab (format t "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X"
+				(aref buffer (incf i))
+				(aref buffer (incf i))
+				op
+				(aref buffer i)
+				(aref buffer (1- i))))
+		   (:zp (format t "~2,'0X    ~a $~2,'0X"
+				(aref buffer (incf i))
+				op
+				(aref buffer i)))
+		   (:ind (format t "~2,'0X~2,'0X  ~a ($~2,'0X~2,'0X)"
+				 (aref buffer (incf i))
+				 (aref buffer (incf i))
+				 op
+				 (aref buffer i)
+				 (aref buffer (1- i))))
+		   (:izx (format t "~2,'0X    ~a ($~2,'0X,X)"
+				 (aref buffer (incf i))
+				 op
+				 (aref buffer i)))
+		   (:izy (format t "~2,'0X    ~a ($~2,'0X),Y"
+				 (aref buffer (incf i))
+				 op
+				 (aref buffer i)))
+		   (:zpx (format t "~2,'0X    ~a $~2,'0X,X"
+				 (aref buffer (incf i))
+				 op
+				 (aref buffer i)))
+		   (:zpy (format t "~2,'0X    ~a $~2,'0X,Y"
+				 (aref buffer (incf i))
+				 op
+				 (aref buffer i)))
+		   (:aby (format t "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X,X"
+				 (aref buffer (incf i))
+				 (aref buffer (incf i))
+				 op
+				 (aref buffer i)
+				 (aref buffer (1- i))))
+		   (:abx (format t "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X,Y"
+				 (aref buffer (incf i))
+				 (aref buffer (incf i))
+				 op
+				 (aref buffer i)
+				 (aref buffer (1- i))))))))
 	 (terpri))
     (values)))
 	       
-	       
-			  
-	 
-
-
-
 (defun test ()
   (reset-compiler)
 
@@ -288,12 +330,22 @@
 
     (db :variable 0)
     (db :another-variable 1)
-
+    (db :lbl1)
+    
     (org #x0600)
 
     (label :start)
-
+    
+    (ORA.IZX :lbl1)
+    (ORA.IZY :lbl1)
+    (ROR)
+    (LSR)
+    (ROL)
+    (ASL)
     (BCC :the-future)
+    (JMP :over-some-text)
+    (DS nil "Scrozzbot")
+    (label :over-some-text)
     (CLD)
     (CLD)
     (label :the-future)
@@ -310,8 +362,10 @@
     (RTS)
     
     (ds nil "Tetradic Chronisms")
-    (db :a-non-zpg-variable #x55))
-  
+    (db :a-non-zpg-variable #x55)
+    (NOP)
+    (label :end)
+ ) 
   ;;
   
   (hexdump #x0000 #x100)

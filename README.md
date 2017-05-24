@@ -8,15 +8,15 @@ Compilation requires (at least) two passes. The same code executes the same way 
 
 Perhaps a third pass can be added e.g. to convert long branches to jmps. This is under the user's control, as the assembler is a library of functions rather than a monolith. Just keep looping over and over again, if you feel it helps. Of course, using some macrology and lambdas and whatnot, this could all be done in one pass, using delayed evaluation. But where would the environment be? What values would the variables take? I'm sure it could be done in Scheme with continuations. But then, you couldn't take advantage of the output of the first run. This is why two or more simple but inefficient passes are better than one incredibly complex but inefficient pass.
 
+- Zeropage addresses can be reserved. They could be reserved in one place by doing org #x0000 and db, etc, but this way you can reserve them in the place that is interested in them as merrily as you like. Until you have used them all, and your compilation will fail.
+
 ~~~~
 
-    (org #x0000)
-
-    (db :variable 0)
-    (db :another-variable 1)
-    (db :lbl1)
-    
     (org #x0600)
+
+    (reserve-zp-b :variable 0)
+    (reserve-zp-b :another-variable 1)
+    (reserve-zp-b :lbl1 0)
 
     (label :start)
     
@@ -24,6 +24,7 @@ Perhaps a third pass can be added e.g. to convert long branches to jmps. This is
     (ORA.IZY :lbl1)
     (ROR)
     (LSR)
+    (dc "This is a comment")
     (ROL)
     (ASL)
     (BCC :the-future)
@@ -51,7 +52,7 @@ Perhaps a third pass can be added e.g. to convert long branches to jmps. This is
     (db :a-non-zpg-variable #x55)
     (NOP)
     (label :end)
-
+    
 ~~~~
 
 I wouldn't read to much into that particular listing, it's mostly nonsense.
@@ -63,15 +64,16 @@ I did think this was going to be YAGNI, but the output looks nice and not everyt
 - Labels are in the left column
 - Hints can be supplied by the compiler so db, dw, ds etc can be recovered. User can apply hints with the function apply-hint Open for extension, open for modification.
 - I'm not adding anything else to this except maybe labels in the right hand column
+- Ok, I added comments to the hint section
 
 ~~~~
-
-(disassemble-6502 buffer :start :end)
+(disassemble-6502 :start :end)
 
 START     0600 0102    ORA ($02,X)
           0602 1102    ORA ($02),Y
           0604 6A      ROR
           0605 4A      LSR
+          ;This is a comment
           0606 2A      ROL
           0607 0A      ASL
           0608 900F    BCC $0619
@@ -97,6 +99,12 @@ A-NON-ZPG 0647 55      DB $55
           0648 EA      NOP
 END       0649 00      BRK
 
+(disassemble-6502 0 10)
+
+VARIABLE  0000 00      DB $00
+ANOTHER-V 0001 01      DB $01
+LBL1      0002 00      DB $00
+          0003 00      BRK
 ~~~~
 
 ## Hexdump

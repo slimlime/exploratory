@@ -196,7 +196,7 @@
 	   (if sym
 	       ; found a word, increment its count and skip along
 	       (let ((symlen (length (first sym))))
-		 (incf (second sym) symlen) ;weighted by symbol length
+		 (incf (second sym)) ;NOT weighted by symbol length
 		 ;(push sym output)
 		 (incf i (1- symlen)))
 	       ; it was just a character, so increment its count
@@ -419,3 +419,14 @@
   (let ((size 0))
 	(encode-tunstall str words #'(lambda (x) (incf size)))
     size))
+
+(defun encode-tunstall-freq (str words)
+  (let ((freq (make-array 256)))
+    (encode-tunstall str words 
+		     #'(lambda (symbol) (incf (aref freq symbol))))
+    (let ((i -1))
+      (sort (map 'vector #'(lambda (symbol) (list (incf i) symbol 0 0))
+			      freq)
+	    #'> :key #'second))))
+
+

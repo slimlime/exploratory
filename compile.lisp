@@ -170,6 +170,9 @@
 (defun lo (addr)
   (logand #xFF (resolve addr)))
 
+(defun dc (comment)
+  (add-hint :comment comment))
+
 ;; 6502 instructions by mode
 
 (defun imp (op)      (push-op      op :imp))
@@ -242,7 +245,8 @@
 
 ;;;; Disassembler
 
-(defun disassemble-6502 (buffer start end)
+(defun disassemble-6502 (start end &key (buffer nil))
+  (when (null buffer) (setf buffer *compiler-buffer*))
   (setf start (resolve start))
   (setf end (resolve end))
   (let ((lab (make-hash-table)))		
@@ -256,12 +260,17 @@
 	   (let* ((label (gethash i lab))
 		  (str (if label 
 			   (subseq (format nil "~a~a" label "         ") 0 9)
-			   "         ")))
-	     (format t "~a ~4,'0X ~2,'0X" str i (aref buffer i)))
-	   (let ((hint (gethash i *compiler-disassembler-hints*)))
-	     (if hint (progn
-			(incf i (1- (car hint)))
-			(format t "      ~a" (cdr hint)))
+			   "         "))
+		  (hint (gethash i *compiler-disassembler-hints*)))
+	     (if (and hint (eq :comment (car hint)))
+		 (format t "          ;~a~%" (cdr hint))
+		 (format t "~a ~4,'0X ~2,'0X" str i (aref buffer i)))
+	     (if (and hint (numberp (car hint)))
+		 (progn
+					;render hint
+		   (incf i (1- (car hint)))
+		   (format t "      ~a" (cdr hint)))
+					;else render opcodes
 		 (case mode
 		   (:imm (format t "~2,'0X    ~a #$~2,'0X"
 				 (aref buffer (incf i))
@@ -341,6 +350,7 @@
     (ORA.IZY :lbl1)
     (ROR)
     (LSR)
+    (dc "This is a comment")
     (ROL)
     (ASL)
     (BCC :the-future)

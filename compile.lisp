@@ -8,7 +8,7 @@
 (defparameter *compiler-buffer* nil)
 (defparameter *compiler-labels* nil)
 (defparameter *compiler-ensure-labels-resolve* nil)
-
+(defparameter *compiler-zp-free-slot* nil)
 
 (defun reset-compiler (&optional (buffer-size 65536))
   (setf *compiler-ptr* 0)
@@ -18,6 +18,7 @@
   (setf *compiler-buffer* (make-array buffer-size
 				      :element-type '(unsigned-byte 8)
 				      :initial-element 0))
+  (setf *compiler-zp-free-slot* 0)
   (values))
 
 (defmacro defop (byte opcode &optional (mode :imp))
@@ -132,11 +133,14 @@
   (assert-address add)
   (setf *compiler-ptr* add))
 
-(defun label (label)
+(defun label (label &key (addr nil))
   (assert (not (numberp label)))
+  (when (null addr)
+    (setf addr *compiler-ptr*))
+  (assert-address addr)
   (let ((add (gethash label *compiler-labels*)))
     (if add
-	(assert (= add *compiler-ptr*)) ;changing the value of a label is wrong
+	(assert (= add addr)) ;changing the value of a label is wrong
 	(setf (gethash label *compiler-labels*) *compiler-ptr*))))
 
 (defun db (label &rest bytes)
@@ -145,9 +149,6 @@
   (when label (label label))
   (dolist (byte bytes)
     (push-byte byte)))
-
-;; TODO LOOKUP DEFINITION OF DW FROM COMMON ASSEMBLERS-
-;; I TAKE IT THEY DO IT LO-HI
 
 (defun dw (label &rest words)
   (add-hint (* 2 (length words))
@@ -172,6 +173,20 @@
 
 (defun dc (comment)
   (add-hint :comment comment))
+
+(defun reserve-zp-b (label byte)
+  (assert (> #xFF *compiler-zp-free-slot*))
+  (unless (gethash label *compiler-labels*)
+    (let ((*compiler-ptr* *compiler-zp-free-slot*))
+      (db label byte))
+    (incf *compiler-zp-free-slot*)))
+
+(defun reserve-zp-w (label word)
+  (assert (> #xFE *compiler-zp-free-slot*))
+  (unless (gethash label *compiler-labels*)
+    (let ((*compiler-ptr* *compiler-zp-free-slot*))
+      (dw label word))
+    (incf *compiler-zp-free-slot* 2)))
 
 ;; 6502 instructions by mode
 
@@ -240,6 +255,7 @@
 ; default addressing modes
 
 (defun JMP (addr) (JMP.AB addr))
+(defun JSR (addr) (JSR.AB addr))
 
 (reset-compiler)
 
@@ -262,9 +278,9 @@
 			   (subseq (format nil "~a~a" label "         ") 0 9)
 			   "         "))
 		  (hint (gethash i *compiler-disassembler-hints*)))
-	     (if (and hint (eq :comment (car hint)))
-		 (format t "          ;~a~%" (cdr hint))
-		 (format t "~a ~4,'0X ~2,'0X" str i (aref buffer i)))
+	     (when (and hint (eq :comment (car hint)))
+	       (format t "          ;~a~%" (cdr hint)))
+	     (format t "~a ~4,'0X ~2,'0X" str i (aref buffer i))
 	     (if (and hint (numberp (car hint)))
 		 (progn
 					;render hint
@@ -335,14 +351,12 @@
     (setf *compiler-ensure-labels-resolve* (= pass 1))
 
 ;; the code
-
-    (org #x0000)
-
-    (db :variable 0)
-    (db :another-variable 1)
-    (db :lbl1)
     
     (org #x0600)
+
+    (reserve-zp-b :variable 0)
+    (reserve-zp-b :another-variable 1)
+    (reserve-zp-b :lbl1 0)
 
     (label :start)
     

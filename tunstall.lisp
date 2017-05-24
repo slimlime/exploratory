@@ -1,5 +1,10 @@
 ; 8-bit Tunstall table
 
+; For our game we want to call the render routine for each character
+; We want the table to be as compact as possible, so we split it into
+; three groups, 1,2 and 3 characters
+
+
 (defun count-words (table str start len strlen)
   (unless (> (+ start len) strlen)
     (let* ((substr (subseq str start (+ len start)))
@@ -68,3 +73,78 @@
 		  (funcall emit j)
 		  (incf i (1- (length word)))
 		  (return)))))))
+
+(defun dtunstall (str)
+  (let ((table (tunstall str 3))
+	(one-chars nil)
+	(two-chars nil)
+	(three-chars nil))
+    (loop for i from 0 to 255 do
+	 (let ((sym (aref table i)))
+	   (when (and (null three-chars)
+		      (< (length sym) 3))
+	     (setf three-chars i))
+	   (when (and (null two-chars)
+		      (< (length sym) 2))
+	     (setf two-chars (- i three-chars)))))
+    (setf one-chars (- 256 two-chars three-chars))
+    
+    (label :rstr-nxt)
+    (INY)
+    (BNE :rstr-cont)
+    (INC.ZP :str-add)
+    (BNE :rstr-cont)
+    (INC.ZP (1+ :str-add))
+    (BNE :rstr-cont)
+    (dc "You've bust the last page if you ended up here")
+    (RTS)
+    (dc "Render the string at STR-ADD")
+    (label :rstr)
+    (STY.IMM #x00)
+    (label :rstr-cont)
+    (LDA.INY :str-add)
+    (CMP.IMM three-chars)
+    (BCS :2char)
+    (dc "Times by three, then index into the three char table")
+    (STA.ZP :scratch)
+    (ASL)
+    (CLC)
+    (ADC.ZP :scratch)
+    (TAX)
+    (LDA.ABX :3char-tbl)
+    (
+    (emit)
+    (INX)
+    (LDA.ABX :3char-tbl)
+    (emit)
+    (INX)
+    (LDA.ABX :3char-tbl)
+    (emit)
+    (CLC)
+    (label :2char)
+    (CMP.IMM (+ three-chars two-chars))
+    (BCS :1char)
+    (ASL)
+    (TAX)
+    (LDA.ABX :2char-tbl)
+    (emit)
+    (INX)
+    (LDA.ABX :2char-tbl)
+    (emit)
+    
+    (label :1char)
+
+    (label :emit)
+    (dc "Emit one character by looking up address in jump table")
+    (TAX)
+    (LDA.ABX :1char-htbl)
+    (PHA)
+    (LDA.ABX :1char-ltble)
+    (PHA)
+    (RTS)
+
+    
+
+
+))
+	    

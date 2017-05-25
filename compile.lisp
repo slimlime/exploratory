@@ -10,6 +10,12 @@
 (defparameter *compiler-ensure-labels-resolve* nil)
 (defparameter *compiler-zp-free-slot* nil)
 
+; todo A way of providing a 'spare byte/word' to the compile
+; which can then be used later e.g.
+
+; (unused-b addr) - tell the compiler this byte is spare
+; (use-b :label)  - tell the compiler to use the next spare byte for a label
+
 (defun reset-compiler (&optional (buffer-size 65536))
   (setf *compiler-ptr* 0)
   (setf *compiler-disassembler-hints* (make-hash-table))
@@ -56,6 +62,8 @@
   (aref *compiler-buffer* add))
 
 (defun hexdump (add len)
+  (unless (numberp add)
+    (setf add (resolve add)))
   (assert-address add)
   (flet ((peek (add)
 	   (if (< add 65536)
@@ -133,15 +141,9 @@
   (assert-address add)
   (setf *compiler-ptr* add))
 
-(defun label (label &key (addr nil))
+(defun label (label)
   (assert (not (numberp label)))
-  (when (null addr)
-    (setf addr *compiler-ptr*))
-  (assert-address addr)
-  (let ((add (gethash label *compiler-labels*)))
-    (if add
-	(assert (= add addr)) ;changing the value of a label is wrong
-	(setf (gethash label *compiler-labels*) *compiler-ptr*))))
+  (setf (gethash label *compiler-labels*) *compiler-ptr*))
 
 (defun db (label &rest bytes)
   (add-hint (length bytes)
@@ -174,14 +176,14 @@
 (defun dc (comment)
   (add-hint :comment comment))
 
-(defun reserve-zp-b (label byte)
+(defun zp-b (label byte)
   (assert (> #xFF *compiler-zp-free-slot*))
   (unless (gethash label *compiler-labels*)
     (let ((*compiler-ptr* *compiler-zp-free-slot*))
       (db label byte))
     (incf *compiler-zp-free-slot*)))
 
-(defun reserve-zp-w (label word)
+(defun zp-w (label word)
   (assert (> #xFE *compiler-zp-free-slot*))
   (unless (gethash label *compiler-labels*)
     (let ((*compiler-ptr* *compiler-zp-free-slot*))
@@ -354,9 +356,9 @@
     
     (org #x0600)
 
-    (reserve-zp-b :variable 0)
-    (reserve-zp-b :another-variable 1)
-    (reserve-zp-b :lbl1 0)
+    (zp-b :variable 0)
+    (zp-b :another-variable 1)
+    (zp-b :lbl1 0)
 
     (label :start)
     
@@ -392,8 +394,7 @@
     (db :a-non-zpg-variable #x55)
     (NOP)
     (label :end)
- ) 
-  ;;
+ )
   
   (hexdump #x0000 #x100)
   (hexdump #x0600 #x100))

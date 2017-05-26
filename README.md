@@ -121,6 +121,28 @@ The hexdump function is definitely useful. I used this to check the output of th
 0630 0000 0000 0000 0000 0000 0000 0000 0000 ................
 ~~~~
 
+## Monitor
+
+Combine the hexdump and the disassembly plus an emulator of your choice and you get a monitor.
+
+~~~~
+
+CL-USER> (monitor-step)
+01FC 0000 0000 0000 0000 0000 0000 0000 0000 ................
+
+0609 88D0 F748 656C 6C6F 2057 6F72 6C64 2100 ...Hello World!.
+0619 EAEA 00AA 6000 0000 0000 0000 0000 0000 ....`...........
+-------------------------------------------------------------
+                          SV BDIZC
+       PC:0609 SP:1FB  SR:00100110 A:00 X:00 Y:0F
+-------------------------------------------------------------
+          ;Decrement the index
+          0609 88      DEY
+          060A D0F7    BNE $0703
+STRING    060C 48      DS "Hello World!"
+
+~~~~
+
 ## Shannon-Fano
 
 When I was a teenager I used to while away the long hot summers chasing ever better compression ratios for storing games on 720K floppies. Then I learned about the pigeon-hole principle and my dreams were shattered. Also, it turned out that a couple of chaps called Lempel and Ziv had already figured this stuff out.

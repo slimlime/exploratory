@@ -57,7 +57,9 @@
       (dotimes (i len)
 	(setf (aref words i)
 	      (car (aref words i))))
-      ;(assert (char= (char (aref words 0) 0)  #\nul))
+      ;assert that code 0 is the eos indicator as we use BEQ
+      ;to detect it in the code later
+      (assert (char= (char (aref words 0) 0)  #\nul))
       words
       )))
  
@@ -112,7 +114,6 @@
 	      (format nil "Expected ~a, but decoded to ~a" str str2))))
     (format t "Total bytes of string data ~d" symcount)))
 
-
 ; assembler commands
 
 (defun dcs (label str)
@@ -134,9 +135,6 @@
       ;in the first pass, add the string to the table
       (process-string str)))
 
-
-
-
 (defun string-test ()
   (org #x600)
   
@@ -150,7 +148,6 @@
   (dcs :my-string "a tale of gold and treasure")
   (label :end)
   (CLD))
-
 
 (defun compile-string-test ()
   (reset-compiler)
@@ -171,8 +168,6 @@
   (setf *compiler-ensure-labels-resolve* t)
 
   (string-test))
-
-
 
 ; WIP decoding... not tested at all
 

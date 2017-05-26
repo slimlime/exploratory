@@ -65,7 +65,7 @@
   (setf str (append-null str))
   (let ((strend (1- (length str))))
     (loop for i from 0 to strend do
-	 (loop for j from 255 downto 0 do
+	 (loop for j from (1- (length *string-table*)) downto 0 do
 	      (let ((word (aref *string-table* j)))
 		(when (and (<= (+ i -1 (length word)) strend)
 			   (equal word (subseq str i (+ i (length word)))))
@@ -148,8 +148,6 @@
   (BRK)
   (dcs nil "about which we need to sing")
   (dcs :my-string "a tale of gold and treasure")
-  (dcs nil "I should really fix the string table because if there isn't enough to 
-fill the page then it throws a wobbly")
   (label :end)
   (CLD))
 

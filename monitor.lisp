@@ -9,13 +9,19 @@
 (defparameter *monitor-get-state* nil)
 ;todo change to lines
 (defparameter *monitor-context-bytes* 8)
+(defparameter *monitor-watches* nil)
 
 (defun monitor-print ()
   (multiple-value-bind (buffer pc sp sr a x y)
-	(funcall *monitor-get-state*)
+      (funcall *monitor-get-state*)
     (let ((*compiler-buffer* buffer))
+      (format t "-- Stack ----------------------------------------------------~%")
       (hexdump (+ sp #x101) 16)
-      (terpri)
+      (when *monitor-watches*
+	(format t "-- Watches --------------------------------------------------~%"))
+      (dolist (a *monitor-watches*)
+	(hexdump (car a) (cdr a)))
+      (format t "-- PC -------------------------------------------------------~%")
       (hexdump pc 32)
       (format t "-------------------------------------------------------------~%")
       (format t "                          SV BDIZC~%")
@@ -23,6 +29,9 @@
       (format t " A:~2,'0X X:~2,'0X Y:~2,'0X~%" a x y)
       (format t "-------------------------------------------------------------~%")
       (disassemble-6502 pc (+ pc *monitor-context-bytes*)))))
+
+(defun monitor-watch (addr len)
+    (push (cons (resolve addr) len) *monitor-watches*))
 
 (defun monitor-step ()
   (funcall *monitor-step*)

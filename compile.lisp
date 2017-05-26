@@ -9,6 +9,9 @@
 (defparameter *compiler-labels* nil)
 (defparameter *compiler-ensure-labels-resolve* nil)
 (defparameter *compiler-zp-free-slot* nil)
+(defparameter *compiler-debug* nil)
+(defparameter *compiler-comments* nil)
+
 
 ; todo A way of providing a 'spare byte/word' to the compile
 ; which can then be used later e.g.
@@ -24,6 +27,7 @@
   (setf *compiler-buffer* (make-array buffer-size
 				      :element-type '(unsigned-byte 8)
 				      :initial-element 0))
+  (setf *compiler-comments* (make-hash-table))
   (setf *compiler-zp-free-slot* 0)
   (values))
 
@@ -107,11 +111,15 @@
   (push-byte byte))
 
 (defun push-address (add)
-  (assert-address add)
+  (if *compiler-ensure-labels-resolve*
+      (assert-address add)
+      (setf add (logand add #xFFFF)))
   (push-byte (logand add #xFF))  ;little end
   (push-byte (ash add -8)))      ;big end
 
 (defun push-op (op mode)
+  (when *compiler-debug*
+    (format t "OP:~a MODE:~a~%" op mode))
   (let ((byte (gethash (cons op mode) *opcodes*)))
     (assert (numberp byte) nil 
 	    (format nil "Opcode:~a Addressing Mode:~a is invalid" op mode))
@@ -119,7 +127,10 @@
 
 (defun push-zpg-op (op mode zpg)
   (push-op op mode)
-  (push-byte (resolve zpg)))
+  (multiple-value-bind (addr resolved) (resolve zpg)
+    (if resolved
+	(push-byte addr)
+	(push-byte 0))))
 
 (defun push-addr-op (op mode addr)
   (push-op op mode)
@@ -127,13 +138,15 @@
 
 (defun resolve (arg)
   (if (numberp arg)
-      arg
+      (values arg t)
       (let ((addr (gethash arg *compiler-labels*)))
-; on the first pass only, allow labels to be 0
-	(if (and (not *compiler-ensure-labels-resolve*)
-		 (null addr))
-	     (values 0 nil)
-	     (values addr t)))))
+; on the first pass only, allow labels to be nil
+	(when (and (null addr) 
+		   *compiler-ensure-labels-resolve*)
+	  (assert nil nil (format nil "The label ~a was not resolved" arg)))
+	(if addr
+	    (values addr t)
+	    (values 0 nil)))))
 
 ;; assembler instructions
 
@@ -174,7 +187,12 @@
   (logand #xFF (resolve addr)))
 
 (defun dc (comment)
-  (add-hint :comment comment))
+  (let ((comments (gethash *compiler-ptr* *compiler-comments*)))
+    (if comments
+	(unless (member comment comments :test 'equal)
+	  (setf (gethash *compiler-ptr* *compiler-comments*)
+		(cons comment comments)))
+	(setf (gethash *compiler-ptr* *compiler-comments*) (list comment)))))
 
 (defun zp-b (label byte)
   (assert (> #xFF *compiler-zp-free-slot*))
@@ -279,9 +297,11 @@
 		  (str (if label 
 			   (subseq (format nil "~a~a" label "         ") 0 9)
 			   "         "))
-		  (hint (gethash i *compiler-disassembler-hints*)))
-	     (when (and hint (eq :comment (car hint)))
-	       (format t "          ;~a~%" (cdr hint)))
+		  (hint (gethash i *compiler-disassembler-hints*))
+		  (comments (gethash i *compiler-comments*)))
+	     (when comments
+	       (dolist (comment (reverse comments))
+		 (format t "          ;~a~%" comment)))
 	     (format t "~a ~4,'0X ~2,'0X" str i (aref buffer i))
 	     (if (and hint (numberp (car hint)))
 		 (progn
@@ -331,7 +351,7 @@
 				 (aref buffer (incf i))
 				 op
 				 (aref buffer i)))
-		   (:aby (format t "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X,X"
+		   (:aby (format t "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X,Y"
 				 (aref buffer (incf i))
 				 (aref buffer (incf i))
 				 op

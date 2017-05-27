@@ -129,22 +129,22 @@ Combine the hexdump and the disassembly plus an emulator of your choice and you 
 
 CL-USER> (monitor-step)
 -- Stack ----------------------------------------------------
-01F1 D306 0A06 0000 0000 0000 0000 0000 0000 ................
+01FA E906 0A06 0000 0000 0000 0000 0000 0000 ................
 -- Watches --------------------------------------------------
-0000 0B59 150A 0000 0000 0000 0000 0000 0000 .Y..............
-060C 5468 6973 2069 7320 7468 6520 2020 2020 This is the     
+060C 5468 6973 2069 7320 7468 6520 7465 7374 This is the test
+061C 2073 7472 6920 2020 2020 2020 2020 2020  stri           
 -- PC -------------------------------------------------------
-06A4 E600 60E6 02D0 04E6 00F0 4BA0 00B1 02F0 ..`.......K.....
-06B4 45C9 5790 1E85 01AA BDA4 0620 F106 A601 E.W........ ....
+06B5 A400 990C 06E6 0060 E602 D004 E603 F04B .......`.......K
+06C5 A000 B102 F045 C957 901E 8501 AABD BA06 .....E.W........
 -------------------------------------------------------------
                           SV BDIZC
-       PC:06A4 SP:1F0  SR:00110101 A:20 X:01 Y:0B
+       PC:06B5 SP:1F9  SR:00100101 A:6E X:0F Y:14
 -------------------------------------------------------------
-          06A4 E600    INC $00
-          06A6 60      RTS
-RSTR-NXT  06A7 E602    INC $02
-          06A9 D004    BNE $06AF
-          06AB E600    INC $00
+EMIT      06B5 A400    LDY $00
+          06B7 990C06  STA $060C,Y           ;STR-BUFFER
+          06BA E600    INC $00
+          06BC 60      RTS
+RSTR-NXT  06BD E602    INC $02
 
 ~~~~
 
@@ -194,7 +194,7 @@ Tunstall gets the best results for maximum word size of three, no surprise reall
 
 Here is a listing to decode the strings. Can you imagine having to have typed this out in the eighties? All we are doing here is pushing the characters into a buffer, but in the next phase, the emit functions will be rendering variable width fonts to a really lo-res screen mode. Probably one of the C-64 screen modes.
 
-Metaprogramming is a lot of fun. We can change the strings and new tables will be generated autoomatically. Here the string decoder and the emit functions have been separated in the 'compiler' but are together in the output. Why don't we do this for modern programs? Ah yes, that's right, we have OO, JIT and SOLID design principles so it is entirely acceptable to have a monolithic compiler.
+Metaprogramming is a lot of fun. We can change the strings and new tables will be generated automatically. Here the string decoder and the emit functions have been separated in the 'compiler' but are together in the output. Why don't we do this for modern programs? Ah yes, that's right, we have OO, JIT and SOLID design principles so it is entirely acceptable to have a monolithic compiler.
 
 ~~~~
 

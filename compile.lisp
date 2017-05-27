@@ -12,7 +12,6 @@
 (defparameter *compiler-debug* nil)
 (defparameter *compiler-comments* nil)
 
-
 ; todo A way of providing a 'spare byte/word' to the compile
 ; which can then be used later e.g.
 
@@ -186,6 +185,13 @@
 (defun lo (addr)
   (logand #xFF (resolve addr)))
 
+;address of the lo byte of a word
+(defun lo-add (addr)
+  (resolve addr))
+
+(defun hi-add (addr)
+  (1+ (resolve addr)))
+
 (defun dc (comment)
   (let ((comments (gethash *compiler-ptr* *compiler-comments*)))
     (if comments
@@ -230,6 +236,11 @@
   (multiple-value-bind (addr resolved) (resolve label)
     (push-sbyte (if resolved (- addr (1+ *compiler-ptr*))
 		    0))))
+
+(defun rel-addr (offset bra-addr)
+  (+ 2 bra-addr (if (> offset #x7F)
+		    (- offset #x100)
+		    offset)))
 
 ;; opcodes
 
@@ -292,7 +303,9 @@
     (loop for i from start to end do
 	 (let* ((opcode (gethash (aref buffer i) *reverse-opcodes*))
 		(mode (cdr opcode))
-		(op (car opcode)))
+		(op (car opcode))
+		(arg1 (aref buffer (+ 1 i)))
+		(arg2 (aref buffer (+ 2 i))))
 	   (let* ((label (gethash i lab))
 		  (str (if label 
 			   (subseq (format nil "~a~a" label "         ") 0 9)
@@ -309,62 +322,35 @@
 		   (incf i (1- (car hint)))
 		   (format t "      ~a" (cdr hint)))
 					;else render opcodes
-		 (case mode
-		   (:imm (format t "~2,'0X    ~a #$~2,'0X"
-				 (aref buffer (incf i))
-				 op 
-				 (aref buffer i)))
-		   (:rel (format t "~2,'0X    ~a $~4,'0X"
-				 (aref buffer (incf i))
-				 op 
-				 (+ i 1 (aref buffer i))))
-		   (:imp (format t "      ~a" op))
-		   (:ab (format t "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X"
-				(aref buffer (incf i))
-				(aref buffer (incf i))
-				op
-				(aref buffer i)
-				(aref buffer (1- i))))
-		   (:zp (format t "~2,'0X    ~a $~2,'0X"
-				(aref buffer (incf i))
-				op
-				(aref buffer i)))
-		   (:ind (format t "~2,'0X~2,'0X  ~a ($~2,'0X~2,'0X)"
-				 (aref buffer (incf i))
-				 (aref buffer (incf i))
-				 op
-				 (aref buffer i)
-				 (aref buffer (1- i))))
-		   (:izx (format t "~2,'0X    ~a ($~2,'0X,X)"
-				 (aref buffer (incf i))
-				 op
-				 (aref buffer i)))
-		   (:izy (format t "~2,'0X    ~a ($~2,'0X),Y"
-				 (aref buffer (incf i))
-				 op
-				 (aref buffer i)))
-		   (:zpx (format t "~2,'0X    ~a $~2,'0X,X"
-				 (aref buffer (incf i))
-				 op
-				 (aref buffer i)))
-		   (:zpy (format t "~2,'0X    ~a $~2,'0X,Y"
-				 (aref buffer (incf i))
-				 op
-				 (aref buffer i)))
-		   (:aby (format t "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X,Y"
-				 (aref buffer (incf i))
-				 (aref buffer (incf i))
-				 op
-				 (aref buffer i)
-				 (aref buffer (1- i))))
-		   (:abx (format t "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X,Y"
-				 (aref buffer (incf i))
-				 (aref buffer (incf i))
-				 op
-				 (aref buffer i)
-				 (aref buffer (1- i))))))))
-	 (terpri))
-    (values)))
+		 (labels ((format-label (addr)
+			    (let ((label (gethash addr lab)))
+			      (when label
+				(format t "~45,1T;~a" label))))
+			  (format-cur-label ()
+			    (format-label (logior arg1 (ash arg2 8))))
+			  (format-1 (fmt) (format t fmt arg1 op arg1)
+				    (incf i))
+			  (format-2 (fmt) (format t fmt arg1 arg2 op arg2 arg1)
+				    (format-cur-label)
+				    (incf i 2)))
+		   (case mode
+		     (:imm (format-1 "~2,'0X    ~a #$~2,'0X"))
+		     (:rel (let ((addr (rel-addr arg1 i)))
+			     (format t "~2,'0X    ~a $~4,'0X" arg1 op addr)
+			     (format-label addr))
+			   (incf i))
+		     (:imp (format t "      ~a" op))
+		     (:ab (format-2 "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X"))
+		     (:zp (format-1 "~2,'0X    ~a $~2,'0X"))
+		     (:ind (format-2 "~2,'0X~2,'0X  ~a ($~2,'0X~2,'0X)"))
+		     (:izx (format-1 "~2,'0X    ~a ($~2,'0X,X)"))
+		     (:izy (format-1 "~2,'0X    ~a ($~2,'0X),Y"))
+		     (:zpx (format-1 "~2,'0X    ~a $~2,'0X,X"))
+		     (:zpy (format-1 "~2,'0X    ~a $~2,'0X,Y"))
+		     (:aby (format-2 "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X,Y"))
+		     (:abx (format-2 "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X,Y")))))
+	   (terpri))
+    (values)))))
 	       
 (defun test ()
   (reset-compiler)

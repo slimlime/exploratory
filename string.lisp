@@ -138,6 +138,12 @@
 (defun emit-char-label (c)
   (format nil "EMIT-~a" c))
 
+(defun print-symbol-table ()
+  (loop for i from 0 to 255 do
+       (format t "~2,'0X:~5a" i (aref *symbol-table* i))
+       (when (zerop (rem i 8))
+	 (terpri))))
+
 (defun strtable ()
   
   ;these variables refer to the first occurance of
@@ -157,9 +163,9 @@
     (zp-w :rstr-add 0)
 
     (label :rstr-nxt)
-    (INC.ZP (lo :rstr-add))
+    (INC.ZP (lo-add :rstr-add))
     (BNE :rstr)
-    (INC.ZP (hi :rstr-add))
+    (INC.ZP (hi-add :rstr-add))
     (BEQ :rstr-done)
     (dc "Render the string at RSTR-ADD")
     (label :rstr)
@@ -186,7 +192,7 @@
     (JMP :rstr-nxt)
     (label :2char)
     (CMP.IMM first-two-char)
-    (BCS :1char)
+    (BCC :1char)
     (STA.ZP :rstr-sym)
     (TAX)
     (LDA.ABX (- (resolve :2ch-0) first-two-char))
@@ -256,7 +262,7 @@
   (STA.ZP (1+ (resolve :rstr-add)))
   (JSR :rstr)
   (BRK)
-  (ds :str-buffer "                ")
+  (ds :str-buffer "                                      ")
 
   (dc "Each character must have its own labelled function")
   (dc "e.g. to render to the screen.")
@@ -317,7 +323,3 @@
   (setf *compiler-ensure-labels-resolve* t)
 
   (string-test))
-
-
-
-

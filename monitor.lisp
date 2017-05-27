@@ -30,7 +30,7 @@
       (format t "-------------------------------------------------------------~%")
       (disassemble-6502 pc (+ pc *monitor-context-bytes*)))))
 
-(defun monitor-watch (addr len)
+(defun monitor-watch (addr &optional (len 16))
     (push (cons (resolve addr) len) *monitor-watches*))
 
 (defun monitor-step ()
@@ -55,30 +55,3 @@
 		      (6502:cpu-xr cl-6502:*cpu*)
 		      (6502:cpu-yr cl-6502:*cpu*)))))
 
-(defun monitor-test ()
-  (reset-compiler)
-
-  (dotimes (pass 2)
-    (setf *compiler-ensure-labels-resolve* (= pass 1))
-    
-    (org #x0600)
-
-    (label :start)
-    (CLD)
-    (LDY.IMM #x10)
-    (label :next)
-    (LDA.ABY :string)
-    (JSR :print)
-    (dc "Decrement the index")
-    (DEY)
-    (BNE :next)
-    (ds :string "Hello World!")
-    (NOP)
-    (NOP)
-    (BRK)
-    (label :print)
-    (TAX)
-    (RTS)
-    (label :end)
-    (monitor-setup-for-cl-6502))
-  (values))

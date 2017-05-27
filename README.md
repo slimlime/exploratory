@@ -198,16 +198,6 @@ Metaprogramming is a lot of fun. We can change the strings and new tables will b
 
 ~~~~
 
-CL-USER> (disassemble-6502 :start :str-buffer)
-          ;Decode a string into a buffer
-START     0600 A912    LDA #$12
-          0602 8502    STA $02
-          0604 A90A    LDA #$0A
-          0606 8503    STA $03
-          0608 20AF06  JSR $06AF
-          060B 00      BRK
-STR-BUFFE 060C 20      DS "                "
-; No value
 CL-USER> (disassemble-6502 :start :end)
           ;Emit a string into a buffer
 START     0600 A912    LDA #$12

@@ -200,144 +200,144 @@ Metaprogramming is a lot of fun. We can change the strings and new tables will b
 
 CL-USER> (disassemble-6502 :start :end)
           ;Emit a string into a buffer
-START     0600 A912    LDA #$12
+START     0600 A928    LDA #$28
           0602 8502    STA $02
           0604 A90A    LDA #$0A
           0606 8503    STA $03
-          0608 20AF06  JSR $06AF
+          0608 20C506  JSR $06C5             ;RSTR
           060B 00      BRK
-STR-BUFFE 060C 20      DS "                "
+STR-BUFFE 060C 20      DS "                                      "
           ;Each character must have its own labelled function
           ;e.g. to render to the screen.
           ;In this test program we will just
           ;write it to memory at an index
-EMIT-     061D A900    LDA #$00
-          061F 4C9F06  JMP $069F
-EMIT-     0622 A920    LDA #$20
-          0624 4C9F06  JMP $069F
-EMIT-,    0627 A92C    LDA #$2C
-          0629 4C9F06  JMP $069F
-EMIT-T    062C A954    LDA #$54
-          062E 4C9F06  JMP $069F
-EMIT-a    0631 A961    LDA #$61
-          0633 4C9F06  JMP $069F
-EMIT-b    0636 A962    LDA #$62
-          0638 4C9F06  JMP $069F
-EMIT-c    063B A963    LDA #$63
-          063D 4C9F06  JMP $069F
-EMIT-d    0640 A964    LDA #$64
-          0642 4C9F06  JMP $069F
-EMIT-e    0645 A965    LDA #$65
-          0647 4C9F06  JMP $069F
-EMIT-f    064A A966    LDA #$66
-          064C 4C9F06  JMP $069F
-EMIT-g    064F A967    LDA #$67
-          0651 4C9F06  JMP $069F
-EMIT-h    0654 A968    LDA #$68
-          0656 4C9F06  JMP $069F
-EMIT-i    0659 A969    LDA #$69
-          065B 4C9F06  JMP $069F
-EMIT-l    065E A96C    LDA #$6C
-          0660 4C9F06  JMP $069F
-EMIT-m    0663 A96D    LDA #$6D
-          0665 4C9F06  JMP $069F
-EMIT-n    0668 A96E    LDA #$6E
-          066A 4C9F06  JMP $069F
-EMIT-o    066D A96F    LDA #$6F
-          066F 4C9F06  JMP $069F
-EMIT-p    0672 A970    LDA #$70
-          0674 4C9F06  JMP $069F
-EMIT-q    0677 A971    LDA #$71
-          0679 4C9F06  JMP $069F
-EMIT-r    067C A972    LDA #$72
-          067E 4C9F06  JMP $069F
-EMIT-s    0681 A973    LDA #$73
-          0683 4C9F06  JMP $069F
-EMIT-t    0686 A974    LDA #$74
-          0688 4C9F06  JMP $069F
-EMIT-u    068B A975    LDA #$75
-          068D 4C9F06  JMP $069F
-EMIT-v    0690 A976    LDA #$76
-          0692 4C9F06  JMP $069F
-EMIT-w    0695 A977    LDA #$77
-          0697 4C9F06  JMP $069F
-EMIT-y    069A A979    LDA #$79
-          069C 4C9F06  JMP $069F
-EMIT      069F A400    LDY $00
-          06A1 990C06  STA $060C,Y
-          06A4 E600    INC $00
-          06A6 60      RTS
-RSTR-NXT  06A7 E602    INC $02
-          06A9 D004    BNE $06AF
-          06AB E600    INC $00
-          06AD F04B    BEQ $06FA
+EMIT-null    0633 A900    LDA #$00
+          0635 4CB506  JMP $06B5             ;EMIT
+EMIT-     0638 A920    LDA #$20
+          063A 4CB506  JMP $06B5             ;EMIT
+EMIT-,    063D A92C    LDA #$2C
+          063F 4CB506  JMP $06B5             ;EMIT
+EMIT-T    0642 A954    LDA #$54
+          0644 4CB506  JMP $06B5             ;EMIT
+EMIT-a    0647 A961    LDA #$61
+          0649 4CB506  JMP $06B5             ;EMIT
+EMIT-b    064C A962    LDA #$62
+          064E 4CB506  JMP $06B5             ;EMIT
+EMIT-c    0651 A963    LDA #$63
+          0653 4CB506  JMP $06B5             ;EMIT
+EMIT-d    0656 A964    LDA #$64
+          0658 4CB506  JMP $06B5             ;EMIT
+EMIT-e    065B A965    LDA #$65
+          065D 4CB506  JMP $06B5             ;EMIT
+EMIT-f    0660 A966    LDA #$66
+          0662 4CB506  JMP $06B5             ;EMIT
+EMIT-g    0665 A967    LDA #$67
+          0667 4CB506  JMP $06B5             ;EMIT
+EMIT-h    066A A968    LDA #$68
+          066C 4CB506  JMP $06B5             ;EMIT
+EMIT-i    066F A969    LDA #$69
+          0671 4CB506  JMP $06B5             ;EMIT
+EMIT-l    0674 A96C    LDA #$6C
+          0676 4CB506  JMP $06B5             ;EMIT
+EMIT-m    0679 A96D    LDA #$6D
+          067B 4CB506  JMP $06B5             ;EMIT
+EMIT-n    067E A96E    LDA #$6E
+          0680 4CB506  JMP $06B5             ;EMIT
+EMIT-o    0683 A96F    LDA #$6F
+          0685 4CB506  JMP $06B5             ;EMIT
+EMIT-p    0688 A970    LDA #$70
+          068A 4CB506  JMP $06B5             ;EMIT
+EMIT-q    068D A971    LDA #$71
+          068F 4CB506  JMP $06B5             ;EMIT
+EMIT-r    0692 A972    LDA #$72
+          0694 4CB506  JMP $06B5             ;EMIT
+EMIT-s    0697 A973    LDA #$73
+          0699 4CB506  JMP $06B5             ;EMIT
+EMIT-t    069C A974    LDA #$74
+          069E 4CB506  JMP $06B5             ;EMIT
+EMIT-u    06A1 A975    LDA #$75
+          06A3 4CB506  JMP $06B5             ;EMIT
+EMIT-v    06A6 A976    LDA #$76
+          06A8 4CB506  JMP $06B5             ;EMIT
+EMIT-w    06AB A977    LDA #$77
+          06AD 4CB506  JMP $06B5             ;EMIT
+EMIT-y    06B0 A979    LDA #$79
+          06B2 4CB506  JMP $06B5             ;EMIT
+EMIT      06B5 A400    LDY $00
+          06B7 990C06  STA $060C,Y           ;STR-BUFFER
+          06BA E600    INC $00
+          06BC 60      RTS
+RSTR-NXT  06BD E602    INC $02
+          06BF D004    BNE $06C5             ;RSTR
+          06C1 E603    INC $03
+          06C3 F04B    BEQ $0710             ;RSTR-DONE
           ;Render the string at RSTR-ADD
-RSTR      06AF A000    LDY #$00
-          06B1 B102    LDA ($02),Y
-          06B3 F045    BEQ $06FA
-          06B5 C957    CMP #$57
-          06B7 901E    BCC $06D7
-          06B9 8501    STA $01
-          06BB AA      TAX
+RSTR      06C5 A000    LDY #$00
+          06C7 B102    LDA ($02),Y
+          06C9 F045    BEQ $0710             ;RSTR-DONE
+          06CB C957    CMP #$57
+          06CD 901E    BCC $06ED             ;2CHAR
+          06CF 8501    STA $01
+          06D1 AA      TAX
           ;Get the first character from the three character table
           ;note that the address to :3ch-0 is offset, so that we
           ;can use the value in A without subtracting
-          06BC BDA406  LDA $06A4,Y
-          06BF 20F106  JSR $06F1
-          06C2 A601    LDX $01
-          06C4 BD4D07  LDA $074D,Y
-          06C7 20F106  JSR $06F1
-          06CA A601    LDX $01
-          06CC BDF607  LDA $07F6,Y
+          06D2 BDBA06  LDA $06BA,Y
+          06D5 200707  JSR $0707             ;RSTR-EMIT
+          06D8 A601    LDX $01
+          06DA BD6307  LDA $0763,Y
+          06DD 200707  JSR $0707             ;RSTR-EMIT
+          06E0 A601    LDX $01
+          06E2 BD0C08  LDA $080C,Y
           ;The third character might be EOS
-          06CF F029    BEQ $06FA
-          06D1 20F106  JSR $06F1
-          06D4 4CA706  JMP $06A7
-2CHAR     06D7 C91A    CMP #$1A
-          06D9 B010    BCS $06EB
-          06DB 8501    STA $01
-          06DD AA      TAX
-          06DE BDDC08  LDA $08DC,Y
-          06E1 20F106  JSR $06F1
-          06E4 A601    LDX $01
-          06E6 BD1909  LDA $0919,Y
+          06E5 F029    BEQ $0710             ;RSTR-DONE
+          06E7 200707  JSR $0707             ;RSTR-EMIT
+          06EA 4CBD06  JMP $06BD             ;RSTR-NXT
+2CHAR     06ED C91A    CMP #$1A
+          06EF 9010    BCC $0701             ;1CHAR
+          06F1 8501    STA $01
+          06F3 AA      TAX
+          06F4 BDF208  LDA $08F2,Y
+          06F7 200707  JSR $0707             ;RSTR-EMIT
+          06FA A601    LDX $01
+          06FC BD2F09  LDA $092F,Y
           ;The second character might be EOS
-          06E9 F00F    BEQ $06FA
-1CHAR     06EB 20F106  JSR $06F1
-          06EE 4CA706  JMP $06A7
+          06FF F00F    BEQ $0710             ;RSTR-DONE
+1CHAR     0701 200707  JSR $0707             ;RSTR-EMIT
+          0704 4CBD06  JMP $06BD             ;RSTR-NXT
           ;Look up address of rendering function in jump table
-RSTR-EMIT 06F1 AA      TAX
-          06F2 BD8A09  LDA $098A,Y
-          06F5 48      PHA
-          06F6 BD7009  LDA $0970,Y
-          06F9 48      PHA
-RSTR-DONE 06FA 60      RTS
+RSTR-EMIT 0707 AA      TAX
+          0708 BDA009  LDA $09A0,Y           ;1CH-HI
+          070B 48      PHA
+          070C BD8609  LDA $0986,Y           ;1CH-LO
+          070F 48      PHA
+RSTR-DONE 0710 60      RTS
           ;Three character string table split into three
           ;so that each character can be retrieved by indexing
           ;without multiplication
-3CH-0     06FB 01      DB $01, $15, $0B, $0C, $15, $14, $13, $01, $0C, $05, $08, $01, $04, $0F, $01, $0C, $01, $11, $04, $0F, $0F, $0F, $01, $15, $0A, $14, $06, $14, $01, $01, $10, $05, $01, $0D, $0D, $01, $01, $18, $07, $14, $0C, $04, $03, $01, $14, $0D, $08, $0B, $14, $0B, $0D, $0A, $05, $16, $08, $0D, $07, $04, $04, $05, $08, $0B, $0C, $01, $01, $04, $11, $08, $04, $13, $14, $01, $08, $01, $14, $13, $10, $0A, $01, $14, $17, $04, $06, $04, $10, $15, $10, $14, $0B, $0C, $02, $13, $08, $13, $01, $08, $19, $14, $0C, $08, $08, $08, $01, $08, $0C, $04, $0D, $0B, $03, $0F, $0F, $04, $0D, $14, $19, $10, $14, $08, $04, $07, $0B, $18, $01, $13, $0D, $08, $08, $01, $07, $04, $13, $08, $0A, $09, $11, $12, $13, $0C, $13, $01, $15, $04, $16, $06, $15, $0C, $11, $0F, $14, $09, $16, $08, $01, $18, $04, $13, $06, $10, $0D, $0E, $11, $0D, $0A, $0C, $0D, $19, $08, $16, $0F
-3CH-1     07A4 15      DB $15, $0B, $08, $0F, $13, $15, $0C, $14, $14, $0D, $01, $0C, $05, $0A, $15, $0F, $11, $04, $14, $0A, $07, $01, $05, $04, $01, $01, $0B, $01, $04, $10, $09, $08, $04, $08, $0D, $05, $18, $0C, $01, $14, $0D, $0F, $0B, $0C, $15, $08, $01, $01, $01, $0C, $01, $14, $16, $0C, $07, $07, $01, $01, $01, $16, $01, $0C, $06, $14, $04, $11, $11, $04, $13, $01, $01, $17, $01, $11, $10, $10, $0A, $13, $14, $08, $04, $01, $10, $13, $0F, $0B, $01, $14, $0C, $13, $01, $0C, $01, $07, $04, $19, $01, $01, $04, $14, $01, $01, $0F, $01, $0D, $0F, $15, $08, $0B, $10, $04, $0D, $19, $02, $14, $18, $08, $07, $13, $01, $08, $01, $13, $08, $08, $06, $12, $15, $01, $0E, $04, $0F, $14, $0C, $13, $16, $08, $13, $14, $04, $01, $06, $0C, $15, $16, $13, $08, $0A, $01, $01, $04, $01, $06, $0B, $0D, $08, $10, $0E, $0D, $11, $0C, $19, $15, $0D, $08, $01, $13, $0F, $06
-3CH-2     084D 0B      DB $0B, $08, $01, $0A, $0C, $13, $0F, $15, $01, $08, $14, $14, $0D, $01, $04, $01, $04, $14, $14, $14, $01, $15, $16, $05, $15, $0C, $01, $15, $01, $09, $01, $01, $0F, $01, $01, $08, $0C, $0D, $11, $01, $0D, $07, $0C, $0F, $01, $00, $15, $04, $04, $14, $05, $00, $0C, $0D, $00, $01, $04, $14, $05, $0F, $0C, $06, $0B, $10, $11, $11, $08, $13, $01, $0C, $17, $04, $11, $13, $01, $0A, $13, $04, $08, $06, $13, $15, $0F, $0C, $07, $0C, $04, $02, $13, $07, $15, $04, $00, $01, $13, $01, $18, $0F, $05, $15, $18, $05, $10, $04, $15, $04, $00, $19, $08, $18, $0D, $19, $14, $01, $08, $01, $07, $01, $08, $0C, $00, $13, $08, $12, $0F, $10, $16, $08, $15, $00, $0E, $0A, $01, $13, $10, $0C, $01, $14, $15, $06, $11, $15, $13, $16, $04, $08, $04, $15, $10, $15, $0D, $06, $10, $0C, $0D, $07, $0E, $11, $19, $0C, $0D, $01, $0B, $08, $13, $08, $00, $06, $0B
+3CH-0     0711 01      DB $01, $15, $0B, $0C, $15, $14, $13, $01, $0C, $05, $08, $01, $04, $0F, $01, $0C, $01, $11, $04, $0F, $0F, $0F, $01, $15, $0A, $14, $06, $14, $01, $01, $10, $05, $01, $0D, $0D, $01, $01, $18, $07, $14, $0C, $04, $03, $01, $14, $0D, $08, $0B, $14, $0B, $0D, $0A, $05, $16, $08, $0D, $07, $04, $04, $05, $08, $0B, $0C, $01, $01, $04, $11, $08, $04, $13, $14, $01, $08, $01, $14, $13, $10, $0A, $01, $14, $17, $04, $06, $04, $10, $15, $10, $14, $0B, $0C, $02, $13, $08, $13, $01, $08, $19, $14, $0C, $08, $08, $08, $01, $08, $0C, $04, $0D, $0B, $03, $0F, $0F, $04, $0D, $14, $19, $10, $14, $08, $04, $07, $0B, $18, $01, $13, $0D, $08, $08, $01, $07, $04, $13, $08, $0A, $09, $11, $12, $13, $0C, $13, $01, $15, $04, $16, $06, $15, $0C, $11, $0F, $14, $09, $16, $08, $01, $18, $04, $13, $06, $10, $0D, $0E, $11, $0D, $0A, $0C, $0D, $19, $08, $16, $0F
+3CH-1     07BA 15      DB $15, $0B, $08, $0F, $13, $15, $0C, $14, $14, $0D, $01, $0C, $05, $0A, $15, $0F, $11, $04, $14, $0A, $07, $01, $05, $04, $01, $01, $0B, $01, $04, $10, $09, $08, $04, $08, $0D, $05, $18, $0C, $01, $14, $0D, $0F, $0B, $0C, $15, $08, $01, $01, $01, $0C, $01, $14, $16, $0C, $07, $07, $01, $01, $01, $16, $01, $0C, $06, $14, $04, $11, $11, $04, $13, $01, $01, $17, $01, $11, $10, $10, $0A, $13, $14, $08, $04, $01, $10, $13, $0F, $0B, $01, $14, $0C, $13, $01, $0C, $01, $07, $04, $19, $01, $01, $04, $14, $01, $01, $0F, $01, $0D, $0F, $15, $08, $0B, $10, $04, $0D, $19, $02, $14, $18, $08, $07, $13, $01, $08, $01, $13, $08, $08, $06, $12, $15, $01, $0E, $04, $0F, $14, $0C, $13, $16, $08, $13, $14, $04, $01, $06, $0C, $15, $16, $13, $08, $0A, $01, $01, $04, $01, $06, $0B, $0D, $08, $10, $0E, $0D, $11, $0C, $19, $15, $0D, $08, $01, $13, $0F, $06
+3CH-2     0863 0B      DB $0B, $08, $01, $0A, $0C, $13, $0F, $15, $01, $08, $14, $14, $0D, $01, $04, $01, $04, $14, $14, $14, $01, $15, $16, $05, $15, $0C, $01, $15, $01, $09, $01, $01, $0F, $01, $01, $08, $0C, $0D, $11, $01, $0D, $07, $0C, $0F, $01, $00, $15, $04, $04, $14, $05, $00, $0C, $0D, $00, $01, $04, $14, $05, $0F, $0C, $06, $0B, $10, $11, $11, $08, $13, $01, $0C, $17, $04, $11, $13, $01, $0A, $13, $04, $08, $06, $13, $15, $0F, $0C, $07, $0C, $04, $02, $13, $07, $15, $04, $00, $01, $13, $01, $18, $0F, $05, $15, $18, $05, $10, $04, $15, $04, $00, $19, $08, $18, $0D, $19, $14, $01, $08, $01, $07, $01, $08, $0C, $00, $13, $08, $12, $0F, $10, $16, $08, $15, $00, $0E, $0A, $01, $13, $10, $0C, $01, $14, $15, $06, $11, $15, $13, $16, $04, $08, $04, $15, $10, $15, $0D, $06, $10, $0C, $0D, $07, $0E, $11, $19, $0C, $0D, $01, $0B, $08, $13, $08, $00, $06, $0B
           ;Two character string table
-2CH-0     08F6 01      DB $01, $08, $15, $0C, $0B, $14, $14, $13, $0F, $01, $01, $15, $0D, $01, $07, $0C, $01, $0C, $04, $0B, $04, $01, $05, $0A, $0F, $13, $05, $04, $08, $08, $0D, $0C, $11, $14, $03, $06, $0B, $04, $16, $0A, $0F, $15, $04, $10, $14, $18, $0D, $05, $09, $0F, $14, $10, $04, $01, $0D, $08, $15, $07, $19, $06, $01
-2CH-1     0933 15      DB $15, $01, $0B, $0F, $08, $01, $15, $0C, $0A, $14, $04, $13, $08, $0C, $01, $14, $05, $0D, $14, $0C, $05, $11, $0D, $14, $07, $08, $16, $0F, $00, $07, $0D, $13, $04, $14, $0B, $10, $01, $01, $0C, $01, $01, $04, $13, $01, $00, $0C, $01, $08, $01, $06, $08, $09, $0D, $18, $19, $0F, $01, $00, $01, $0B, $10
+2CH-0     090C 01      DB $01, $08, $15, $0C, $0B, $14, $14, $13, $0F, $01, $01, $15, $0D, $01, $07, $0C, $01, $0C, $04, $0B, $04, $01, $05, $0A, $0F, $13, $05, $04, $08, $08, $0D, $0C, $11, $14, $03, $06, $0B, $04, $16, $0A, $0F, $15, $04, $10, $14, $18, $0D, $05, $09, $0F, $14, $10, $04, $01, $0D, $08, $15, $07, $19, $06, $01
+2CH-1     0949 15      DB $15, $01, $0B, $0F, $08, $01, $15, $0C, $0A, $14, $04, $13, $08, $0C, $01, $14, $05, $0D, $14, $0C, $05, $11, $0D, $14, $07, $08, $16, $0F, $00, $07, $0D, $13, $04, $14, $0B, $10, $01, $01, $0C, $01, $01, $04, $13, $01, $00, $0C, $01, $08, $01, $06, $08, $09, $0D, $18, $19, $0F, $01, $00, $01, $0B, $10
           ;Addresses for the character jump table in two tables
           ;hi-byte and lo-byte, less one, for use by rts
-1CH-LO    0970 1C      DB $1C, $21, $26, $2B, $30, $35, $3A, $3F, $44, $49, $4E, $53, $58, $5D, $62, $67, $6C, $71, $76, $7B, $80, $85, $8A, $8F, $94, $99
-1CH-HI    098A 06      DB $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06
-          09A4 81      DCS 'This is a bunch of strings'
-          09AD F0      DCS 'which appear in the program'
-          09B7 C3      DCS 'They will be analysed in the'
-          09C1 DC      DCS 'first pass of the compiler'
-          09CA 15      DCS 'to build a string table'
-          09D3 66      DCS 'in the second pass, the '
-          09DC 5C      DCS 'string table will be built'
-          09E5 80      DCS 'and the strings actually encoded'
-          09F2 A8      DCS 'a third pass is now required'
-          09FC 2C      DCS 'as the string table is variable'
-          0A07 D3      DCS 'length and so are the strings'
-STR       0A12 81      DCS 'This is the test string'
-END       0A1C 00      BRK
+1CH-LO    0986 32      DB $32, $37, $3C, $41, $46, $4B, $50, $55, $5A, $5F, $64, $69, $6E, $73, $78, $7D, $82, $87, $8C, $91, $96, $9B, $A0, $A5, $AA, $AF
+1CH-HI    09A0 06      DB $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06, $06
+          09BA 81      DCS 'This is a bunch of strings'
+          09C3 F0      DCS 'which appear in the program'
+          09CD C3      DCS 'They will be analysed in the'
+          09D7 DC      DCS 'first pass of the compiler'
+          09E0 15      DCS 'to build a string table'
+          09E9 66      DCS 'in the second pass, the '
+          09F2 5C      DCS 'string table will be built'
+          09FB 80      DCS 'and the strings actually encoded'
+          0A08 A8      DCS 'a third pass is now required'
+          0A12 2C      DCS 'as the string table is variable'
+          0A1D D3      DCS 'length and so are the strings'
+STR       0A28 81      DCS 'This is the test string'
+END       0A32 00      BRK
 
 ~~~~
 

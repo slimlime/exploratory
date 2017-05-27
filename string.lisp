@@ -5,11 +5,13 @@
 
 (defparameter *word-table* nil)
 (defparameter *symbol-table* nil)
-(defparameter *strings* nil)
+(defparameter *processed-strings* nil)
+(defparameter *compiled-strings* nil)
 
 (defun reset-symbol-table ()
+  (setf *compiled-strings* nil)
   (setf *symbol-table* nil)
-  (setf *strings* nil)
+  (setf *processed-strings* nil)
   (setf *word-table* (make-hash-table :test 'equal)))
 
 (defun add-to-word-table (str)
@@ -23,7 +25,7 @@
   (format nil "~a~a" str #\nul))
 
 (defun process-string (str)
-  (push str *strings*)
+  (push str *processed-strings*)
   (setf str (append-eos str))
   (loop for i from 0 to (- (length str) 1) do
        (add-to-word-table (subseq str i (+ 1 i))))
@@ -60,8 +62,7 @@
       ;assert that code 0 is the eos indicator as we use BEQ
       ;to detect it in the code later
       (assert (char= (char (aref words 0) 0)  #\nul))
-      words
-      )))
+      words)))
  
 (defun encode-string (str emit)
   (setf str (append-eos str))
@@ -76,7 +77,8 @@
 		  (return)))))))
 
 (defun build-symbol-table ()
-  (setf *symbol-table* (sort-word-table)))
+  (setf *symbol-table* (sort-word-table))
+  (validate-strings))
 
 (defun process-test ()
   (reset-symbol-table)
@@ -97,11 +99,12 @@
       (close in)))
   (setf *symbol-table* (sort-word-table)))
 
-; check that all the strings we used as input
-; can be reproduced
+; check that (in theory) all the strings we used as input
+; can be reproduced. Obviously the 6502 assembler to do
+; it has to be right too...
 (defun validate-strings ()
   (let ((symcount 0))
-    (dolist (str *strings*)
+    (dolist (str *processed-strings*)
       (let ((str2 ""))
 	    (encode-string str #'(lambda (i word)
 				   (declare (ignore word))
@@ -112,7 +115,8 @@
 	    (assert (equal str str2)
 	      (str str2) 
 	      (format nil "Expected ~a, but decoded to ~a" str str2))))
-    (format t "Total bytes of string data ~d" symcount)))
+    (when *compiler-debug*
+      (format t "Checked ~d bytes of string data~%" symcount))))
 
 ; assembler commands
 
@@ -128,6 +132,7 @@
 	  (encode-string str #'(lambda (i word)
 				 (declare (ignore word i))
 				 (incf len)))
+	  (push (cons *compiler-ptr* str) *compiled-strings*)
 	  (add-hint len (format nil "DCS '~a'" str))
 	  (encode-string str #'(lambda (i word)
 				 (declare (ignore word))
@@ -250,19 +255,16 @@
       (apply #'db (nreverse lo))
       (apply #'db (nreverse hi)))))
 
-(defun string-test ()
+(defun string-test (string)
   (org #x600)
   (label :start)
   (dc "Emit a string into a buffer")
-  (LDA.IMM (lo :str))
-  (print (resolve :rstr-add))
-  (STA.ZP :rstr-add)
-  (LDA.IMM (hi :str))
-  (print (1+ (resolve :rstr-add)))
-  (STA.ZP (1+ (resolve :rstr-add)))
+  (LDA.IMM (lo string))
+  (STA.ZP (lo-add :rstr-add))
+  (LDA.IMM (hi string))
+  (STA.ZP (hi-add :rstr-add))
   (JSR :rstr)
   (BRK)
-  (ds :str-buffer "                                      ")
 
   (dc "Each character must have its own labelled function")
   (dc "e.g. to render to the screen.")
@@ -288,38 +290,71 @@
   (when *symbol-table*
     (strtable))
 
+  ;; define some encoded strings
+
   (dcs nil "This is a bunch of strings")
   (dcs nil "which appear in the program")
   (dcs nil "They will be analysed in the")
   (dcs nil "first pass of the compiler")
   (dcs nil "to build a string table")
-  (dcs nil "in the second pass, the ")
+  (dcs nil "in the second pass, the")
   (dcs nil "string table will be built")
   (dcs nil "and the strings actually encoded")
   (dcs nil "a third pass is now required")
   (dcs nil "as the string table is variable")
   (dcs nil "length and so are the strings")
 
-  (dcs :str "This is the test string")
+  (dcs :test-str "This is a test string")
+  
+  (dw :str-buffer 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
 
   (label :end))
 
-(defun compile-string-test ()
+(defun compile-string-test (&optional (string :test-str))
   (reset-compiler)
   (reset-symbol-table)
+
+  (flet ((pass ()
+	   (string-test string)))
+    
+    ;; pass 1, get strings
+    
+    (pass)
+    
+    ;; pass 2, build table, intern strings
+    
+    (build-symbol-table)
+    
+    (pass)
+    
+    ;; pass 3, resolve all labels
+    
+    (setf *compiled-strings* nil) ;reset string table- not idempotent to adds
+    (setf *compiler-ensure-labels-resolve* t)
+    
+    (pass)))
+
+(defun test-decoder ()
   
-  ; pass 1, get strings
+  ; compile the program, *compiled-strings* will
+  ; then contain a list of all its strings
+  ; we can use it to recompile a test application
+  ; and run it to make sure all the strings
+  ; can be recovered in 6502
 
-  (string-test)
+  (compile-string-test :test-str)
 
-  ; pass 2, build table, intern strings
+  (dolist (str *compiled-strings*)
 
-  (build-symbol-table)
+    (compile-string-test (car str))
+    (monitor-reset #x600)
+    (monitor-run :print nil)
 
-  (string-test)
-
-  ; pass 3, resolve all labels
-
-  (setf *compiler-ensure-labels-resolve* t)
-
-  (string-test))
+    (let ((*compiler-buffer* (monitor-buffer)))
+      (let ((output 
+	     (map 'string #'code-char
+		  (subseq *compiler-buffer*
+			  (resolve :str-buffer)
+			  (position 0 *compiler-buffer* :start (resolve :str-buffer))))))
+	(format t "~a~%" output)
+	(assert (equal output (cdr str)))))))

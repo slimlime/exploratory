@@ -1,6 +1,6 @@
 ## 27/5/2017 Roundtrip encoding strings
 
-Strings can be added to the program with the assembler command dcs, e.g.
+Compressed strings can be added to the program with the assembler command dcs, e.g.
 
 ~~~~
 (dcs :my-string "This is a string")

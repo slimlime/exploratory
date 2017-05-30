@@ -27,6 +27,8 @@ VICKY (I was going to go for V.I.C.K.Y. Perhaps there's a movie in there somewhe
 
 Look, here is a test rendering I dumped in using a 'medieval' style font. Sadly I think that at 12 pixels high, it will be too big, there being room for only 15 lines. Note the horrific horizontal spacing- variable width rendering of fonts is next on the agenda.
 
+![Alt text](/capture.png)
+
 ## 27/5/2017 Roundtrip encoding strings
 
 Compressed strings can be added to the program with the assembler command dcs, e.g.

@@ -1,3 +1,32 @@
+## 30/5/2017 Label namespaces and VICKY
+
+It would be nice to use the same generice names for labels when writing assembly language, e.g. next, done, start, end. To this end, I added namespaces. Using the macro with-namespace instructs the assembler to try to resolve all labels in the specified namespace. If it can't find one, it tries the global namespace. The label directive will apply the label to the currently active namespace unless told otherwise by an optional namespace parameter. This is useful for 'exposing' a label in the middle of a namespace block.
+
+~~~~
+ (with-namespace :decode-string
+
+      (zp-b :sym 0)
+      
+      (label :next)
+      (INC.ZP (lo-add :decode-string-add))
+      (BNE :decode-string)
+      (INC.ZP (hi-add :decode-string-add))
+      (BEQ :done)
+      (label :decode-string nil) ; in the global namespace
+      (LDY.IMM #x0)
+      (LDA.IZY :decode-string-add)
+      (BEQ :done)
+      (CMP.IMM first-three-char)
+      (BCC :2char)
+      (STA.ZP :sym)
+~~~~
+
+### VICKY
+
+VICKY (I was going to go for V.I.C.K.Y. Perhaps there's a movie in there somewhere about a regular schoolgirl who is actually a robot) is a view of an mmap'ed section of memory, rendered to the screen in the washed out palette of the VIC-II fromm the C64. This is giving the 6502 code something to target. For now, it will just render the hi-res bitmap mode, 320x200 which I plan on using for the adventure game.
+
+Look, here is a test rendering I dumped in using a 'medieval' style font. Sadly I think that at 12 pixels high, it will be too big, there being room for only 15 lines. Note the horrific horizontal spacing- variable width rendering of fonts is next on the agenda.
+
 ## 27/5/2017 Roundtrip encoding strings
 
 Compressed strings can be added to the program with the assembler command dcs, e.g.

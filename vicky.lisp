@@ -1,0 +1,62 @@
+; todo create array of mapped colours
+
+(defparameter *c64-colours* (make-array 16))
+(defparameter *screen-width* 320)
+(defparameter *screen-height* 200)
+(defparameter *render-width* 640)
+(defparameter *render-height* 400)
+(defparameter *sx* 2)
+(defparameter *sy* 2)
+
+(defun map-color (surface-fp r g b)
+  (sdl-cffi::sdl-map-rgb (sdl-base:pixel-format surface-fp)
+			 b g r))
+
+(defun vicky ()
+  (map-screen)
+  (sdl:window *render-width* *render-height* :title-caption "VICKY")
+  (sdl:with-init ()
+    (let ((surface (sdl:create-surface *render-width*
+				       *render-height*
+				       :bpp 24)))
+      (let* ((redraw nil)
+	     (timer (make-timer #'(lambda () (setf redraw t)))))
+	(schedule-timer timer 2 :repeat-interval 0.1)
+	
+	(sdl:with-events ()
+	  (:idle ()
+		 (when redraw
+		   (let ((sfp (sdl:fp surface)))
+		     (lispbuilder-sdl-base::with-pixel (p sfp)
+		       (let ((x 0) (y 0))
+			   (loop for ptr from 0 to (1- *screen-buffer-length*) do
+				(let ((byte (sb-sys:sap-ref-8 *screen-buffer-sap* ptr))
+				      (bit #x80))
+				  (loop while (not (= 0 bit)) do
+				       (let ((color (if (= 0 (logand bit byte)) 
+					    (map-color sfp #x66 #x44 #x00)
+					    (map-color sfp #xee #xee #x77)))) 
+					 (lispbuilder-sdl-base::write-pixel p x y color)
+					 (lispbuilder-sdl-base::write-pixel p (1+ x) y color)	
+					 ;(lispbuilder-sdl-base::write-pixel p (1+ x) (1+ y) color)
+					 ;(lispbuilder-sdl-base::write-pixel p x (1+ y) color)	
+					 (setf bit (ash bit -1))
+					 (incf x *sx*)))
+				  (when (>= x *render-width*)
+				    (incf y *sy*)
+				    (when (>= y *render-height*)
+				      (return))
+				    (setf x 0)))))))
+		   (setf redraw nil)
+		   (sdl:blit-surface surface)
+		   (sdl:update-display)))
+	  (:key-down-event (:key key)
+			   (when (sdl:key= key :sdl-key-escape)
+			     (sdl:push-quit-event)))
+	  (:quit-event () 
+		       (unschedule-timer timer)
+		       t)
+	  (:video-expose-event ()
+			       (sdl:update-display)))))))
+
+;(dolist (timer (list-all-timers)) (unschedule-timer timer))

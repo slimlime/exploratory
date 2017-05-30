@@ -11,6 +11,7 @@
 (defparameter *compiler-zp-free-slot* nil)
 (defparameter *compiler-debug* nil)
 (defparameter *compiler-comments* nil)
+(defparameter *compiler-label-namespace* nil)
 
 ; todo A way of providing a 'spare byte/word' to the compile
 ; which can then be used later e.g.
@@ -76,7 +77,7 @@
        for i from add to (+ add (1- (* 16 (ceiling len 16))))
        for j from 1 do
 	 (when (= 1 (rem j 16))
-	   (format t "~4,'0X " i))
+	   (format t "~4,'0X  " i))
 	 (format t "~2,'0X" (peek i))
 	 (when (zerop (rem j 2))
 	   (format t " "))
@@ -138,7 +139,13 @@
 (defun resolve (arg)
   (if (numberp arg)
       (values arg t)
-      (let ((addr (gethash arg *compiler-labels*)))
+      (let ((addr nil))
+	; try first in the label namespace
+	(when *compiler-labels*
+	  (setf addr (gethash (cons *compiler-label-namespace* arg) *compiler-labels*)))
+	; if no match try again in the global namespace
+	(unless addr
+	  (setf addr (gethash arg *compiler-labels*)))
 ; on the first pass only, allow labels to be nil
 	(when (and (null addr) 
 		   *compiler-ensure-labels-resolve*)
@@ -153,8 +160,14 @@
   (assert-address add)
   (setf *compiler-ptr* add))
 
-(defun label (label)
+(defun label (label &optional (namespace nil namespace-p))
   (assert (not (numberp label)))
+  (unless namespace-p
+    ; use the scoped namespace unless one is supplied
+    (setf namespace *compiler-label-namespace*))
+  (when namespace
+    ; combine the label and namespace if one is present
+    (setf label (cons namespace label)))
   (setf (gethash label *compiler-labels*) *compiler-ptr*))
 
 (defun db (label &rest bytes)
@@ -213,6 +226,17 @@
     (let ((*compiler-ptr* *compiler-zp-free-slot*))
       (dw label word))
     (incf *compiler-zp-free-slot* 2)))
+
+(defmacro with-namespace (namespace &body body)
+  "In the scope of the macro, define labels in the namespace
+   Label resolution will be done preferentially in this namespace
+   but will fall back to the global namespace if not found"
+  (let ((ns (gensym)))
+  `(let* ((,ns ,namespace)
+	  (*compiler-label-namespace* ,ns))
+     (dc (format nil "+ ~a" ,ns))
+     ,@body
+     (dc (format nil "- ~a" ,ns)))))
 
 ;; 6502 instructions by mode
 
@@ -292,6 +316,13 @@
 
 ;;;; Disassembler
 
+(defun fmt-label (label &optional (namespace-p nil))
+  (if (consp label)
+	(if namespace-p 
+	    (format nil "~a:~a" (car label) (cdr label))
+	    (format nil "~a" (cdr label)))
+	(format nil "~a" label)))
+
 (defun disassemble-6502 (start end &key (buffer nil))
   (when (null buffer) (setf buffer *compiler-buffer*))
   (setf start (resolve start))
@@ -308,13 +339,13 @@
 		(arg2 (aref buffer (+ 2 i))))
 	   (let* ((label (gethash i lab))
 		  (str (if label 
-			   (subseq (format nil "~a~a" label "         ") 0 9)
-			   "         "))
+			   (subseq (format nil "~a~a" (fmt-label label) "             ") 0 13)
+			   "             "))
 		  (hint (gethash i *compiler-disassembler-hints*))
 		  (comments (gethash i *compiler-comments*)))
 	     (when comments
 	       (dolist (comment (reverse comments))
-		 (format t "          ;~a~%" comment)))
+		 (format t "              ;~a~%" comment)))
 	     (format t "~a ~4,'0X ~2,'0X" str i (aref buffer i))
 	     (if (and hint (numberp (car hint)))
 		 (progn
@@ -325,7 +356,7 @@
 		 (labels ((format-label (addr)
 			    (let ((label (gethash addr lab)))
 			      (when label
-				(format t "~45,1T;~a" label))))
+				(format t "~45,1T;~a" (fmt-label label)))))
 			  (format-cur-label ()
 			    (format-label (logior arg1 (ash arg2 8))))
 			  (format-1 (fmt) (format t fmt arg1 op arg1)
@@ -351,56 +382,3 @@
 		     (:abx (format-2 "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X,Y")))))
 	   (terpri))
     (values)))))
-	       
-(defun test ()
-  (reset-compiler)
-
-  (dotimes (pass 2)
-    (setf *compiler-ensure-labels-resolve* (= pass 1))
-
-;; the code
-    
-    (org #x0600)
-
-    (zp-b :variable 0)
-    (zp-b :another-variable 1)
-    (zp-b :lbl1 0)
-
-    (label :start)
-    
-    (ORA.IZX :lbl1)
-    (ORA.IZY :lbl1)
-    (ROR)
-    (LSR)
-    (dc "This is a comment")
-    (ROL)
-    (ASL)
-    (BCC :the-future)
-    (JMP :over-some-text)
-    (DS nil "Scrozzbot")
-    (label :over-some-text)
-    (CLD)
-    (CLD)
-    (label :the-future)
-    (CLD)
-    (STA.ZP :another-variable)
-    (STA.AB :a-non-zpg-variable)
-    (JMP :start)
-    (RTS)
-    (dw :words #x1234 #x5678 #xABCD)
-    (db :bytes #x01 #x02 #x03)
-    (BRK)
-    (LDA.IMM (lo :start))
-    (PHA)
-    (LDA.IMM (hi :start))
-    (PHA)
-    (RTS)
-    
-    (ds nil "Tetradic Chronisms")
-    (db :a-non-zpg-variable #x55)
-    (NOP)
-    (label :end)
- )
-  
-  (hexdump #x0000 #x100)
-  (hexdump #x0600 #x100))

@@ -1,6 +1,6 @@
-## 30/5/2017 Label namespaces and VICKY
+## 30/5/2017 Label namespaces, VICKY and YAGNI
 
-It would be nice to use the same generice names for labels when writing assembly language, e.g. next, done, start, end. To this end, I added namespaces. Using the macro with-namespace instructs the assembler to try to resolve all labels in the specified namespace. If it can't find one, it tries the global namespace. The label directive will apply the label to the currently active namespace unless told otherwise by an optional namespace parameter. This is useful for 'exposing' a label in the middle of a namespace block.
+It would be nice to use the same generic names for labels when writing assembly language, e.g. next, done, start, end. To this end, I added namespaces. Using the macro with-namespace instructs the assembler to try to resolve all labels in the specified namespace. If it can't find one, it tries the global namespace. The label directive will apply the label to the currently active namespace unless told otherwise by an optional namespace parameter. This is useful for 'exposing' a label in the middle of a namespace block. Of course, it isn't really exposing anything, since it the label is available everywhere with its qualifier. The qualifier is added by consing it to the label; I will probably change this to something nicer if it gets in the way. If it doesn't get in the way then I won't, as it is YAGNI, which from now on will be referred to as yaggers.
 
 ~~~~
  (with-namespace :decode-string
@@ -8,9 +8,9 @@ It would be nice to use the same generice names for labels when writing assembly
       (zp-b :sym 0)
       
       (label :next)
-      (INC.ZP (lo-add :decode-string-add))
+      (INC.ZP (lo-add :a-global-string-add))
       (BNE :decode-string)
-      (INC.ZP (hi-add :decode-string-add))
+      (INC.ZP (hi-add :a-global-string-add))
       (BEQ :done)
       (label :decode-string nil) ; in the global namespace
       (LDY.IMM #x0)
@@ -25,7 +25,7 @@ It would be nice to use the same generice names for labels when writing assembly
 
 VICKY (I was going to go for V.I.C.K.Y. Perhaps there's a movie in there somewhere about a regular schoolgirl who is actually a robot) is a view of an mmap'ed section of memory, rendered to the screen in the washed out palette of the VIC-II fromm the C64. This is giving the 6502 code something to target. For now, it will just render the hi-res bitmap mode, 320x200 which I plan on using for the adventure game.
 
-Look, here is a test rendering I dumped in using a 'medieval' style font. Sadly I think that at 12 pixels high, it will be too big, there being room for only 15 lines. Note the horrific horizontal spacing- variable width rendering of fonts is next on the agenda.
+Look, here is a test rendering I dumped in using a 'medieval' style font. Sadly I think that at 12 pixels high, it will be too big, there being room for only 15 lines (the original, 8-bit break on which it was based is even bigger). Note the horrific horizontal spacing- variable width rendering of fonts is next on the agenda. For some of you, the brown and yellow colour scheme will bring back memories redolent of languorous summers spent indoors waiting for tapes to load. I had a Spectrum, so I feel nothing. Perhaps resentment, not greatly dulled by time.
 
 ![Alt text](/capture.png)
 

@@ -1,3 +1,61 @@
+## 31/5/2017 8 bit multiplication by 10
+
+Let's say you have a bunch of characters that are 10 pixels high and you want to do a multiplication to look up the address of the bytes where you are keeping them. Well, the first step, I thought was to see if we can do multiplication *at all* on the 6502. Here is a new instruction, MUL10, which does it.
+
+Having said that it will be pretty useless as we need a 16 bit address if we are to have any hope of rendering it to the screen.
+
+Anyway, here is a function to multiply by 10, well actually a function that will emit some 6502 machine code to multiply by ten, followed by a function which does it, runs it through an emulator and checks that it actually works.
+
+~~~~
+
+(defun MUL10 ()
+  "Multiply A by ten, if 0 <= A <= 25"
+  (zp-b :scratch)
+  (ASL)
+  (STA.ZP :scratch)
+  (ASL)
+  (ASL)
+  (CLC)
+  (ADC.ZP :scratch))
+
+(defun test-MUL10 ()
+  (dotimes (v 26)
+    (reset-compiler)
+    
+    (ORG #x600)
+
+    (LDA v)
+    (MUL10)
+    (BRK)
+  
+    (monitor-reset #x600)
+    (monitor-run :print nil)
+
+    (multiple-value-bind (buffer pc sp sr a x y)
+	(funcall *monitor-get-state*)
+      (declare (ignore buffer pc sp sr x y))
+      (assert (= a (* v 10))))))
+
+~~~~
+
+Note the scratch reservation with zp-b, scratch is going to be a byte that may change at any time. Except in an interrupt, where we should probably take care not to use it. Because it is lisp and the compiler labels are variables, we can do this instead, though it is Yaggers atm.
+
+~~~~
+
+(let ((*scratch-label* :iscratch))
+	;dangerous interrupt code here
+	...
+	(MUL10)
+	...)
+	
+(defun MUL10 ()
+  "Multiply A by ten, if 0 <= A <= 25"
+  (zp-b *scratch-label*)
+  (ASL)
+  (STA.ZP *scratch-label*)
+  
+~~~~
+
 ## 30/5/2017 Label namespaces, VICKY and YAGNI
 
 It would be nice to use the same generic names for labels when writing assembly language, e.g. next, done, start, end. To this end, I added namespaces. Using the macro with-namespace instructs the assembler to try to resolve all labels in the specified namespace. If it can't find one, it tries the global namespace. The label directive will apply the label to the currently active namespace unless told otherwise by an optional namespace parameter. This is useful for 'exposing' a label in the middle of a namespace block. Of course, it isn't really exposing anything, since it the label is available everywhere with its qualifier. The qualifier is added by consing it to the label; I will probably change this to something nicer if it gets in the way. If it doesn't get in the way then I won't, as it is YAGNI, which from now on will be referred to as yaggers.
@@ -28,6 +86,8 @@ VICKY (I was going to go for V.I.C.K.Y. Perhaps there's a movie in there somewhe
 Look, here is a test rendering I dumped in using a 'medieval' style font. Sadly I think that at 12 pixels high, it will be too big, there being room for only 15 lines (the original, 8-bit break on which it was based is even bigger). Note the horrific horizontal spacing- variable width rendering of fonts is next on the agenda. For some of you, the brown and yellow colour scheme will bring back memories redolent of languorous summers spent indoors waiting for tapes to load. I had a Spectrum, so I feel nothing. Perhaps resentment, not greatly dulled by time.
 
 ![Alt text](/capture.png)
+
+UPDATE - As you can see three additional fonts have been added, 10 pixels high. There are some flaws. But, meh, fix it when it needs fixing. It will be okay at the sanding stage.
 
 ## 27/5/2017 Roundtrip encoding strings
 

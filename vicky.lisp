@@ -21,7 +21,7 @@
 				       :bpp 24)))
       (let* ((redraw nil)
 	     (timer (make-timer #'(lambda () (setf redraw t)))))
-	(schedule-timer timer 2 :repeat-interval 0.1)
+	(schedule-timer timer 2 :repeat-interval 1)
 	
 	(sdl:with-events ()
 	  (:idle ()

@@ -41,19 +41,29 @@
   (funcall *monitor-step*)
   (monitor-print))
 
+(defun monitor-go ()
+  (monitor-print)
+  (format t "Press RETURN to step, anthing else followed by RETURN to quit~%")
+  (loop while (char= (read-char) #\Newline) do
+       (monitor-step)))
+
 (defun monitor-run (&key (break-on 'BRK) (max-cycles 1000000) (print t))
   (multiple-value-bind (buffer pc sp sr a x y)
       (funcall *monitor-get-state*)
-    (declare (ignore sp sr a x y))
+    (declare (ignore sp pc sr a x y))
     (let ((*compiler-buffer* buffer))
       (loop for i from 1 to max-cycles do
-	   (funcall *monitor-step*)
-	   (let ((op (gethash (aref *compiler-buffer* pc)
-			      *reverse-opcodes*)))
-	     (when (and op (eq break-on (car op)))
-	       (return))))
-      (when print
-	(monitor-print)))))
+	   (multiple-value-bind (buffer pc sp sr a x y)
+	       (funcall *monitor-get-state*)
+	     (declare (ignore buffer sp sr a x y))
+	     (let ((op (gethash (aref *compiler-buffer* pc)
+				*reverse-opcodes*)))
+	       (format t "~4,'0X ~a~%" pc op)
+	       (when (and op (eq break-on (car op)))
+		 (return)))
+	     (funcall *monitor-step*)))
+	   (when print
+	     (monitor-print)))))
 
 (defun monitor-buffer ()
   (funcall *monitor-buffer*))

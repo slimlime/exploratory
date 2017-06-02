@@ -7,10 +7,12 @@
 (defparameter *compiler-disassembler-hints* nil)
 (defparameter *compiler-buffer* nil)
 (defparameter *compiler-labels* nil)
+(defparameter *compiler-aliases* nil)
 (defparameter *compiler-ensure-labels-resolve* nil)
 (defparameter *compiler-zp-free-slot* nil)
 (defparameter *compiler-debug* nil)
 (defparameter *compiler-comments* nil)
+(defparameter *compiler-postfix-comments* nil)
 (defparameter *compiler-label-namespace* nil)
 
 ; todo A way of providing a 'spare byte/word' to the compile
@@ -24,10 +26,12 @@
   (setf *compiler-disassembler-hints* (make-hash-table))
   (setf *compiler-ensure-labels-resolve* nil)
   (setf *compiler-labels* (make-hash-table :test 'equal))
+  (setf *compiler-aliases* (make-hash-table :test 'equal))
   (setf *compiler-buffer* (make-array buffer-size
 				      :element-type '(unsigned-byte 8)
 				      :initial-element 0))
   (setf *compiler-comments* (make-hash-table))
+  (setf *compiler-postfix-comments* (make-hash-table))
   (setf *compiler-zp-free-slot* 0)
   (values))
 
@@ -47,10 +51,15 @@
 			    (:izx 'zpg)  (:izy 'zpg)
 			    (:imm 'byte) (:ind 'addr))))
 	       (push `(defun ,(intern
-			       (format nil "~a.~a"
-				       (string opcode)
-				       (string mode)))
-			  ,(list param)
+			       (if (and (not (eq 'AND opcode))
+					(eq :imm mode))
+				   (format nil "~a"
+					   (string opcode))
+				   (format nil "~a.~a"
+					   (string opcode)
+					   (string mode))))
+			  ,(list param '&optional 'comment)
+			,(list 'when 'comment '(dc comment t))
 			,(list (intern (string mode))
 			       `',opcode
 			       param)) todo))))
@@ -129,7 +138,11 @@
   (push-op op mode)
   (multiple-value-bind (addr resolved) (resolve zpg)
     (if resolved
-	(push-byte addr)
+	(progn
+	  (assert (and (>= addr 0) (< addr 256))
+		  nil "Could not use zero-page addressing for ~a as it was not on the zero page (~a)"
+		  zpg addr)
+	  (push-byte addr))
 	(push-byte 0))))
 
 (defun push-addr-op (op mode addr)
@@ -140,25 +153,39 @@
   (if (numberp arg)
       (values arg t)
       (let ((addr nil))
-	; try first in the label namespace
-	(when *compiler-labels*
-	  (setf addr (gethash (cons *compiler-label-namespace* arg) *compiler-labels*)))
-	; if no match try again in the global namespace
-	(unless addr
-	  (setf addr (gethash arg *compiler-labels*)))
-; on the first pass only, allow labels to be nil
-	(when (and (null addr) 
-		   *compiler-ensure-labels-resolve*)
-	  (assert nil nil (format nil "The label ~a was not resolved" arg)))
-	(if addr
-	    (values addr t)
-	    (values 0 nil)))))
+	;; if there is an alias, then resolve that to a label first
+	(let ((aliased-label (gethash 
+			      (if (consp arg)
+				  arg
+				  (cons *compiler-label-namespace* arg))
+			      *compiler-aliases*)))
+	  (if aliased-label
+	      ;; use the aliased label with the namespace
+	      ;; it was applied with, ignore the current namespace
+	      (setf addr (gethash aliased-label *compiler-labels*))
+	      ;; otherwise try the label in the current namespace
+	      ;; followed by the global namespace
+	      (progn
+		(when *compiler-label-namespace*
+		  (setf addr (gethash (cons *compiler-label-namespace* arg)
+				      *compiler-labels*)))
+		;; if no match try again in the global namespace
+		(unless addr
+		  (setf addr (gethash arg *compiler-labels*)))))
+	  ;; on the first pass only, allow
+	  ;; labels to be null (resolve to 0 if so)
+	  (when (and (null addr) 
+		     *compiler-ensure-labels-resolve*)
+	    (assert nil nil (format nil "The label ~a was not resolved (aliased-label [~a])" arg aliased-label)))
+	  (if addr
+	      (values addr t)
+	      (values 0 nil))))))
 
 ;; assembler instructions
 
-(defun org (add)
-  (assert-address add)
-  (setf *compiler-ptr* add))
+ (defun org (add)
+   (assert-address add)
+   (setf *compiler-ptr* add))
 
 (defun label (label &optional (namespace nil namespace-p))
   (assert (not (numberp label)))
@@ -169,6 +196,12 @@
     ; combine the label and namespace if one is present
     (setf label (cons namespace label)))
   (setf (gethash label *compiler-labels*) *compiler-ptr*))
+
+(defun alias (alias label)
+  (assert (not (numberp alias)))
+  (when *compiler-label-namespace*
+    (setf alias (cons *compiler-label-namespace* alias)))
+  (setf (gethash alias *compiler-aliases*) label))
 
 (defun db (label &rest bytes)
   (add-hint (length bytes)
@@ -192,35 +225,62 @@
        (push-byte (char-code c)))
   (push-byte 0))
 
+(defun dc (comment &optional (postfix nil))
+  (when *compiler-debug*
+    (print comment))
+  (let ((*compiler-comments* (if postfix
+				 *compiler-postfix-comments*
+				 *compiler-comments*)))
+    (let ((comments (gethash *compiler-ptr* *compiler-comments*)))
+      (if comments
+	  (unless (member comment comments :test 'equal)
+	    (setf (gethash *compiler-ptr* *compiler-comments*)
+		  (cons comment comments)))
+	  (setf (gethash *compiler-ptr* *compiler-comments*) (list comment))))))
+
+(defun fmt-label (label &optional (namespace-p nil))
+  (if (consp label)
+	(if namespace-p 
+	    (format nil "~a:~a" (car label) (cdr label))
+	    (format nil "~a" (cdr label)))
+	(format nil "~a" label)))
+
 (defun hi (addr)
+  "Return the high byte of an address"
+  (unless (numberp addr)
+    (dc (format nil "HI : ~a" (fmt-label addr t)) t))
   (ash (resolve addr) -8))
 
 (defun lo (addr)
+  "Return the lo byte of an address"
+  (unless (numberp addr)
+    (dc (format nil "LO : ~a" (fmt-label addr t)) t))
   (logand #xFF (resolve addr)))
 
-;address of the lo byte of a word
 (defun lo-add (addr)
+  "Return the address of the lo byte, aka the address itself"
+  (unless (numberp addr)
+    (dc (format nil "~a" (fmt-label addr t)) t))
   (resolve addr))
 
 (defun hi-add (addr)
+  "Return the address of the hi byte of a label, aka the address + 1"
+  (unless (numberp addr)
+    (dc (format nil "~a + 1" (fmt-label addr t)) t))
   (1+ (resolve addr)))
 
-(defun dc (comment)
-  (let ((comments (gethash *compiler-ptr* *compiler-comments*)))
-    (if comments
-	(unless (member comment comments :test 'equal)
-	  (setf (gethash *compiler-ptr* *compiler-comments*)
-		(cons comment comments)))
-	(setf (gethash *compiler-ptr* *compiler-comments*) (list comment)))))
+;todo remove byte/word as not really setting it and also clashes
+;if it appears once in the program, could assemble a zero page
+;set up routine if needed.
 
-(defun zp-b (label byte)
+(defun zp-b (label &optional (byte 0))
   (assert (> #xFF *compiler-zp-free-slot*))
   (unless (gethash label *compiler-labels*)
     (let ((*compiler-ptr* *compiler-zp-free-slot*))
       (db label byte))
     (incf *compiler-zp-free-slot*)))
 
-(defun zp-w (label word)
+(defun zp-w (label &optional (word 0))
   (assert (> #xFE *compiler-zp-free-slot*))
   (unless (gethash label *compiler-labels*)
     (let ((*compiler-ptr* *compiler-zp-free-slot*))
@@ -237,6 +297,13 @@
      (dc (format nil "+ ~a" ,ns))
      ,@body
      (dc (format nil "- ~a" ,ns)))))
+
+(defun dump-aliases ()
+  (maphash #'(lambda (k v) (format t "~a -> ~a~%" (fmt-label k t) v)) *compiler-aliases*))
+
+(defun dump-labels ()
+  (maphash #'(lambda (k v) (format t "~a -> ~4,'0X~%" (fmt-label k t) v)) *compiler-labels*))
+
 
 ;; 6502 instructions by mode
 
@@ -257,9 +324,13 @@
 
 (defun rel (op label)
   (push-op op :rel)
-  (multiple-value-bind (addr resolved) (resolve label)
-    (push-sbyte (if resolved (- addr (1+ *compiler-ptr*))
-		    0))))
+  (if (numberp label)
+      ;for relative addressing we assume that
+      ;if a number is passed then it is relative
+      (push-sbyte label)
+      (multiple-value-bind (addr resolved) (resolve label)
+	(push-sbyte (if resolved (- addr (1+ *compiler-ptr*))
+			0)))))
 
 (defun rel-addr (offset bra-addr)
   (+ 2 bra-addr (if (> offset #x7F)
@@ -316,19 +387,18 @@
 
 ;;;; Disassembler
 
-(defun fmt-label (label &optional (namespace-p nil))
-  (if (consp label)
-	(if namespace-p 
-	    (format nil "~a:~a" (car label) (cdr label))
-	    (format nil "~a" (cdr label)))
-	(format nil "~a" label)))
+(defun right-justify (s)
+  (subseq (format nil "            ~a" s)
+	  (length s)))
 
 (defun disassemble-6502 (start end &key (buffer nil))
   (when (null buffer) (setf buffer *compiler-buffer*))
-  (setf start (resolve start))
-  (setf end (resolve end))
+  (let ((*compiler-ensure-labels-resolve* t))
+    (setf start (resolve start))
+    (setf end (resolve end)))
   (let ((lab (make-hash-table)))		
-					;invert the label table
+    ;;invert the label table i.e. lookup label by address
+    ;;todo, additional labels at the same address are currently hidden
     (maphash #'(lambda (k v) (setf (gethash v lab) k))
 	     *compiler-labels*)
     (loop for i from start to end do
@@ -338,14 +408,15 @@
 		(arg1 (aref buffer (+ 1 i)))
 		(arg2 (aref buffer (+ 2 i))))
 	   (let* ((label (gethash i lab))
-		  (str (if label 
-			   (subseq (format nil "~a~a" (fmt-label label) "             ") 0 13)
-			   "             "))
+		  (str (if label
+			   (right-justify (fmt-label label))
+			   "            "))
 		  (hint (gethash i *compiler-disassembler-hints*))
-		  (comments (gethash i *compiler-comments*)))
+		  (comments (gethash i *compiler-comments*))
+		  (postfix-comments (gethash i *compiler-postfix-comments*)))
 	     (when comments
 	       (dolist (comment (reverse comments))
-		 (format t "              ;~a~%" comment)))
+		 (format t "             ;~a~%" comment)))
 	     (format t "~a ~4,'0X ~2,'0X" str i (aref buffer i))
 	     (if (and hint (numberp (car hint)))
 		 (progn
@@ -380,5 +451,7 @@
 		     (:zpy (format-1 "~2,'0X    ~a $~2,'0X,Y"))
 		     (:aby (format-2 "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X,Y"))
 		     (:abx (format-2 "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X,Y")))))
-	   (terpri))
-    (values)))))
+	     (dolist (comment (reverse postfix-comments))
+	       (format t "~45,1T;~a" comment))
+	     (terpri))
+	   (values)))))

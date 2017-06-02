@@ -1,4 +1,69 @@
-## 31/5/2017 8 bit multiplication by 10
+# 2/6/2017 Rendering an upside down G
+
+## Flag and register value sneakery
+
+6502 has no BRA. Sometimes we need a BRA, so
+
+~~~~
+(LDY 10 "10 pixel character height")
+(BNE :go)
+~~~~
+
+Sneaky. 6502.org details a lot more of these kind of shenanighans.
+
+For the font renderer, I have used Y as a counter to index into the character data. Counting down to zero is best, there's no comparison. Here I use the (supposedly rarely used) X indexed indirect zero page addressing mode without having to reach for the far more sensible Y indirect indexed mode, which would necessitate preserving the state of Y somewhere horrible like the stack.
+
+~~~~
+(DEX)
+(BNE :shift-right)
+(ORA.IZX :raster "Bam, free indirection into raster, since X is 0")
+~~~~
+
+Which leads me to the upside-downness of the G. Since we count down, we index from the top of the data. Boo. Rather than count up and do a wasteful and aesthetically displeasing CMP, we simply reverse the generated font data. Never do at run-time what can be done at assembly time. Especially when your runtime is 1Mhz and you don't even have an instruction to increment the accumulator.
+
+## Label aliasing
+
+Since the 6502 has basically no registers we use the zeropage in its place. So it is nice to define bytes and words for specific important uses (e.g. important global state), but it is also nice to use it for 'local variables' which may change from function to function. All this acheives is a nicer disassembly.
+
+~~~~
+(zp-w :something-important)
+(zp-w :A0) ;scratch data
+(zp-w :A1)
+(zp-w :A2)
+
+...
+
+(label :a-function)
+(alias :multiplier :A0)		;use A0 for our multiplier
+(LDA :multiplier)
+~~~~
+
+## First conceptual problem
+
+The first hard problem has arisen. Consider the following snippet,
+
+~~~~
+(defun inc16.zp (label)
+  "Increment a zero-page word"
+  (INC.ZP (lo-add label))
+  (BNE :end)
+  (INC.ZP (hi-add label))
+  (label :end))
+~~~~
+
+To the human eye, this looks reasonable, but since labels are placed into a global table, if you call this function twice, one instance will not know which end to call. Wrapping in a namespace doesn't help either. Now the problem is one of identifying the instance of the label from one pass to another, which is really the second problem in computer science. There's probably a way to resolve the labels using a fancy algorithm. Until I figure out what that is and if it is worth it, the first solution is,
+
+~~~~
+(defun inc16.zp (label)
+  "Increment a zero-page word"
+  (INC.ZP (lo-add label))
+  (BNE 2)
+  (INC.ZP (hi-add label)))
+~~~~
+
+Ultimate Yaggers- now I can continue with the font renderer.
+
+# 31/5/2017 8 bit multiplication by 10
 
 Let's say you have a bunch of characters that are 10 pixels high and you want to do a multiplication to look up the address of the bytes where you are keeping them. Well, the first step, I thought was to see if we can do multiplication *at all* on the 6502. Here is a new instruction, MUL10, which does it.
 
@@ -56,7 +121,7 @@ Note the scratch reservation with zp-b, scratch is going to be a byte that may c
   
 ~~~~
 
-## 30/5/2017 Label namespaces, VICKY and YAGNI
+# 30/5/2017 Label namespaces, VICKY and YAGNI
 
 It would be nice to use the same generic names for labels when writing assembly language, e.g. next, done, start, end. To this end, I added namespaces. Using the macro with-namespace instructs the assembler to try to resolve all labels in the specified namespace. If it can't find one, it tries the global namespace. The label directive will apply the label to the currently active namespace unless told otherwise by an optional namespace parameter. This is useful for 'exposing' a label in the middle of a namespace block. Of course, it isn't really exposing anything, since it the label is available everywhere with its qualifier. The qualifier is added by consing it to the label; I will probably change this to something nicer if it gets in the way. If it doesn't get in the way then I won't, as it is YAGNI, which from now on will be referred to as yaggers.
 
@@ -79,7 +144,7 @@ It would be nice to use the same generic names for labels when writing assembly 
       (STA.ZP :sym)
 ~~~~
 
-### VICKY
+## VICKY
 
 VICKY (I was going to go for V.I.C.K.Y. Perhaps there's a movie in there somewhere about a regular schoolgirl who is actually a robot) is a view of an mmap'ed section of memory, rendered to the screen in the washed out palette of the VIC-II fromm the C64. This is giving the 6502 code something to target. For now, it will just render the hi-res bitmap mode, 320x200 which I plan on using for the adventure game.
 
@@ -89,7 +154,7 @@ Look, here is a test rendering I dumped in using a 'medieval' style font. Sadly 
 
 UPDATE - As you can see three additional fonts have been added, 10 pixels high. There are some flaws. But, meh, fix it when it needs fixing. It will be okay at the sanding stage.
 
-## 27/5/2017 Roundtrip encoding strings
+# 27/5/2017 Roundtrip encoding strings
 
 Compressed strings can be added to the program with the assembler command dcs, e.g.
 

@@ -4,6 +4,8 @@
   "Update VICKY from the monitor buffer"
   (copy-to-screen-buffer (monitor-buffer) *screen-address*))
 
+(defparameter *font-height* 10)
+
 (defun render-char ()
 
   ; some scratch area from the zero page
@@ -11,7 +13,6 @@
 
   (zp-w :A0)
   (zp-w :A1)
-  (zp-w :A2)
 
   (zp-b :D0)
   (zp-b :D1)
@@ -20,19 +21,12 @@
 
   (with-namespace :render-char
     (alias :char :A0)
-    (alias :top :A1)
-    (alias :raster :A2)
+    (alias :raster :A1)
 
     (alias :shift :D0)
     (alias :temp-char-index :D1)
-
-    ;todo swap x and y might free up the raster.
-    ;we can always move it back to the top and across
     
-    (dc "Get the screen pointer and transfer it to a temporary")
-    (dc "zero page word, we will use that as our raster")
-    (cpy16.zp :top :raster)
-    (LDY 10 "10 pixel character height")
+    (LDY *font-height* (format nil "~a pixel character height" *font-height*))
     (BNE :go)
     (label :next)
     (dc "Move the raster to the next line")
@@ -64,7 +58,7 @@
     (STA.IZX :raster)
     (dc "Now shift the same character byte left by 8-offset")
     (LDA 8)
-    (CLC)
+    (SEC)
     (SBC.ZP :shift)
     (TAX)
     (dc "Get the bit pattern again")
@@ -86,10 +80,18 @@
     (ADC.ZP :shift)
     (CMP 8)
     (BCC :not-wrapped)
-    (inc16.zp :top)
-    (AND.IMM #x7) 
-    (label :not-wrapped)
+    (dc "There is a case where we will have a char of width 9")
+    (dc "this means we need to advance an extra byte")
+    (dc "Doing this compare clears the carry when we don't")
+    (CMP 16)
+    (AND.IMM #x7)
     (STA.ZP :shift)
+    (sbc16.zp (1- (* 40 (1- *font-height*))) :raster)
+    (RTS)
+    (label :not-wrapped)
+    (dc "Move the raster back up, and left 1 byte")
+    (STA.ZP :shift)
+    (sub16.zp (1+ (* 40 (1- *font-height*))) :raster)
     (RTS)
 
 ))
@@ -102,10 +104,28 @@
 	   (org #x600)
 	   (CLD)
 	   (label :render-test)
-	   (LDA #x4)
-	   (STA.ZP (cons :render-char :shift))
-	   (sta16.zp #x80F0 (cons :render-char  :top))
 
+	   (zp-b :count)
+	   (zp-w :y)
+	   
+	   (sta16.zp #x80F0 :y)
+
+	   (LDA 7)
+	   (STA.ZP :count)
+	   (label :doit)
+	   (LDA.ZP :count)
+	   (STA.ZP (cons :render-char :shift))
+
+	   (LDA.ZP (lo-add :y))
+	   (CLC)
+	   (ADC #xB8)
+	   (STA.ZP (lo-add :y))
+	   (LDA.ZP (hi-add :y))
+	   (ADC #x01)
+	   (STA.ZP (hi-add :y))
+
+	   (cpy16.zp :y (cons :render-char :raster))
+	   	   
 	   (sta16.zp '(:past . #\C) (cons :render-char :char))
 	   
 	   (JSR :render-char)
@@ -129,8 +149,11 @@
 	   (JSR :render-char)
 	   (sta16.zp '(:past . #\e) (cons :render-char :char))
 	   
-	   (JSR :render-char)
+	   (JSR :render-char)	   
 	   
+	   (DEC.ZP :count)
+	   (BNE :doit)
+
 	   (BRK)
 
 	   (render-char)

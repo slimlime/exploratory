@@ -11,6 +11,26 @@
   (BNE 2)
   (INC.ZP (hi-add label)))
 
+(defun sub16.zp (value zp)
+  "Subtract a 16 bit value from a zero-page word"
+  (SEC)
+  (LDA.ZP (lo-add zp))
+  (SBC (lo value))
+  (STA.ZP (lo-add zp))
+  (LDA.ZP (hi-add zp))
+  (SBC (hi value))
+  (STA.ZP (hi-add zp)))
+
+(defun sbc16.zp (value zp)
+  "Subtract a 16 bit value from a zero-page word without setting the carry first"
+  (LDA.ZP (lo-add zp))
+  (SBC (lo value))
+  (STA.ZP (lo-add zp))
+  (LDA.ZP (hi-add zp))
+  (SBC (hi value))
+  (STA.ZP (hi-add zp)))
+
+
 (defun cpy16.zp (from to)
   "Copy a zero page word to another using A"
   (LDA.ZP (lo-add from))

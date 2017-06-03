@@ -8,6 +8,9 @@
 (defparameter *monitor-watches* nil)
 (defparameter *monitor-buffer* nil)
 
+(defun hex (number)
+  (format t "~4,'0X" number))
+
 (defun monitor-print ()
   (multiple-value-bind (buffer pc sp sr a x y)
       (funcall *monitor-get-state*)
@@ -58,6 +61,7 @@
 	     (declare (ignore buffer sp sr a x y))
 	     (let ((op (gethash (aref *compiler-buffer* pc)
 				*reverse-opcodes*)))
+	       ;(format t "~2,'0X ~a~%" pc op)
 	       (when (and op (eq break-on (car op)))
 		 (return)))
 	     (funcall *monitor-step*)))

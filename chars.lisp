@@ -33,6 +33,16 @@
 
   ;; this comment makes me think we can store something in the high
   ;; nybble! Since the character data is taking up about 6 pages
+  ;; 
+  ;; Kerning idea
+  ;; 7       6       5       4       3       2       1       0
+  ;; Top R   Bot R   Top L   Bot L   ----- width --------------
+  ;; In the high nybble, a set bit indicates the character is
+  ;; 'free' in the quadrant described, clear bit, occupied
+  ;; Lo R indicates the character is occupied in the lower right
+  ;; That way, a kerning offset can be produced by looking at
+  ;; the next character. Clear bit so that they can be set on
+  ;; an ad-hoc basis for commonly occurring pairs.
 
   (let ((font-name nil))
     (flet ((defchar (c data)

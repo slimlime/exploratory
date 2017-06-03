@@ -58,7 +58,6 @@
 	     (declare (ignore buffer sp sr a x y))
 	     (let ((op (gethash (aref *compiler-buffer* pc)
 				*reverse-opcodes*)))
-	       (format t "~4,'0X ~a~%" pc op)
 	       (when (and op (eq break-on (car op)))
 		 (return)))
 	     (funcall *monitor-step*)))
@@ -73,7 +72,7 @@
   (setf *monitor-buffer* #'(lambda () (cl-6502:get-range 0)))
   (setf (cl-6502:get-range 0) buffer)
   (setf (6502:cpu-pc cl-6502:*cpu*) org)
-  (setf *monitor-step* 
+  (setf *monitor-step*
 	#'(lambda ()
 	    (let ((byte (cl-6502:get-byte (6502:cpu-pc cl-6502:*cpu*))))
 	      ; BRK seems to fubar cl-6502 next time it is called

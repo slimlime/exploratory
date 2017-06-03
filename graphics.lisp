@@ -20,11 +20,14 @@
 
   (with-namespace :render-char
     (alias :char :A0)
-    (alias :top :A1) ;if this becomes an input move it from scratch
+    (alias :top :A1)
     (alias :raster :A2)
 
     (alias :shift :D0)
     (alias :temp-char-index :D1)
+
+    ;todo swap x and y might free up the raster.
+    ;we can always move it back to the top and across
     
     (dc "Get the screen pointer and transfer it to a temporary")
     (dc "zero page word, we will use that as our raster")
@@ -78,8 +81,16 @@
     (dc "Now, the first byte of the character data holds the")
     (dc "width of the character. Add it to the offset and")
     (dc "if necessary, increment the screen ptr")
-
-    (BRK)
+    (LDA.IZY :char)
+    (CLC)
+    (ADC.ZP :shift)
+    (CMP 8)
+    (BCC :not-wrapped)
+    (inc16.zp :top)
+    (AND.IMM #x7) 
+    (label :not-wrapped)
+    (STA.ZP :shift)
+    (RTS)
 
 ))
 
@@ -91,15 +102,49 @@
 	   (org #x600)
 	   (CLD)
 	   (label :render-test)
-	   (sta16.zp '(:past . #\G) (cons :render-char :char))
-	   (sta16.zp #x8000 (cons :render-char  :top))
+	   (LDA #x4)
+	   (STA.ZP (cons :render-char :shift))
+	   (sta16.zp #x80F0 (cons :render-char  :top))
+
+	   (sta16.zp '(:past . #\C) (cons :render-char :char))
 	   
+	   (JSR :render-char)
+	   (sta16.zp '(:past . #\o) (cons :render-char :char))
+	   
+	   (JSR :render-char)
+	   (sta16.zp '(:past . #\v) (cons :render-char :char))
+	   
+	   (JSR :render-char)
+	   (sta16.zp '(:past . #\e) (cons :render-char :char))
+	   
+	   (JSR :render-char)
+	   (sta16.zp '(:past . #\f) (cons :render-char :char))
+	   
+	   (JSR :render-char)
+	   (sta16.zp '(:past . #\e) (cons :render-char :char))
+	   
+	   (JSR :render-char)
+	   (sta16.zp '(:past . #\f) (cons :render-char :char))
+	   
+	   (JSR :render-char)
+	   (sta16.zp '(:past . #\e) (cons :render-char :char))
+	   
+	   (JSR :render-char)
+	   
+	   (BRK)
+
 	   (render-char)
+	   
 	   (font-data)))
 
     (pass)
     (setf *compiler-ensure-labels-resolve* t)
     (pass))
  
-  (monitor-reset #x600))
+  (monitor-reset #x600)
+  (monitor-run)
+  (update-vicky)
+)
+
+
 

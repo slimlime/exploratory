@@ -1,14 +1,14 @@
 ;; this file contains code to write characters to screen
 
 (defun byte-width (b)
-  (when (= 1 (logand 1 b)) (return-from byte-width 9))
-  (when (= 2 (logand 2 b)) (return-from byte-width 8))
-  (when (= 4 (logand 4 b)) (return-from byte-width 7))
-  (when (= 8 (logand 8 b)) (return-from  byte-width 6))
-  (when (= 16 (logand 16 b)) (return-from byte-width 5))
-  (when (= 32 (logand 32 b)) (return-from byte-width 4))
-  (when (= 64 (logand 64 b)) (return-from byte-width 3))
-  (when (= 128 (logand 128 b)) (return-from byte-width 2)))
+  (when (= 1 (logand 1 b)) (return-from byte-width 8))
+  (when (= 2 (logand 2 b)) (return-from byte-width 7))
+  (when (= 4 (logand 4 b)) (return-from byte-width 6))
+  (when (= 8 (logand 8 b)) (return-from  byte-width 5))
+  (when (= 16 (logand 16 b)) (return-from byte-width 4))
+  (when (= 32 (logand 32 b)) (return-from byte-width 3))
+  (when (= 64 (logand 64 b)) (return-from byte-width 2))
+  (when (= 128 (logand 128 b)) (return-from byte-width 1)))
 
 (defun char-width (data)
   (byte-width (apply #'logior data)))
@@ -29,6 +29,7 @@
 (defun font-data ()
 
   (dc "Font tables. First byte of each character is the width")
+  (dc "Characters are stored upside down")
 
   ;; this comment makes me think we can store something in the high
   ;; nybble! Since the character data is taking up about 6 pages
@@ -37,8 +38,8 @@
     (flet ((defchar (c data)
 	     ;;apply the define bytes function to the character data
 	     (apply #'db (append (list (cons font-name c))
-				 (list (char-width data))
-				 data)))
+				 (list (1+ (char-width data)))
+				 (reverse data))))
 	   (deffont (label)
 	     (setf font-name label)
 	     (label label :font)

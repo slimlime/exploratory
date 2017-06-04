@@ -113,8 +113,9 @@
   (assert (< byte 256)))
 
 (defun push-byte (byte)
-  (assert-byte byte)
-  (setf (aref *compiler-buffer* *compiler-ptr*) byte)
+  (when *compiler-final-pass*
+    (assert-byte byte))
+  (setf (aref *compiler-buffer* *compiler-ptr*) (logand byte #xff))
   (incf *compiler-ptr*))
 
 (defun push-sbyte (byte)

@@ -14,10 +14,14 @@
   (zp-w :A0)
   (zp-w :A1)
   (zp-w :A2)
-  
+    
   (zp-b :D0)
   (zp-b :D1)
   (zp-b :D2)
+
+  ; some non-scratch zpg
+
+  (zp-w :font)
 
   (when *symbol-table*
 
@@ -81,10 +85,14 @@
 	(dc "Look up address of character data")
 	(dc "table is offset by one as EOS is not present")
 	(TAX)
-	(LDA.ABX (1- (resolve :1ch-hi)))
-	(STA.ZP (hi-add '(:typeset . :char)))
 	(LDA.ABX (1- (resolve :1ch-lo)))
-	(STA.ZP (lo-add '(:typeset . :char)))
+	(CLC)
+	(dc "Add the offset of the font")
+	(ADC.ZP (lo-add :font))
+	(STA.ZP (lo-add '(:typeset . :char)))	
+	(LDA.ABX (1- (resolve :1ch-hi)))
+	(ADC.ZP (hi-add :font))
+	(STA.ZP (hi-add '(:typeset . :char)))
 	(JMP :typeset)
 	(label :done)
 	(RTS)
@@ -119,7 +127,24 @@
 	      (hi (list :1ch-hi)))
 	  (loop for i from 1 to (1- first-two-char) do
 	       ;start at 1 as 0 is EOS
-	       (let ((label (cons :past (char (aref *symbol-table* i) 0))))	   
+	       (let* ((c (char (aref *symbol-table* i) 0))
+		      (label (cons :present c)))
+		 
+		 ;compiler check that characters in the other two typefaces are present
+		 
+		 (resolve (cons :past c))
+		 (resolve (cons :future c))
+
+		 (when *compiler-final-pass*
+		   (format t "~4,'0X ~4,'0X ~c~%" (resolve label)
+			   (resolve '(:font . :present))
+			   c))
+
+		 ;store the relative offset into the font, now we are insisting
+		 ;that the characters in each font are in the same order
+		 (setf label (- (resolve label)
+				(resolve '(:font . :present))))
+		 		 
 		 (push (lo label) lo)
 		 (push (hi label) hi)))
 
@@ -214,9 +239,27 @@
 	   (CLD)
 	   (label :render-test2)
    
-	   (sta16.zp :ctb :A2)
-	   
+	   (LDA 0)
+	   (STA.ZP :D0)
+	   (sta16.zp :str1 :A2)
+	   (sta16.zp '(:font . :present) :font)
 	   (sta16.zp #x80F0 '(:typeset . :raster))
+
+	   (JSR :typeset-cs)
+
+	   (LDA 0)
+	   (STA.ZP :D0)
+	   (sta16.zp :str2 :A2)
+	   (sta16.zp '(:font . :past) :font)
+	   (sta16.zp (+ #x80F0 (* 40 15)) '(:typeset . :raster))
+
+	   (JSR :typeset-cs)
+
+	   (LDA 0)
+	   (STA.ZP :D0)
+	   (sta16.zp :str3 :A2)
+	   (sta16.zp '(:font . :future) :font)
+	   (sta16.zp (+ #x80F0 (* 40 15 2)) '(:typeset . :raster))
 
 	   (JSR :typeset-cs)
 
@@ -225,8 +268,10 @@
 	   (typeset)
 	   (font-data)
 
-	   (dcs :ctb "King Chadric and his russet steed, Portia")))
-
+	   (dcs :str1 "Chad Jenkins and his red Porsche.")
+	   (dcs :str2 "King Chadric and his russet steed, Portia.")
+	   (dcs :str3 "Galacto Imperator Chadrix.")))
+    
     (pass)
     
     (build-symbol-table)
@@ -257,6 +302,8 @@
 	   (zp-b :count)
 	   (zp-w :y)
 	   
+	   
+	   (sta16.zp '(:font . :present) :font)
 	   (sta16.zp #x80F0 :y)
 
 	   (LDA 7)

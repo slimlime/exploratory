@@ -42,19 +42,11 @@
 	     (label label :font)
 	     (dc (format nil "~a font table" font-name))))
 
-      ; A space for all seasons. We should probably special case this
-      ; in the text renderer.
-
-      (label '(:past . #\ ))
-      (label '(:present . #\ ))
-      (label '(:future . #\ ))
-      
-      (db nil 4 0 0 0 0 0 0 0 0 0 0)
-
       ; Now the actual font data
 
       (deffont :present)
 
+      (db '(:present . #\ ) 4 0 0 0 0 0 0 0 0 0 0)
       (defchar #\! '(128 128 128 128 128 128 0 0 128 0))
       (defchar #\' '(160 160 160 0 0 0 0 0 0 0))
       (defchar #\, '(0 0 0 0 0 0 192 192 64 128))
@@ -124,7 +116,8 @@
       (defchar #\z '(0 254 134 12 24 48 96 194 254 0))
 
       (deffont :past)
-    
+
+      (db '(:past . #\ ) 4 0 0 0 0 0 0 0 0 0 0)    
       (defchar #\! '(32 96 224 96 96 96 96 64 32 112))
       (defchar #\' '(0 0 64 192 192 128 0 0 0 0))
       (defchar #\, '(0 0 0 0 0 0 96 224 32 64))
@@ -166,7 +159,7 @@
       (defchar #\X '(199 230 108 56 126 252 56 60 238 199))
       (defchar #\Y '(194 99 99 119 63 27 3 62 124 128))
       (defchar #\Z '(113 255 30 8 126 252 64 240 255 14))
-      (defchar #\a '(0 0 50 252 12 108 220 238 116 0))
+      (defchar #\a '(0 0 48 252 12 108 220 238 116 0))
       (defchar #\b '(96 208 192 220 238 198 198 198 100 56))
       (defchar #\c '(0 0 56 76 196 192 192 228 120 0))
       (defchar #\d '(64 96 48 56 92 204 204 204 232 112))
@@ -195,6 +188,7 @@
 
       (deffont :future)
 
+      (db '(:future . #\ ) 4 0 0 0 0 0 0 0 0 0 0)
       (defchar #\! '(192 192 192 192 224 224 224 224 0 224))
       (defchar #\' '(192 192 192 0 0 0 0 0 0 0))
       (defchar #\, '(0 0 0 0 0 0 0 0 0 96))

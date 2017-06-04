@@ -4,6 +4,20 @@ So rendering from compressed strings in a variety of fonts is almost there. I wa
 
 ![Alt text](/three-fonts.png)
 
+~~~~
+           (sta16.zp :str1 :A2)
+	   (sta16.zp '(:font . :present) :font)
+	   (sta16.zp #x80F0 '(:typeset . :raster))
+
+	   (JSR :typeset-cs)
+
+	   ...
+	   
+	   (dcs :str1 "Chad Jenkins and his red Porsche.")
+~~~~
+
+Note the use of the faked 16 bit mnemonic.
+
 ## Kerning
 
 I have an idea for a simple kerning algorithm. Each letter currently has its width measured by the assembler and leaves exactly one pixel between it and the next. In the length byte of the character data there is a nybble free.

@@ -61,7 +61,8 @@
 	      (car (aref words i))))
       ;assert that code 0 is the eos indicator as we use BEQ
       ;to detect it in the code later
-      (assert (char= (char (aref words 0) 0)  #\nul))
+      (assert (char= (char (aref words 0) 0) #\nul))
+      (assert (char= (char (aref words 1) 0) #\ ))
       words)))
  
 (defun encode-string (str emit)
@@ -78,6 +79,12 @@
 
 (defun build-symbol-table ()
   (setf *symbol-table* (sort-word-table))
+  (when (< (length *symbol-table*) 256)
+	   (setf *symbol-table*
+		 (concatenate 'vector 
+			      *symbol-table*
+			      (make-array (- 256 (length *symbol-table*))
+					  :initial-element "   "))))
   (validate-strings))
 
 (defun process-test ()
@@ -132,7 +139,8 @@
 	  (encode-string str #'(lambda (i word)
 				 (declare (ignore word i))
 				 (incf len)))
-	  (push (cons *compiler-ptr* str) *compiled-strings*)
+	  (when *compiler-final-pass*
+	    (push (cons *compiler-ptr* str) *compiled-strings*))
 	  (add-hint len (format nil "DCS '~a'" str))
 	  (encode-string str #'(lambda (i word)
 				 (declare (ignore word))
@@ -331,8 +339,7 @@
     
     ;; pass 3, resolve all labels
     
-    (setf *compiled-strings* nil) ;reset string table- not idempotent to adds
-    (setf *compiler-ensure-labels-resolve* t)
+    (setf *compiler-final-pass* t)
     
     (pass)))
 

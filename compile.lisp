@@ -8,7 +8,7 @@
 (defparameter *compiler-buffer* nil)
 (defparameter *compiler-labels* nil)
 (defparameter *compiler-aliases* nil)
-(defparameter *compiler-ensure-labels-resolve* nil)
+(defparameter *compiler-final-pass* nil)
 (defparameter *compiler-zp-free-slot* nil)
 (defparameter *compiler-debug* nil)
 (defparameter *compiler-comments* nil)
@@ -24,7 +24,7 @@
 (defun reset-compiler (&optional (buffer-size 65536))
   (setf *compiler-ptr* 0)
   (setf *compiler-disassembler-hints* (make-hash-table))
-  (setf *compiler-ensure-labels-resolve* nil)
+  (setf *compiler-final-pass* nil)
   (setf *compiler-labels* (make-hash-table :test 'equal))
   (setf *compiler-aliases* (make-hash-table :test 'equal))
   (setf *compiler-buffer* (make-array buffer-size
@@ -44,7 +44,9 @@
     (cond ((eq mode :imp)
 	   (push `(defun ,opcode () (imp ',opcode)) todo))
 	  ((eq mode :rel)
-	   (push `(defun ,opcode (label) (rel ',opcode label)) todo))
+	   (push `(defun ,opcode (label &optional comment) 
+		    (dc comment t)
+		    (rel ',opcode label)) todo))
 	  (t (let ((param (case mode 
 			    (:aby 'addr) (:abx 'addr) (:ab  'addr)
 			    (:zp  'zpg)  (:zpx 'zpg)  (:zpy 'zpg)
@@ -101,9 +103,10 @@
   (values)))
 
 (defun add-hint (size str)
-  (setf (gethash *compiler-ptr*
-		 *compiler-disassembler-hints*)
-	(cons size str)))
+  (when *compiler-final-pass*
+    (setf (gethash *compiler-ptr*
+		   *compiler-disassembler-hints*)
+	  (cons size str))))
 
 (defun assert-byte (byte)
   (assert (>= byte 0))
@@ -120,7 +123,7 @@
   (push-byte byte))
 
 (defun push-address (add)
-  (if *compiler-ensure-labels-resolve*
+  (if *compiler-final-pass*
       (assert-address add)
       (setf add (logand add #xFFFF)))
   (push-byte (logand add #xFF))  ;little end
@@ -175,7 +178,7 @@
 	  ;; on the first pass only, allow
 	  ;; labels to be null (resolve to 0 if so)
 	  (when (and (null addr) 
-		     *compiler-ensure-labels-resolve*)
+		     *compiler-final-pass*)
 	    (assert nil nil (format nil "The label ~a was not resolved (aliased-label [~a])" arg aliased-label)))
 	  (if addr
 	      (values addr t)
@@ -226,17 +229,18 @@
   (push-byte 0))
 
 (defun dc (comment &optional (postfix nil))
-  (when *compiler-debug*
-    (print comment))
-  (let ((*compiler-comments* (if postfix
-				 *compiler-postfix-comments*
-				 *compiler-comments*)))
-    (let ((comments (gethash *compiler-ptr* *compiler-comments*)))
-      (if comments
-	  (unless (member comment comments :test 'equal)
-	    (setf (gethash *compiler-ptr* *compiler-comments*)
-		  (cons comment comments)))
-	  (setf (gethash *compiler-ptr* *compiler-comments*) (list comment))))))
+  (when *compiler-final-pass*
+    (when *compiler-debug*
+      (print comment))
+    (let ((*compiler-comments* (if postfix
+				   *compiler-postfix-comments*
+				   *compiler-comments*)))
+      (let ((comments (gethash *compiler-ptr* *compiler-comments*)))
+	(if comments
+	    (unless (member comment comments :test 'equal)
+	      (setf (gethash *compiler-ptr* *compiler-comments*)
+		    (cons comment comments)))
+	    (setf (gethash *compiler-ptr* *compiler-comments*) (list comment)))))))
 
 (defun fmt-label (label &optional (namespace-p nil))
   (if (consp label)
@@ -328,9 +332,12 @@
       ;for relative addressing we assume that
       ;if a number is passed then it is relative
       (push-sbyte label)
-      (multiple-value-bind (addr resolved) (resolve label)
-	(push-sbyte (if resolved (- addr (1+ *compiler-ptr*))
-			0)))))
+      (if *compiler-final-pass*
+	  (multiple-value-bind (addr resolved) (resolve label)
+	    (push-sbyte (if resolved (- addr (1+ *compiler-ptr*))
+			    0)))
+	  (push-sbyte 0))))
+
 
 (defun rel-addr (offset bra-addr)
   (+ 2 bra-addr (if (> offset #x7F)
@@ -393,7 +400,7 @@
 
 (defun disassemble-6502 (start end &key (buffer nil))
   (when (null buffer) (setf buffer *compiler-buffer*))
-  (let ((*compiler-ensure-labels-resolve* t))
+  (let ((*compiler-final-pass* t))
     (setf start (resolve start))
     (setf end (resolve end)))
   (let ((lab (make-hash-table)))		
@@ -450,7 +457,7 @@
 		     (:zpx (format-1 "~2,'0X    ~a $~2,'0X,X"))
 		     (:zpy (format-1 "~2,'0X    ~a $~2,'0X,Y"))
 		     (:aby (format-2 "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X,Y"))
-		     (:abx (format-2 "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X,Y")))))
+		     (:abx (format-2 "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X,X")))))
 	     (dolist (comment (reverse postfix-comments))
 	       (format t "~45,1T;~a" comment))
 	     (terpri))

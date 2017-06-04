@@ -31,19 +31,6 @@
   (dc "Font tables. First byte of each character is the width")
   (dc "Characters are stored upside down")
 
-  ;; this comment makes me think we can store something in the high
-  ;; nybble! Since the character data is taking up about 6 pages
-  ;; 
-  ;; Kerning idea
-  ;; 7       6       5       4       3       2       1       0
-  ;; Top R   Bot R   Top L   Bot L   ----- width --------------
-  ;; In the high nybble, a set bit indicates the character is
-  ;; 'free' in the quadrant described, clear bit, occupied
-  ;; Lo R indicates the character is occupied in the lower right
-  ;; That way, a kerning offset can be produced by looking at
-  ;; the next character. Clear bit so that they can be set on
-  ;; an ad-hoc basis for commonly occurring pairs.
-
   (let ((font-name nil))
     (flet ((defchar (c data)
 	     ;;apply the define bytes function to the character data
@@ -54,6 +41,17 @@
 	     (setf font-name label)
 	     (label label :font)
 	     (dc (format nil "~a font table" font-name))))
+
+      ; A space for all seasons. We should probably special case this
+      ; in the text renderer.
+
+      (label '(:past . #\ ))
+      (label '(:present . #\ ))
+      (label '(:future . #\ ))
+      
+      (db nil 4 0 0 0 0 0 0 0 0 0 0)
+
+      ; Now the actual font data
 
       (deffont :present)
 
@@ -71,6 +69,7 @@
       (defchar #\7 '(252 196 140 12 24 24 48 48 96 224))
       (defchar #\8 '(120 204 132 132 204 120 204 132 204 120))
       (defchar #\9 '(112 216 136 216 120 8 8 24 120 224))
+      (defchar #\? '(0 0 56 124 140 8 48 112 56 16))
       (defchar #\A '(56 28 44 46 70 70 254 135 131 135))
       (defchar #\B '(254 99 99 99 126 99 99 99 99 254))
       (defchar #\C '(63 115 225 192 192 192 192 225 115 62))

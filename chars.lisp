@@ -24,6 +24,23 @@
       (setf tib (ash tib 1)))
     value))
 
+;the width byte contains the width in the lo-nybble.
+;kerning occurs if bit 6 is set AND bit 7 of the next
+;character is set. e.g. for 'To' T would have bit 6 set
+;and o would have bit 7 set
+
+; bit-6 is set with :kern-r 
+; bit-7 is set with :kern-l
+; bit-6 and 7 are set with :kern-lr
+
+(defun width-byte (data &optional kerning)
+  (logior (char-width data)
+	  (case kerning
+	    (:kern-r #x40)
+	    (:kern-l #x80)
+	    (:kern-lr #xC0)
+	    (otherwise 0))))
+
 ; The 3 font tables are going to take up about 2K!
 
 (defun font-data ()
@@ -32,10 +49,10 @@
   (dc "Characters are stored upside down")
 
   (let ((font-name nil))
-    (flet ((defchar (c data)
+    (flet ((defchar (c data &optional kerning)
 	     ;;apply the define bytes function to the character data
 	     (apply #'db (append (list (cons font-name c))
-				 (list (1+ (char-width data)))
+				 (list (width-byte data kerning))
 				 (reverse data))))
 	   (deffont (label)
 	     (setf font-name label)
@@ -46,7 +63,7 @@
 
       (deffont :present)
 
-      (db '(:present . #\ ) 4 0 0 0 0 0 0 0 0 0 0)
+      (db '(:present . #\ ) 3 0 0 0 0 0 0 0 0 0 0)
       (defchar #\! '(128 128 128 128 128 128 0 0 128 0))
       (defchar #\' '(160 160 160 0 0 0 0 0 0 0))
       (defchar #\, '(0 0 0 0 0 0 192 192 64 128))
@@ -93,10 +110,10 @@
       (defchar #\c '(0 62 98 192 192 192 192 98 60 0))
       (defchar #\d '(2 14 6 126 206 198 198 198 206 119))
       (defchar #\e '(0 60 98 254 192 192 192 98 60 0))
-      (defchar #\f '(56 100 96 96 248 96 96 96 96 240))
+      (defchar #\f '(56 100 96 96 248 96 96 96 96 240) :kern-r)
       (defchar #\g '(0 118 206 198 198 206 118 6 70 60))
       (defchar #\h '(32 224 108 118 102 102 102 102 247 0))
-      (defchar #\i '(48 48 0 16 112 48 48 48 48 120))
+      (defchar #\i '(48 48 0 16 112 48 48 48 48 120) :kern-lr)
       (defchar #\j '(96 96 0 32 224 96 96 96 96 192))
       (defchar #\k '(32 224 96 102 100 104 120 108 102 243))
       (defchar #\l '(32 224 96 96 96 96 96 96 96 240))
@@ -106,7 +123,7 @@
       (defchar #\p '(238 115 99 99 99 115 110 96 96 240))
       (defchar #\q '(119 206 198 198 198 206 118 6 6 6))
       (defchar #\r '(0 238 118 102 96 96 96 96 240 0))
-      (defchar #\s '(0 60 100 96 60 6 70 70 60 0))
+      (defchar #\s '(0 60 100 96 60 6 70 70 60 0) :kern-l)
       (defchar #\t '(32 96 96 248 96 96 96 96 104 48))
       (defchar #\u '(0 239 198 198 198 198 198 206 115 0))
       (defchar #\v '(0 247 98 98 52 52 52 24 24 0))
@@ -117,7 +134,9 @@
 
       (deffont :past)
 
-      (db '(:past . #\ ) 4 0 0 0 0 0 0 0 0 0 0)    
+      ;Kerning FeFiFo
+
+      (db '(:past . #\ ) 3 0 0 0 0 0 0 0 0 0 0)    
       (defchar #\! '(32 96 224 96 96 96 96 64 32 112))
       (defchar #\' '(0 0 64 192 192 128 0 0 0 0))
       (defchar #\, '(0 0 0 0 0 0 96 224 32 64))
@@ -163,17 +182,17 @@
       (defchar #\b '(96 208 192 220 238 198 198 198 100 56))
       (defchar #\c '(0 0 56 76 196 192 192 228 120 0))
       (defchar #\d '(64 96 48 56 92 204 204 204 232 112))
-      (defchar #\e '(0 0 56 92 200 208 224 228 120 0))
-      (defchar #\f '(28 44 96 96 248 96 96 112 96 64))
+      (defchar #\e '(0 0 56 92 200 208 224 228 120 0) :kern-l)
+      (defchar #\f '(28 44 96 96 248 96 96 112 96 64) :kern-r)
       (defchar #\g '(0 60 76 204 236 124 12 12 200 240))
       (defchar #\h '(64 192 192 220 238 198 198 198 196 200))
-      (defchar #\i '(32 96 0 96 224 96 96 96 112 96))
+      (defchar #\i '(32 96 0 96 224 96 96 96 112 96) :kern-l)
       (defchar #\j '(32 96 0 96 224 96 96 96 96 192))
       (defchar #\k '(112 224 96 110 119 103 126 103 99 243))
       (defchar #\l '(96 224 96 96 96 96 96 96 112 96))
       (defchar #\m '(0 0 86 251 219 219 219 219 219 0))
       (defchar #\n '(0 0 44 118 230 102 102 119 102 0))
-      (defchar #\o '(0 0 56 92 204 204 204 232 112 0))
+      (defchar #\o '(0 0 56 92 204 204 204 232 112 0) :kern-l)
       (defchar #\p '(0 28 46 102 102 230 120 224 96 64))
       (defchar #\q '(0 56 92 204 204 236 124 14 12 8))
       (defchar #\r '(0 0 46 118 228 96 96 112 96 0))
@@ -188,11 +207,11 @@
 
       (deffont :future)
 
-      (db '(:future . #\ ) 4 0 0 0 0 0 0 0 0 0 0)
+      (db '(:future . #\ ) 3 0 0 0 0 0 0 0 0 0 0)
       (defchar #\! '(192 192 192 192 224 224 224 224 0 224))
       (defchar #\' '(192 192 192 0 0 0 0 0 0 0))
-      (defchar #\, '(0 0 0 0 0 0 0 0 0 96))
-      (defchar #\. '(0 0 0 0 0 0 0 0 192 192))
+      (defchar #\, '(0 0 0 0 0 0 0 0 0 96) :kern-l)
+      (defchar #\. '(0 0 0 0 0 0 0 0 192 192) :kern-l)
       (defchar #\0 '(255 195 195 195 195 227 227 227 227 255))
       (defchar #\1 '(192 192 192 192 192 224 224 224 224 224))
       (defchar #\2 '(255 195 3 3 6 12 24 48 103 255))
@@ -223,18 +242,18 @@
       (defchar #\Q '(255 195 195 195 195 227 227 239 231 255))
       (defchar #\R '(255 195 195 195 255 240 248 236 230 227))
       (defchar #\S '(255 192 96 48 24 236 230 227 227 255))
-      (defchar #\T '(255 24 24 24 24 56 56 56 56 56))
+      (defchar #\T '(255 24 24 24 24 56 56 56 56 56) :kern-r)
       (defchar #\U '(195 195 195 195 195 227 227 227 227 255))
-      (defchar #\V '(195 195 195 198 204 248 240 224 192 128))
+      (defchar #\V '(195 195 195 198 204 248 240 224 192 128) :kern-r)
       (defchar #\W '(195 195 195 195 195 219 255 231 195 129))
       (defchar #\X '(195 195 102 60 24 60 102 195 227 227))
       (defchar #\Y '(195 195 195 102 60 24 24 56 56 56))
       (defchar #\Z '(255 3 6 12 24 48 96 224 224 255))
-      (defchar #\a '(0 0 63 3 255 195 195 195 255 0))
+      (defchar #\a '(0 0 63 3 255 195 195 195 255 0) :kern-l)
       (defchar #\b '(192 192 192 255 195 195 195 195 255 0))
-      (defchar #\c '(0 0 0 255 192 192 192 192 255 0))
+      (defchar #\c '(0 0 0 255 192 192 192 192 255 0) :kern-l)
       (defchar #\d '(3 3 3 255 195 195 195 195 255 0))
-      (defchar #\e '(0 0 0 255 195 195 255 192 255 0))
+      (defchar #\e '(0 0 0 255 195 195 255 192 255 0) :kern-l)
       (defchar #\f '(120 96 96 96 248 96 96 96 96 96))
       (defchar #\g '(0 0 0 255 195 195 255 3 195 255))
       (defchar #\h '(192 192 192 255 195 195 195 195 195 0))
@@ -244,7 +263,7 @@
       (defchar #\l '(192 192 192 192 192 192 192 192 224 0))
       (defchar #\m '(0 0 0 195 231 255 219 195 195 0))
       (defchar #\n '(0 0 0 195 227 243 219 207 199 0))
-      (defchar #\o '(0 0 0 255 195 195 195 195 255 0))
+      (defchar #\o '(0 0 0 255 195 195 195 195 255 0) :kern-l)
       (defchar #\p '(0 0 0 255 195 195 195 195 255 192))
       (defchar #\q '(0 0 0 255 195 195 195 195 255 3))
       (defchar #\r '(0 0 0 255 192 192 192 192 192 0))

@@ -35,17 +35,23 @@
 	     (when (= (length sym) 2)
 	       (setf first-two-char i))))
 
+      (label :typeset-cs)
+
       (with-namespace :typeset-cs
 
 	(alias :sym :D2)
 	(alias :str :A2)
-      
+
+	(LDA 0)
+	(STA.ZP '(:typeset . :prev-width))
+	(STA.ZP '(:typeset . :shift))
+	(BEQ :first)
 	(label :next)
 	(INC.ZP (lo-add :str))
-	(BNE :typeset-cs)
+	(BNE :first)
 	(INC.ZP (hi-add :str))
 	(BEQ :done "Gone off the edge of the map")
-	(label :typeset-cs nil)		; in the global namespace
+	(label :first)
 	(LDY #x0)
 	(LDA.IZY :str)
 	(BEQ :done)
@@ -158,8 +164,36 @@
     (alias :raster :A1)
 
     (alias :shift :D0)
-    
-    (LDX 0 "We need X to be 0")
+    (alias :prev-width :D1)
+
+    (LDX 0)
+    (LDA.ZP :prev-width)
+    (BEQ :start)
+    (dc "Prior to this shift, bit 6 set if previous admits to the right")
+    (ASL "Now that flag is in bit 7")
+    (dc "Bit 7 set iff prev char admits to right and current char admits to left")    
+    (AND.IZX :char)
+    (EOR #x80)
+    (ASL)
+    (dc "Now the carry is set iff there is no kerning between the two characters")
+    (LDA.ZP :prev-width)
+    (AND.IMM #xf)
+    (ADC.ZP :shift)
+    (CMP 8)
+    (BCC :not-wrapped)
+    (dc "There is a case where we will have a char of width 9")
+    (dc "this means we need to advance an extra byte")
+    (dc "Doing this compare clears the carry when we don't")
+    (CMP 16)
+    (AND.IMM #x7)
+    (STA.ZP :shift)
+    (sbc16.zp (1- (* 40 (1- *font-height*))) :raster)
+    (JMP :start)
+    (label :not-wrapped)
+    (dc "Move the raster back up, and left 1 byte")
+    (STA.ZP :shift)
+    (sub16.zp (1+ (* 40 (1- *font-height*))) :raster)
+    (label :start)
     (LDY *font-height* (format nil "~a pixel character height" *font-height*))
     (BNE :go)
     (label :next)
@@ -207,28 +241,13 @@
     (DEY)
     (BNE :next)
     (dc "Now, the first byte of the character data holds the")
-    (dc "width of the character. Add it to the offset and")
-    (dc "if necessary, increment the screen ptr")
+    (dc "width of the character. Store it, so we can use it")
+    (dc "before we draw the next character")
     (LDA.IZY :char)
-    (CLC)
-    (ADC.ZP :shift)
-    (CMP 8)
-    (BCC :not-wrapped)
-    (dc "There is a case where we will have a char of width 9")
-    (dc "this means we need to advance an extra byte")
-    (dc "Doing this compare clears the carry when we don't")
-    (CMP 16)
-    (AND.IMM #x7)
-    (STA.ZP :shift)
-    (sbc16.zp (1- (* 40 (1- *font-height*))) :raster)
-    (RTS)
-    (label :not-wrapped)
-    (dc "Move the raster back up, and left 1 byte")
-    (STA.ZP :shift)
-    (sub16.zp (1+ (* 40 (1- *font-height*))) :raster)
-    (RTS)
+    (STA.ZP :prev-width)
+    (RTS)))
 
-    ))
+(defparameter *line-spacing* (* 11 40))
 
 (defun render-test2 ()
   (reset-compiler)
@@ -239,27 +258,39 @@
 	   (CLD)
 	   (label :render-test2)
    
-	   (LDA 0)
-	   (STA.ZP :D0)
 	   (sta16.zp :str1 :A2)
 	   (sta16.zp '(:font . :present) :font)
 	   (sta16.zp #x80F0 '(:typeset . :raster))
 
 	   (JSR :typeset-cs)
 
-	   (LDA 0)
-	   (STA.ZP :D0)
 	   (sta16.zp :str2 :A2)
 	   (sta16.zp '(:font . :past) :font)
-	   (sta16.zp (+ #x80F0 (* 40 15)) '(:typeset . :raster))
+           (sta16.zp (+ #x80F0 *line-spacing*) '(:typeset . :raster))
 
 	   (JSR :typeset-cs)
 
-	   (LDA 0)
-	   (STA.ZP :D0)
 	   (sta16.zp :str3 :A2)
 	   (sta16.zp '(:font . :future) :font)
-	   (sta16.zp (+ #x80F0 (* 40 15 2)) '(:typeset . :raster))
+	   (sta16.zp (+ #x80F0 (* 2 *line-spacing*)) '(:typeset . :raster))
+
+	   (JSR :typeset-cs)
+
+	   (sta16.zp :kern :A2)
+	   (sta16.zp '(:font . :present) :font)
+	   (sta16.zp (+ #x80F0 (* 3 *line-spacing*)) '(:typeset . :raster))
+
+	   (JSR :typeset-cs)
+	   
+	   (sta16.zp :kern :A2)
+	   (sta16.zp '(:font . :past) :font)
+	   (sta16.zp (+ #x80F0 (* 4 *line-spacing*)) '(:typeset . :raster))
+
+	   (JSR :typeset-cs)
+	 
+	   (sta16.zp :kern :A2)
+	   (sta16.zp '(:font . :future) :font)
+	   (sta16.zp (+ #x80F0 (* 5 *line-spacing*)) '(:typeset . :raster))
 
 	   (JSR :typeset-cs)
 
@@ -270,7 +301,10 @@
 
 	   (dcs :str1 "Chad Jenkins and his red Porsche.")
 	   (dcs :str2 "King Chadric and his russet steed, Portia.")
-	   (dcs :str3 "Galacto Imperator Chadrix.")))
+	   (dcs :str3 "Galacto Imperator Chadrix.")
+	   (dcs :kern "To The fefifof Potato Flibbly Tomato V,V.Vo")
+))
+   
     
     (pass)
     

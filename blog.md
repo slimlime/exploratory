@@ -1,3 +1,27 @@
+# 5/6/2017 Kerning has been achieved
+
+Added a very basic kerning algorithm whereby a character can decide if it admits a character a pixel closer to the right, and a character can decide if it is such a character that can be admitted a pixel closer, to the left.
+
+![Alt text](/kerning.png)
+
+The extra code to decide whether to kern or not. The widths of all characters were reduced by one in the tables- the extra pixel is added back in when (in the vast majority of cases) the two adjacent characters do not kern together.
+
+~~~~
+
+    (ASL "Now that flag is in bit 7")
+    (dc "Bit 7 set iff prev char admits to right and current char admits to left")    
+    (AND.IZX :char)
+    (EOR #x80)
+    (ASL)
+    (dc "Now the carry is set iff there is no kerning between the two characters")
+    (LDA.ZP :prev-width)
+    (AND.IMM #xf)
+    (ADC.ZP :shift)
+
+~~~~
+
+The more complex scheme where there are two classes of adjacency (over/under and sparseness) for kerning has not been implememnted, this is why the spacing of "hi" could be improved in the first typeface. I am pretty happy with the typesetting now so I will move on to text flow and then the exciting business of images, which will be compressed with a sliding-window algorithm, or a variant on the fixed width symbol. Since we are outputting the data into screen memory, sliding-window now becomes a possibility where it was not with the text- it is important to note that nowhere do we actually write out the strings to a memory in anything as vulgar as ASCII. That is for C programmers.
+
 # 4/6/2017 Rendering test
 
 So rendering from compressed strings in a variety of fonts is almost there. I wanted a certain feel to the game and variable width fonts were an absolute must. Since no-one is reading this blog, this screen shot will not give anything of the game away. The deadline for the IF competition is September, so that's a certain motivation, but it also means I won't be checking in the actual game data here until after.

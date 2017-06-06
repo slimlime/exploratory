@@ -14,6 +14,7 @@
   (zp-w :A0)
   (zp-w :A1)
   (zp-w :A2)
+  (zp-w :A3)
     
   (zp-b :D0)
   (zp-b :D1)
@@ -35,13 +36,14 @@
 	     (when (= (length sym) 2)
 	       (setf first-two-char i))))
 
-      
       (with-namespace :typeset-cs
 
 	(alias :sym :D2)
 	(alias :str :A2)
+	(alias :tmp-raster :A3)
 
 	(label :typeset-cs nil)
+	(cpy16.zp '(:typeset . :raster) :tmp-raster)
 	(LDA 0)
 	(STA.ZP '(:typeset . :prev-width))
 	(STA.ZP '(:typeset . :shift))
@@ -89,18 +91,33 @@
 	(JSR :emit)
 	(JMP :next)
 	(label :emit)
+	(CMP 1)
+	(BEQ :newline)
 	(dc "Look up address of character data")
-	(dc "table is offset by one as EOS is not present")
+	(dc "table is offset by two as EOS=0 NEWLINE=1")
 	(TAX)
-	(LDA.ABX (1- (resolve :1ch-lo)))
+	(LDA.ABX (- (resolve :1ch-lo) 2))
 	(CLC)
 	(dc "Add the offset of the font")
 	(ADC.ZP (lo-add :font))
 	(STA.ZP (lo-add '(:typeset . :char)))	
-	(LDA.ABX (1- (resolve :1ch-hi)))
+	(LDA.ABX (- (resolve :1ch-hi) 2))
 	(ADC.ZP (hi-add :font))
 	(STA.ZP (hi-add '(:typeset . :char)))
 	(JMP :typeset)
+	(label :newline)
+	(dc "Carry is clear from the cmp 1")
+	(LDA (lo (1- (* 40 (1+ *font-height*)))))
+	(ADC.ZP (lo-add :tmp-raster))
+	(STA.ZP (lo-add :tmp-raster))
+	(STA.ZP (lo-add '(:typeset . :raster)))
+	(LDA (hi (1- (* 40 (1+ *font-height*)))))
+	(ADC.ZP (hi-add :tmp-raster))
+	(STA.ZP (hi-add :tmp-raster))
+	(STA.ZP (hi-add '(:typeset . :raster)))
+	(LDA 0)
+	(STA.ZP '(:typeset . :shift))
+	(STA.ZP '(:typeset . :prev-width))
 	(label :done)
 	(RTS)
 
@@ -132,8 +149,8 @@
       	
 	(let ((lo (list :1ch-lo))
 	      (hi (list :1ch-hi)))
-	  (loop for i from 1 to (1- first-two-char) do
-	       ;start at 1 as 0 is EOS
+	  (loop for i from 2 to (1- first-two-char) do
+	       ;start at 2 as 0 is EOS and 1 is NEWLINE
 	       (let* ((c (char (aref *symbol-table* i) 0))
 		      (label (cons :present c)))
 		 
@@ -255,6 +272,34 @@
     (funcall pass)
     (setf *compiler-final-pass* t)
     (funcall pass))
+
+(defun odyssey ()
+  (reset-compiler)
+  (reset-symbol-table)
+
+  (flet ((pass ()
+	   
+	   (org #x600)
+	   (CLD)
+	   (label :render-test2)
+   
+	   (sta16.zp :str '(:typeset-cs . :str))
+	   (sta16.zp '(:font . :present) :font)
+	   (sta16.zp #x8000 '(:typeset . :raster))
+
+	   (JSR :typeset-cs)
+
+	   (BRK)
+
+	   (typeset)
+	   (font-data)
+
+	   (dcs :str (justify *odyssey* :width (font-width :present)))))
+    (build #'pass))
+  
+  (monitor-reset #x600)
+  (monitor-run)
+  (update-vicky))
 
 (defun render-test2 ()
   (reset-compiler)

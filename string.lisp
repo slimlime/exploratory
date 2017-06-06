@@ -12,7 +12,8 @@
   (setf *compiled-strings* nil)
   (setf *symbol-table* nil)
   (setf *processed-strings* nil)
-  (setf *word-table* (make-hash-table :test 'equal)))
+  (setf *word-table* (make-hash-table :test 'equal))
+  (process-string (string #\Newline)))
 
 (defun add-to-word-table (str)
   (let ((count (gethash str *word-table*)))
@@ -62,7 +63,7 @@
       ;assert that code 0 is the eos indicator as we use BEQ
       ;to detect it in the code later
       (assert (char= (char (aref words 0) 0) #\nul))
-      (assert (char= (char (aref words 1) 0) #\ ))
+      (assert (char= (char (aref words 1) 0) #\Newline))
       words)))
 
 (defun encode-string (str emit)

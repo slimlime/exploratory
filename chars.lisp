@@ -1,4 +1,9 @@
 ;; this file contains code to write characters to screen
+;; todo fix :present q (missing serif) O, clumsy, m a messy
+;;                   - has too big a gap
+
+;; for the justification algorithm to lookup the widths
+(defparameter *font-widths* (make-hash-table :test 'equal))
 
 (defun byte-width (b)
   (when (= 1 (logand 1 b)) (return-from byte-width 8))
@@ -51,6 +56,8 @@
   (let ((font-name nil))
     (flet ((defchar (c data &optional kerning)
 	     ;;apply the define bytes function to the character data
+	     (setf (gethash (cons font-name c) *font-widths*)
+		   (char-width data))
 	     (apply #'db (append (list (cons font-name c))
 				 (list (width-byte data kerning))
 				 (reverse data))))
@@ -60,13 +67,18 @@
 	     (dc (format nil "~a font table" font-name))))
 
       ; Now the actual font data
+      ; spaces are special cases, and, wasteful.
+      ; could be handled in the code
 
       (deffont :present)
 
       (db '(:present . #\ ) 3 0 0 0 0 0 0 0 0 0 0)
+      (setf (gethash '(:present . #\ ) *font-widths*) 3)
+
       (defchar #\! '(128 128 128 128 128 128 0 0 128 0))
       (defchar #\' '(160 160 160 0 0 0 0 0 0 0))
       (defchar #\, '(0 0 0 0 0 0 192 192 64 128))
+      (defchar #\- '(0 0 0 #xF 0 0 0 0 0 0))
       (defchar #\. '(0 0 0 0 0 0 0 0 192 192))
       (defchar #\0 '(60 102 195 195 195 195 195 195 102 60))
       (defchar #\1 '(96 224 96 96 96 96 96 96 96 240))
@@ -137,9 +149,12 @@
       ;Kerning FeFiFo
 
       (db '(:past . #\ ) 3 0 0 0 0 0 0 0 0 0 0)    
+      (setf (gethash '(:past . #\ ) *font-widths*) 3)
+
       (defchar #\! '(32 96 224 96 96 96 96 64 32 112))
       (defchar #\' '(0 0 64 192 192 128 0 0 0 0))
       (defchar #\, '(0 0 0 0 0 0 96 224 32 64))
+      (defchar #\- '(0 0 0 #xF 0 0 0 0 0 0))
       (defchar #\. '(0 0 0 0 0 0 0 64 224 64))
       (defchar #\0 '(60 78 198 206 214 230 198 198 228 120))
       (defchar #\1 '(16 48 112 176 48 48 48 48 124 248))
@@ -208,9 +223,12 @@
       (deffont :future)
 
       (db '(:future . #\ ) 3 0 0 0 0 0 0 0 0 0 0)
+      (setf (gethash '(:future . #\ ) *font-widths*) 3)
+
       (defchar #\! '(192 192 192 192 224 224 224 224 0 224))
       (defchar #\' '(192 192 192 0 0 0 0 0 0 0))
       (defchar #\, '(0 0 0 0 0 0 0 0 0 96) :kern-l)
+      (defchar #\- '(0 0 0 #xF 0 0 0 0 0 0))
       (defchar #\. '(0 0 0 0 0 0 0 0 192 192) :kern-l)
       (defchar #\0 '(255 195 195 195 195 227 227 227 227 255))
       (defchar #\1 '(192 192 192 192 192 224 224 224 224 224))

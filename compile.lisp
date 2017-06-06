@@ -21,6 +21,9 @@
 ; (unused-b addr) - tell the compiler this byte is spare
 ; (use-b :label)  - tell the compiler to use the next spare byte for a label
 
+; WIBNI
+; Assert if final page jump bug
+
 (defun reset-compiler (&optional (buffer-size 65536))
   (setf *compiler-ptr* 0)
   (setf *compiler-disassembler-hints* (make-hash-table))
@@ -78,7 +81,7 @@
   (assert-address add)
   (aref *compiler-buffer* add))
 
-(defun hexdump (add len)
+(defun hexdump (add &optional (len 32))
   (unless (numberp add)
     (setf add (resolve add)))
   (assert-address add)

@@ -64,7 +64,7 @@
       (assert (char= (char (aref words 0) 0) #\nul))
       (assert (char= (char (aref words 1) 0) #\ ))
       words)))
- 
+
 (defun encode-string (str emit)
   (setf str (append-eos str))
   (let ((strend (1- (length str))))

@@ -1,10 +1,10 @@
 (defparameter *screen-address* #x8000)
+(defparameter *font-height* 10)
+(defparameter *line-spacing* (* (1+ *font-height*) 40))
 
 (defun update-vicky ()
   "Update VICKY from the monitor buffer"
   (copy-to-screen-buffer (monitor-buffer) *screen-address*))
-
-(defparameter *font-height* 10)
 
 (defun typeset ()
   
@@ -35,13 +35,13 @@
 	     (when (= (length sym) 2)
 	       (setf first-two-char i))))
 
-      (label :typeset-cs)
-
+      
       (with-namespace :typeset-cs
 
 	(alias :sym :D2)
 	(alias :str :A2)
 
+	(label :typeset-cs nil)
 	(LDA 0)
 	(STA.ZP '(:typeset . :prev-width))
 	(STA.ZP '(:typeset . :shift))
@@ -51,8 +51,9 @@
 	(BNE :first)
 	(INC.ZP (hi-add :str))
 	(BEQ :done "Gone off the edge of the map")
+	(label :typeset-cs-cont nil) ;don't reset shift position
 	(label :first)
-	(LDY #x0)
+	(LDY 0)
 	(LDA.IZY :str)
 	(BEQ :done)
 	(CMP first-three-char)
@@ -109,7 +110,7 @@
 
 	(flet ((dtbl (label start end char-pos)
 		 (let ((bytes (list label)))
-					;label is the first argument to db, followed by the bytes
+		   ;;label is the first argument to db, followed by the bytes
 		   (loop for i from start to end do
 			(let ((sym (aref *symbol-table* i)))
 			  (push (position (string (char sym char-pos))
@@ -127,7 +128,7 @@
 	  (dtbl :2ch-1 first-two-char (1- first-three-char) 1))
   
 	(dc "Addresses for the character data table in two tables")
-	(dc "hi-byte and lo-byte, less one, for use by rts")
+	(dc "hi-byte and lo-byte")
       	
 	(let ((lo (list :1ch-lo))
 	      (hi (list :1ch-hi)))
@@ -136,18 +137,19 @@
 	       (let* ((c (char (aref *symbol-table* i) 0))
 		      (label (cons :present c)))
 		 
-		 ;compiler check that characters in the other two typefaces are present
+		 ;;compiler check that characters in the other two typefaces are present
 		 
 		 (resolve (cons :past c))
 		 (resolve (cons :future c))
 
-		 (when *compiler-final-pass*
+		 (when (and *compiler-debug* 
+			    *compiler-final-pass*)
 		   (format t "~4,'0X ~4,'0X ~c~%" (resolve label)
 			   (resolve '(:font . :present))
 			   c))
 
-		 ;store the relative offset into the font, now we are insisting
-		 ;that the characters in each font are in the same order
+		 ;;store the relative offset into the font, this means of course
+		 ;;that the characters in the font are in the same order
 		 (setf label (- (resolve label)
 				(resolve '(:font . :present))))
 		 		 
@@ -166,10 +168,10 @@
     (alias :shift :D0)
     (alias :prev-width :D1)
 
-    (LDX 0)
+    (LDX 0 "Ensure we can use X indexed addressing later")
     (LDA.ZP :prev-width)
     (BEQ :start)
-    (dc "Prior to this shift, bit 6 set if previous admits to the right")
+    (dc "Prior to this shift, bit 6 set if previous char admits to the right")
     (ASL "Now that flag is in bit 7")
     (dc "Bit 7 set iff prev char admits to right and current char admits to left")    
     (AND.IZX :char)
@@ -247,48 +249,54 @@
     (STA.ZP :prev-width)
     (RTS)))
 
-(defparameter *line-spacing* (* 11 40))
+(defun build (pass)
+    (funcall pass)
+    (build-symbol-table)
+    (funcall pass)
+    (setf *compiler-final-pass* t)
+    (funcall pass))
 
 (defun render-test2 ()
   (reset-compiler)
   (reset-symbol-table)
+
   (flet ((pass ()
 	   
 	   (org #x600)
 	   (CLD)
 	   (label :render-test2)
    
-	   (sta16.zp :str1 :A2)
+	   (sta16.zp :str1 '(:typeset-cs . :str))
 	   (sta16.zp '(:font . :present) :font)
 	   (sta16.zp #x80F0 '(:typeset . :raster))
 
 	   (JSR :typeset-cs)
 
-	   (sta16.zp :str2 :A2)
+	   (sta16.zp :str2 '(:typeset-cs . :str))
 	   (sta16.zp '(:font . :past) :font)
            (sta16.zp (+ #x80F0 *line-spacing*) '(:typeset . :raster))
 
 	   (JSR :typeset-cs)
 
-	   (sta16.zp :str3 :A2)
+	   (sta16.zp :str3 '(:typeset-cs . :str))
 	   (sta16.zp '(:font . :future) :font)
 	   (sta16.zp (+ #x80F0 (* 2 *line-spacing*)) '(:typeset . :raster))
 
 	   (JSR :typeset-cs)
 
-	   (sta16.zp :kern :A2)
+	   (sta16.zp :kern '(:typeset-cs . :str))
 	   (sta16.zp '(:font . :present) :font)
 	   (sta16.zp (+ #x80F0 (* 3 *line-spacing*)) '(:typeset . :raster))
 
 	   (JSR :typeset-cs)
 	   
-	   (sta16.zp :kern :A2)
+	   (sta16.zp :kern '(:typeset-cs . :str))
 	   (sta16.zp '(:font . :past) :font)
 	   (sta16.zp (+ #x80F0 (* 4 *line-spacing*)) '(:typeset . :raster))
 
 	   (JSR :typeset-cs)
 	 
-	   (sta16.zp :kern :A2)
+	   (sta16.zp :kern '(:typeset-cs . :str))
 	   (sta16.zp '(:font . :future) :font)
 	   (sta16.zp (+ #x80F0 (* 5 *line-spacing*)) '(:typeset . :raster))
 
@@ -302,31 +310,18 @@
 	   (dcs :str1 "Chad Jenkins and his red Porsche.")
 	   (dcs :str2 "King Chadric and his russet steed, Portia.")
 	   (dcs :str3 "Galacto Imperator Chadrix.")
-	   (dcs :kern "To The fefifof Potato Flibbly Tomato V,V.Vo")
-))
-   
+	   (dcs :kern "To The fefifof Potato Flibbly Tomato V,V.Vo")))
     
-    (pass)
-    
-    (build-symbol-table)
-    
-    (pass)
-    
-    (setf *compiler-final-pass* t)
-    
-    (pass)
-
+    (build #'pass))
+  
   (monitor-reset #x600)
   (monitor-run)
-  (update-vicky)
-
-
-))
-
+  (update-vicky))
 
 (defun render-test ()
   
   (reset-compiler)
+  (reset-symbol-table)
   
   (flet ((pass ()
 	   (org #x600)
@@ -336,8 +331,7 @@
 	   (zp-b :count)
 	   (zp-w :y)
 	   
-	   
-	   (sta16.zp '(:font . :present) :font)
+      	   (sta16.zp '(:font . :present) :font)
 	   (sta16.zp #x80F0 :y)
 
 	   (LDA 7)
@@ -355,49 +349,34 @@
 	   (STA.ZP (hi-add :y))
 
 	   (cpy16.zp :y (cons :typeset :raster))
-	   	   
-	   (sta16.zp '(:past . #\C) (cons :typeset :char))
+
+	   (sta16.zp :covefefe '(:typeset-cs . :str))
+
+	   (LDA 0)
+	   (STA.ZP '(:typeset . :prev-width))
 	   
-	   (JSR :typeset)
-	   (sta16.zp '(:past . #\o) (cons :typeset :char))
-	   
-	   (JSR :typeset)
-	   (sta16.zp '(:past . #\v) (cons :typeset :char))
-	   
-	   (JSR :typeset)
-	   (sta16.zp '(:past . #\e) (cons :typeset :char))
-	   
-	   (JSR :typeset)
-	   (sta16.zp '(:past . #\f) (cons :typeset :char))
-	   
-	   (JSR :typeset)
-	   (sta16.zp '(:past . #\e) (cons :typeset :char))
-	   
-	   (JSR :typeset)
-	   (sta16.zp '(:past . #\f) (cons :typeset :char))
-	   
-	   (JSR :typeset)
-	   (sta16.zp '(:past . #\e) (cons :typeset :char))
-	   
-	   (JSR :typeset)	   
-	   
+	   ;; call into the entry point that does not
+	   ;; reset the shift position so we can check
+	   ;; the rendering at every bit offset
+	   (JSR :typeset-cs-cont)
+
 	   (DEC.ZP :count)
 	   (BNE :doit)
 
 	   (BRK)
 
+	   (dcs :covefefe "Covefefe")
+	   (dcs :fluff " ")
+
 	   (typeset)
 	   
 	   (font-data)))
 
-    (pass)
-    (setf *compiler-final-pass* t)
-    (pass))
- 
+    (build #'pass))
+
   (monitor-reset #x600)
   (monitor-run)
-  (update-vicky)
-)
+  (update-vicky))
 
 
 

@@ -1,12 +1,51 @@
+# 7/6/2017 Functional design, imperative code
+
+Or, functional assembler.
+
+Assembler is clearly an imperative paradigm, the Von Neumann architecture being pretty close to a real-world Turing machine. Purity (in the functional progamming sense) is hardly a consideration. Consider this design for the text rendering pipeline,
+
+~~~~                           
+                              +--------------------+
+                              |                    |
+                        screen state ->            |
+compressed string data -> decompress -> combine ---+
+                        bit patterns -> 
+
+~~~~
+
+Forgetting monads, a typical practical functional design is to minimise state except where necessary, this diagram is pretty close to that, functional in the middle with state at either end. Very simple to reason about and easy to test. We might implement it in a C like language by having something like,
+
+~~~~
+
+	draw(decompress(str), font, screen-buffer)
+
+~~~~
+
+Which can't make great claims to being functional and pure (but we are ignoring monads), it seems like typical, practical strategy. But, it does a lot of work that we don't need to do- for example, consider the decompress function. It probably returns a string. Haskell would probably be able to optimise this away at runtime by not computing anything until necessary (I doubt it though, in the general case).
+
+A-ha, you say, you would not return a string, you would invert control and call out to a function-
+
+~~~~
+
+	(decompress(str, draw, font), screen-buffer)
+
+~~~~
+
+Much better, now you can decompress and draw without a temporary 2TB string on the stack. But it does seem to have introduced a coupling between decompress and draw, namely that the font has to be passed in. In C you would probably live with this. In a C#, you would surely introduce a closure,
+
+~~~~
+
+	(decompress(str, (c)=>draw(c,font), screen-buffer))
+
+~~~~
+
+Now it is decoupled and efficient. But how is a closure implemented? Well it is just some state stuffed somewhere, and this strategy is exactly what I have done with the 6502 implementation. So if you squint hard enough, it is functional, it merely has the appearance of mutating state left, right and centre. Moreover, we are forced to think this way by the extreme constraints imposed by the lack of memory and cycles in a 40 year old processor.
+
 # 6/6/2017 Justified ancient text
 
 ![Alt text](/muse.png)
 
 The justification is pre-computed, following the principle of never doing at run-time what can be done at assembly time. Of course, this is often a space-time trade-off, but in this case it isn't. I did violate one rule, DRY, that is, the width calculation is done in LISP as well as in 6502. The text measurement could have been done by running the actual code, but then it is easy to take principles too far.
-
-## Functional design, imperative code
-
-...
 
 # 5/6/2017 Kerning has been achieved
 

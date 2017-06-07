@@ -1,3 +1,13 @@
+# 6/6/2017 Justified ancient text
+
+![Alt text](/muse.png)
+
+The justification is pre-computed, following the principle of never doing at run-time what can be done at assembly time. Of course, this is often a space-time trade-off, but in this case it isn't. I did violate one rule, DRY, that is, the width calculation is done in LISP as well as in 6502. The text measurement could have been done by running the actual code, but then it is easy to take principles too far.
+
+## Functional design, imperative code
+
+...
+
 # 5/6/2017 Kerning has been achieved
 
 Added a very basic kerning algorithm whereby a character can decide if it admits a character a pixel closer to the right, and a character can decide if it is such a character that can be admitted a pixel closer, to the left.

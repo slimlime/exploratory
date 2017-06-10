@@ -13,6 +13,8 @@
 ;; 8 - orange  9 - brown       A - light red  B - dark grey
 ;; C - grey    D - light green E - light blue F - light grey
 
+;; http://unusedino.de/ec64/technical/misc/vic656x/colors/
+
 (defun map-c64-colours (surface-fp)
   (let ((i 0))
     (dolist (colour '(#x000000 #xFFFFFF #x68372B #x70A4B2

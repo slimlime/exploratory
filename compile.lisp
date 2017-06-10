@@ -81,6 +81,39 @@
   (assert-address add)
   (aref *compiler-buffer* add))
 
+
+(defun resolve (arg)
+  (if (numberp arg)
+      (values arg t)
+      (let ((addr nil))
+	;; if there is an alias, then resolve that to a label first
+	(let ((aliased-label (gethash 
+			      (if (consp arg)
+				  arg
+				  (cons *compiler-label-namespace* arg))
+			      *compiler-aliases*)))
+	  (if aliased-label
+	      ;; use the aliased label with the namespace
+	      ;; it was applied with, ignore the current namespace
+	      (setf addr (gethash aliased-label *compiler-labels*))
+	      ;; otherwise try the label in the current namespace
+	      ;; followed by the global namespace
+	      (progn
+		(when *compiler-label-namespace*
+		  (setf addr (gethash (cons *compiler-label-namespace* arg)
+				      *compiler-labels*)))
+		;; if no match try again in the global namespace
+		(unless addr
+		  (setf addr (gethash arg *compiler-labels*)))))
+	  ;; on the first pass only, allow
+	  ;; labels to be null (resolve to 0 if so)
+	  (when (and (null addr) 
+		     *compiler-final-pass*)
+	    (assert nil nil (format nil "The label ~a was not resolved (aliased-label [~a])" arg aliased-label)))
+	  (if addr
+	      (values addr t)
+	      (values 0 nil))))))
+
 (defun hexdump (add &optional (len 32))
   (unless (numberp add)
     (setf add (resolve add)))
@@ -157,38 +190,6 @@
 (defun push-addr-op (op mode addr)
   (push-op op mode)
   (push-address (resolve addr)))
-
-(defun resolve (arg)
-  (if (numberp arg)
-      (values arg t)
-      (let ((addr nil))
-	;; if there is an alias, then resolve that to a label first
-	(let ((aliased-label (gethash 
-			      (if (consp arg)
-				  arg
-				  (cons *compiler-label-namespace* arg))
-			      *compiler-aliases*)))
-	  (if aliased-label
-	      ;; use the aliased label with the namespace
-	      ;; it was applied with, ignore the current namespace
-	      (setf addr (gethash aliased-label *compiler-labels*))
-	      ;; otherwise try the label in the current namespace
-	      ;; followed by the global namespace
-	      (progn
-		(when *compiler-label-namespace*
-		  (setf addr (gethash (cons *compiler-label-namespace* arg)
-				      *compiler-labels*)))
-		;; if no match try again in the global namespace
-		(unless addr
-		  (setf addr (gethash arg *compiler-labels*)))))
-	  ;; on the first pass only, allow
-	  ;; labels to be null (resolve to 0 if so)
-	  (when (and (null addr) 
-		     *compiler-final-pass*)
-	    (assert nil nil (format nil "The label ~a was not resolved (aliased-label [~a])" arg aliased-label)))
-	  (if addr
-	      (values addr t)
-	      (values 0 nil))))))
 
 ;; assembler instructions
 

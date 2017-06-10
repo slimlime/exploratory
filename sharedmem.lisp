@@ -1,34 +1,45 @@
-(defparameter *screen-buffer-fd* nil)
-(defparameter *screen-buffer-sap* nil)
-(defparameter *screen-buffer-length* 8192)
+;; map the entire memory space
 
-(defun unmap-screen ()
-  (when *screen-buffer-sap*
-    (sb-posix:munmap *screen-buffer-sap* *screen-buffer-length*)
-    (setf *screen-buffer-sap* nil))
-  (when *screen-buffer-fd*
-    (close *screen-buffer-fd*)
-    (setf *screen-buffer-fd* nil)))
+(defparameter *buffer-fd* nil)
+(defparameter *buffer-sap* nil)
+(defparameter *buffer-length* #x10000)
 
-(defun map-screen ()
-  (unmap-screen)
-  (setf *screen-buffer-fd* (open "screen-buffer" :direction :io :element-type '(unsigned-byte 8)
+(defun setmem (addr byte)
+  (assert (>= addr 0))
+  (assert (< addr 65536))
+  (setf (sb-sys:sap-ref-8 *buffer-sap* addr) byte))
+
+(defun getmem (addr)
+  (assert (>= addr 0))
+  (assert (< addr 65536))
+  (sb-sys:sap-ref-8 *buffer-sap* addr))
+
+(defun unmap-memory ()
+  (when *buffer-sap*
+    (sb-posix:munmap *buffer-sap* *buffer-length*)
+    (setf *buffer-sap* nil))
+  (when *buffer-fd*
+    (close *buffer-fd*)
+    (setf *buffer-fd* nil)))
+
+(defun map-memory ()
+  (unmap-memory)
+  (setf *buffer-fd* (open "/dev/shm/6502-instance-0" :direction :io :element-type '(unsigned-byte 8)
 				 :if-exists :overwrite
 				 :if-does-not-exist :create))
-  (file-position *screen-buffer-fd* *screen-buffer-length*)
-  (write-byte 0 *screen-buffer-fd*)
-  (file-position *screen-buffer-fd* 0)
-  (setf *screen-buffer-sap*
-	(sb-posix:mmap nil *screen-buffer-length* (logior sb-posix:prot-read
+  (file-position *buffer-fd* *buffer-length*)
+  (write-byte 0 *buffer-fd*)
+  (file-position *buffer-fd* 0)
+  (setf *buffer-sap*
+	(sb-posix:mmap nil *buffer-length* (logior sb-posix:prot-read
 							  sb-posix:prot-write)
-		       sb-posix:map-shared *screen-buffer-fd* 0))
-  (close *screen-buffer-fd*))
+		       sb-posix:map-shared *buffer-fd* 0))
+  (close *buffer-fd*))
 
-(defun copy-to-screen-buffer (src offset)
-  (unless *screen-buffer-sap*
-    (map-screen))
+(defun setmem-copy (src)
+  (unless *buffer-sap*
+    (map-memory))
 ;todo - use pinned buffer and sb-sys copy function. Also, make memory
 ;       or make memory driver in emulator access this directly
-  (loop for i from 0 to (1- *screen-buffer-length*) do
-       (setf (sb-sys:sap-ref-8 *screen-buffer-sap* i)
-	     (aref src (+ i offset)))))
+  (loop for i from 0 to (1- *buffer-length*) do
+       (setmem i (aref src i))))

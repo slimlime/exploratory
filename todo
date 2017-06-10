@@ -1,0 +1,18 @@
+1. Colour attributes for VICKY
+2. Abstract memory model to
+   a) Attach outside debugger
+   b) Make VICKY look at real memory
+3. Make own emulator
+4. Investigate parenscript
+5. Create VINEs, String tables etc
+   Bytecode
+
+   Bit 7 6 5 - 0  7 -  0
+       0 0 0       n/a   - End of vine
+       0 0 HI-ADD LO-ADD - Call proc (leave till needed)
+       0 1 HI-ADD LO-ADD - Vine at address
+       1 0 TABLE   n/a   - String table random
+       1 1 HI-ADD LO-ADD - String at address
+
+   Obviously this would be a lot more compact than a procedure which simply JSRs to
+   render a bunch of strings, but yaggers.

@@ -1,10 +1,11 @@
-(defparameter *screen-address* #x8000)
-(defparameter *font-height* 10)
 (defparameter *line-spacing* (* (1+ *font-height*) 40))
 
 (defun update-vicky ()
-  "Update VICKY from the monitor buffer"
-  (copy-to-screen-buffer (monitor-buffer) *screen-address*))
+  (let ((buf (monitor-buffer))) ;need to abstract out the memory, ditch cl-6502
+    (loop for i from 0 to +char-memory-length+ do
+	 (setf (aref buf (+ i *char-memory-address*)) #x63))
+    "Update VICKY from the monitor buffer"
+    (setmem-copy buf)))
 
 (defun typeset ()
   
@@ -276,26 +277,26 @@
 (defun odyssey ()
   (reset-compiler)
   (reset-symbol-table)
-
-  (flet ((pass ()
+  (let ((font :past))
+    (flet ((pass ()
 	   
-	   (org #x600)
-	   (CLD)
-	   (label :render-test2)
+	     (org #x600)
+	     (CLD)
+	     (label :render-test2)
    
-	   (sta16.zp :str '(:typeset-cs . :str))
-	   (sta16.zp '(:font . :present) :font)
-	   (sta16.zp #x8000 '(:typeset . :raster))
+	     (sta16.zp :str '(:typeset-cs . :str))
+	     (sta16.zp (cons :font font) :font)
+	     (sta16.zp #x8000 '(:typeset . :raster))
 
-	   (JSR :typeset-cs)
+	     (JSR :typeset-cs)
 
-	   (BRK)
+	     (BRK)
 
-	   (typeset)
-	   (font-data)
+	     (typeset)
+	     (font-data)
 
-	   (dcs :str (justify *odyssey* :width (font-width :present)))))
-    (build #'pass))
+	     (dcs :str (justify *odyssey* :width (font-width font)))))
+      (build #'pass))) 
   
   (monitor-reset #x600)
   (monitor-run)

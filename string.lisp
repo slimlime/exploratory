@@ -8,13 +8,6 @@
 (defparameter *processed-strings* nil)
 (defparameter *compiled-strings* nil)
 
-(defun reset-symbol-table ()
-  (setf *compiled-strings* nil)
-  (setf *symbol-table* nil)
-  (setf *processed-strings* nil)
-  (setf *word-table* (make-hash-table :test 'equal))
-  (process-string (string #\Newline)))
-
 (defun add-to-word-table (str)
   (let ((count (gethash str *word-table*)))
     (setf (gethash str *word-table*)
@@ -34,6 +27,15 @@
        (add-to-word-table (subseq str i (+ 2 i))))
   (loop for i from 0 to (- (length str) 3) do
        (add-to-word-table (subseq str i (+ 3 i)))))
+
+(defun reset-symbol-table ()
+  (setf *compiled-strings* nil)
+  (setf *symbol-table* nil)
+  (setf *processed-strings* nil)
+  (setf *word-table* (make-hash-table :test 'equal))
+  ;; Adding newline now means it will be in a predictable
+  ;; location, namely 1
+  (process-string (string #\Newline)))
 
 (defun sort-word-table ()
   (let ((wordlist nil)
@@ -78,6 +80,25 @@
 		  (incf i (1- (length word)))
 		  (return)))))))
 
+; check that (in theory) all the strings we used as input
+; can be reproduced. Obviously the 6502 assembler to do
+; it has to be right too...
+(defun validate-strings ()
+  (let ((symcount 0))
+    (dolist (str *processed-strings*)
+      (let ((str2 ""))
+	    (encode-string str #'(lambda (i word)
+				   (declare (ignore word))
+				   (incf symcount)
+				   (setf str2 (format nil "~a~a" str2
+						      (aref *symbol-table* i)))))
+	    (setf str (append-eos str))
+	    (assert (equal str str2)
+	      (str str2) 
+	      (format nil "Expected ~a, but decoded to ~a" str str2))))
+    (when *compiler-debug*
+      (format t "Checked ~d bytes of string data~%" symcount))))
+
 (defun build-symbol-table ()
   (setf *symbol-table* (sort-word-table))
   (when (< (length *symbol-table*) 256)
@@ -106,25 +127,6 @@
          while line do (process-string line))
       (close in)))
   (setf *symbol-table* (sort-word-table)))
-
-; check that (in theory) all the strings we used as input
-; can be reproduced. Obviously the 6502 assembler to do
-; it has to be right too...
-(defun validate-strings ()
-  (let ((symcount 0))
-    (dolist (str *processed-strings*)
-      (let ((str2 ""))
-	    (encode-string str #'(lambda (i word)
-				   (declare (ignore word))
-				   (incf symcount)
-				   (setf str2 (format nil "~a~a" str2
-						      (aref *symbol-table* i)))))
-	    (setf str (append-eos str))
-	    (assert (equal str str2)
-	      (str str2) 
-	      (format nil "Expected ~a, but decoded to ~a" str str2))))
-    (when *compiler-debug*
-      (format t "Checked ~d bytes of string data~%" symcount))))
 
 ; assembler commands
 

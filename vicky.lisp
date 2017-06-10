@@ -1,19 +1,32 @@
-; todo create array of mapped colours
-
-(defparameter *c64-colours* (make-array 16))
-(defparameter *screen-width* 320)
-(defparameter *screen-height* 200)
-(defparameter *render-width* 640)
-(defparameter *render-height* 400)
+(defparameter *colours* (make-array 16))
+(defparameter *render-width* (* 2 +screen-width+))
+(defparameter *render-height* (* 2 +screen-height+))
 (defparameter *sx* 2)
 (defparameter *sy* 2)
 
-(defun map-color (surface-fp r g b)
+(defun map-colour (surface-fp r g b)
   (sdl-cffi::sdl-map-rgb (sdl-base:pixel-format surface-fp)
 			 b g r))
 
+;; 0 - black   1 - white       2 - red        3 - cyan
+;; 4 - purple  5 - green       6 - blue       7 - yellow
+;; 8 - orange  9 - brown       A - light red  B - dark grey
+;; C - grey    D - light green E - light blue F - light grey
+
+(defun map-c64-colours (surface-fp)
+  (let ((i 0))
+    (dolist (colour '(#x000000 #xFFFFFF #x68372B #x70A4B2
+		      #x6F3D86 #x588D43 #x352879 #xB8C76F
+		      #x6F4F25 #x433900 #x9A6759 #x444444
+		      #x6C6C6C #x9AD284 #x6C5EB5 #x959595))
+      (setf (aref *colours* i)
+	    (map-colour surface-fp (ash colour -16)
+			(logand #xff (ash colour -8))
+			(logand #xff colour)))
+      (incf i))))
+
 (defun vicky ()
-  (map-screen)
+  (map-memory)
   (sdl:window *render-width* *render-height* :title-caption "VICKY")
   (sdl:with-init ()
     (let ((surface (sdl:create-surface *render-width*
@@ -27,19 +40,21 @@
 	  (:idle ()
 		 (when redraw
 		   (let ((sfp (sdl:fp surface)))
+		     (map-c64-colours sfp) ; I wonder if this really has to be done for every instance
 		     (lispbuilder-sdl-base::with-pixel (p sfp)
 		       (let ((x 0) (y 0))
-			   (loop for ptr from 0 to (1- *screen-buffer-length*) do
-				(let ((byte (sb-sys:sap-ref-8 *screen-buffer-sap* ptr))
-				      (bit #x80))
+			   (loop for ptr from 0 to (1- +screen-memory-length+) do
+				(let* ((byte (getmem (+ ptr *screen-memory-address*)))
+				       (bit #x80)
+				       (attribute (getmem (+ *char-memory-address*
+							     (mod ptr 40)
+							     (* 40 (floor ptr 320)))))
+				       (bg (aref *colours* (ash attribute -4)))
+				       (fg (aref *colours* (logand #xf attribute))))
 				  (loop while (not (= 0 bit)) do
-				       (let ((color (if (= 0 (logand bit byte)) 
-					    (map-color sfp #x66 #x44 #x00)
-					    (map-color sfp #xee #xee #x77)))) 
+				       (let ((color (if (= 0 (logand bit byte)) bg fg))) 
 					 (lispbuilder-sdl-base::write-pixel p x y color)
 					 (lispbuilder-sdl-base::write-pixel p (1+ x) y color)	
-					 ;(lispbuilder-sdl-base::write-pixel p (1+ x) (1+ y) color)
-					 ;(lispbuilder-sdl-base::write-pixel p x (1+ y) color)	
 					 (setf bit (ash bit -1))
 					 (incf x *sx*)))
 				  (when (>= x *render-width*)

@@ -1,3 +1,16 @@
+# 11/6/2017 VICKY gets a playmate
+
+First attempt at converting an image for use in the game. Not sure I'm keen on her corpse-like pallour, but her gaze is purposeful as well as purple, and undead romance is extremely popular with today's youth so perhaps it is alright.
+
+![Alt text](/conversion.png)
+
+104 x 104 pixel image with attributes selected by a naive algorithm. Luckily I decided to try sum of absolute difference to select the colours- my first go was with sum of squares and the result was terrible. This has given me the motivation to try YUV which is simple, and CIELAB which is not.
+
+These images should compress nicely for the game as they have a lot of space. To make them even more sparse
+
+- If foreground attribute == background attribute => bitmap is empty for that cell
+- If foreground has more pixels than background, invert the cell
+
 # 10/6/2017 Future, past and present
 
 After the SSD disaster of 8th June, Marceline is back from the dead with a spanky new 1TB drive. Here are some lessons

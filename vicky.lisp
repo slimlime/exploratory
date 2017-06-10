@@ -1,3 +1,7 @@
+(defparameter *c64-colours* #(#x000000 #xFFFFFF #x68372B #x70A4B2
+			      #x6F3D86 #x588D43 #x352879 #xB8C76F
+			      #x6F4F25 #x433900 #x9A6759 #x444444
+			      #x6C6C6C #x9AD284 #x6C5EB5 #x959595))
 (defparameter *colours* (make-array 16))
 (defparameter *render-width* (* 2 +screen-width+))
 (defparameter *render-height* (* 2 +screen-height+))
@@ -16,16 +20,12 @@
 ;; http://unusedino.de/ec64/technical/misc/vic656x/colors/
 
 (defun map-c64-colours (surface-fp)
-  (let ((i 0))
-    (dolist (colour '(#x000000 #xFFFFFF #x68372B #x70A4B2
-		      #x6F3D86 #x588D43 #x352879 #xB8C76F
-		      #x6F4F25 #x433900 #x9A6759 #x444444
-		      #x6C6C6C #x9AD284 #x6C5EB5 #x959595))
-      (setf (aref *colours* i)
-	    (map-colour surface-fp (ash colour -16)
-			(logand #xff (ash colour -8))
-			(logand #xff colour)))
-      (incf i))))
+  (loop for i from 0 to 15 do
+       (setf (aref *colours* i)
+	     (let ((colour (aref *c64-colours* i)))
+	       (map-colour surface-fp (ash colour -16)
+			   (logand #xff (ash colour -8))
+			   (logand #xff colour))))))
 
 (defun vicky ()
   (map-memory)

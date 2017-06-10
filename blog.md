@@ -1,3 +1,34 @@
+# 10/6/2017 Future, past and present
+
+After the SSD disaster of 8th June, Marceline is back from the dead with a spanky new 1TB drive. Here are some lessons
+
+- Back up your code to one of these hosting repos. Thankfully I only lost a couple of hours worth of code
+- Save your config files for emacs etc
+- Ubuntu 17 has a nice font compared to Ubuntu 14
+
+The work I did lose was making VICKY support C64 Hi-Res mode colour attributes. 320x200 resolution, split into 8x8 squares, each of which can have two colours from a palette of 16. Colours are stored in the 1000 byte character memory (aka screen memory). The lo-nybble contains the background colour, the hi-nybble the foreground colour.
+
+Mr Timmerman has a nice article on C64 colours, so I used the RGB values he came up with here http://unusedino.de/ec64/technical/misc/vic656x/colors/
+
+Two more screenshots, demonstrating justification for different fonts and the attribute changes.
+
+![Alt text](/yeolde.png)
+![Alt text](/future.png)
+
+## Images
+
+Next up, images. I can't decide whether I will draw them using a cross platform C64 image editor or to draw them and convert them. Programming a converter might be nice, but I don't want to get bogged down. What I will certainly be working on is a sliding window compressor.
+
+## Other changes
+
+- Shared memory now maps the entire 64K
+
+I didn't want to map the character memory and bitmap memory separately. I will be able to attach a monitor at some point to a running game session.
+
+- Shared memory now uses /dev/shm
+
+The proper way to do this of course is with shm_open() rather than mmap'ing to a file in /dev/shm but I couldn't find this function in sb-posix. I wonder if having an mmap'd file updating to disk every second wasn't the reason my SSD carked it...
+
 # 7/6/2017 Functional design, imperative code
 
 Or, functional assembler.

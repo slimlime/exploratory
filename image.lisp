@@ -24,6 +24,18 @@
 ;;                      YUV - Sum of abs      Rubbish
 ;;                      YUV - Squares         Better, still no green in the Porsche
 ;;                                            but Lena has lost her ghastly pallour
+;; face looks good with abs-diff
+;; For the porsche, dithered + adjusted yuv is best
+;; For Lena, dthering + RGB abs. So it's just preference
+;; We must choose and move on
+
+;; Outline for a better method?
+
+;; Pick every other pixel, alternating between lines, picking bg and fg to
+;; minimise the error of the pixel
+;; Go back and pick the odd pixels picking bg and fg such that the sum of the
+;; errors of the pixel and its neighbours is minimised
+
 
 (defun abs-diff (x1 y1 z1 x2 y2 z2)
   (+ (abs (- x1 x2))
@@ -34,15 +46,22 @@
   (* x x))
 
 (defun square-diff (x1 y1 z1 x2 y2 z2)
-  (+ (square (- x1 x2))
-     (square (- y1 y2))
-     (square (- z1 z2))))
+  (sqrt (+ (square (- x1 x2))
+	   (square (- y1 y2))
+	   (square (- z1 z2)))))
 
 (defun rgb2yuv (r g b)
-  (let ((y (+ (*  0.257 r) (*  0.504 g) (*  0.098 b) 16))
-	(u (+ (* -0.148 r) (* -0.291 g) (*  0.439 b) 128))
-	(v (+ (*  0.439 r) (* -0.368 g) (* -0.071 b) 128)))
-    (values y u v)))
+  (let ((y (+ (*  0.257 r) (*  0.504 g) (*  0.098 b)))
+	(u (+ (* -0.148 r) (* -0.291 g) (*  0.439 b)))
+	(v (+ (*  0.439 r) (* -0.368 g) (* -0.071 b))))
+;    (values y u v)))
+    (values (* 2.5 y) (* 1.75 u) (* 1.25 v))))
+;    (values y (* 1.75 u) (* 1.25 v))))
+    
+;; Good values for lena 2.5 1.75 1.25 - this gives nice value for porsche too
+;; cellardoor 2.5 1.75 1.25
+;; porsche 1 1.75 1.25
+;; maxine 1 1 1 / 1 1.75 1.25
 
 (defun yuv (r1 g1 b1 r2 g2 b2)
   (multiple-value-bind (y1 u1 v1)
@@ -51,14 +70,13 @@
 	(rgb2yuv r2 g2 b2)
       (square-diff y1 u1 v1 y2 u2 v2))))
 
-(defun colour-diff (c1 c2 &optional (f #'abs-diff))
+(defun colour-diff (c1 c2 &optional (f #'yuv))
   (let ((r1 (ash c1 -16))
 	(g1 (logand #xff (ash c1 -8)))
 	(b1 (logand #xff c1))
 	(r2 (ash c2 -16))
 	(g2 (logand #xff (ash c2 -8)))
 	(b2 (logand #xff c2)))
-
     (funcall f r1 g1 b1 r2 g2 b2)))
 
 ;; Now we could convert to YUV or CIELAB. I prefer the little known
@@ -156,6 +174,4 @@
 	   (setf x 0))
 
 	   )))
-
-
 

@@ -1,8 +1,55 @@
+# 11/6/2017 PM - Gallery
+
+Always the danger is that you complete a piece of work and then start playing around with it for hours on end rather than doing the next bit. So here is a gallery of images I converted, for research purposes. Images for the game are going to be 104x104 to start with, maybe there will be some variation if needed. Additionally there will be a title page, so I included an image of an eerie gas station to give an idea of what it will be like.
+
+Eerie gas-station
+
+![Alt text](/blog/gasstation.png)
+
+A creepy door
+
+![Alt text](/blog/door.png)
+
+The final image of the Porsche, no dithering, biased YUV conversion
+
+![Alt text](/blog/porsche.png)
+
+Maxine...
+
+![Alt text](/blog/maxine.png)
+
+
+- Dithering - No.
+
+Decided not to implement it and that using Imagemagick to do it was cheating for the purposes of this exercise. Also, dithering... the word itself is antithetical to the aims of this project.
+
+- YUV
+
+Two chroma channels and luminosity. It should give a better distance metric than RGB but I'll be honest, it's subjective and I messed around by biasing the YUV channels before they ended up in the difference metric. Sometimes RGB absolute distance worked better!
+
+- Grey (or, Gray)
+
+The colour selection is biased towards the greys. I have a feeling that this is due to the fact that the grays in the C64 palette vary in luminosity whereas the other colours are very similar. This means that any image where the colours are closer to grey in luminosity will end up when they are converted as... grey. The thing is, endless tweaking of the biases in the palette selection are not going to make the C64 look like a Silicon Graphics workstation.
+
+I feel it is time to move on to image compression, which I may have mistakenly referred to as LZMA earlier. The algorithm I am actually going to use is LZ77, which I last implemented in 68000 machine code circa 1989. At the time I had no idea it was already a well established (and superseded) technique. It should work well for the simple images here. To improve things
+
+## Popcount
+
+Helping the compression...
+
+- Foreground == Background
+
+Lots of attribute squares get the same foreground as background. This means they have empty data. More zeroes = better compression.
+
+- Popcount
+
+For the first time ever in over 20 years of programming I found a use for popcount (i.e. counting the set bits in a byte). When assigning an attribute you can just as easily swap the bits and switch foreground and background colours. The image conversion routine *posterize-image* does precisely this- if there are more set bits than unset bits, it inverts the cell. Hopefully this will aid the compression by reducing the number of different bytes. Perhaps it will do nothing, in which case I will have failed to properly render service to Lord YAGNI once more. (Also, the popcount is done manually, rather than with the HN obsessives x86 instruction)
+
 # 11/6/2017 VICKY gets a playmate
 
 First attempt at converting an image for use in the game. Not sure I'm keen on her corpse-like pallour, but her gaze is purposeful as well as purple, and undead romance is extremely popular with today's youth so perhaps it is alright.
 
-![Alt text](/conversion.png)
+![Alt text](/blog/conversion.png)
 
 104 x 104 pixel image with attributes selected by a naive algorithm. Luckily I decided to try sum of absolute difference to select the colours- my first go was with sum of squares and the result was terrible. This has given me the motivation to try YUV which is simple, and CIELAB which is not.
 
@@ -13,8 +60,8 @@ These images should compress nicely for the game as they have a lot of space. To
 
 ## Dithering
 
-![Alt text](/porsche1.png) 
-![Alt text](/porsche2.png)
+![Alt text](/blog/porsche1.png) 
+![Alt text](/blog/porsche2.png)
 
 There seems to be a glitch where the bottom of the image hasn't been processed, also, the green of the grass hasn't really come through so I think there is more work to do on the colour-diff function. But I am liking the terrible aesthetic of this. Will all add to the crushing atmosphere when playing it in silence while it rains outside in the middle of the night.
 
@@ -32,8 +79,8 @@ Mr Timmerman has a nice article on C64 colours, so I used the RGB values he came
 
 Two more screenshots, demonstrating justification for different fonts and the attribute changes.
 
-![Alt text](/yeolde.png)
-![Alt text](/future.png)
+![Alt text](/blog/yeolde.png)
+![Alt text](/blog/future.png)
 
 ## Images
 
@@ -94,7 +141,7 @@ Now it is decoupled and efficient. But how is a closure implemented? Well it is 
 
 # 6/6/2017 Justified ancient text
 
-![Alt text](/muse.png)
+![Alt text](/blog/muse.png)
 
 The justification is pre-computed, following the principle of never doing at run-time what can be done at assembly time. Of course, this is often a space-time trade-off, but in this case it isn't. I did violate one rule, DRY, that is, the width calculation is done in LISP as well as in 6502. The text measurement could have been done by running the actual code, but then it is easy to take principles too far.
 
@@ -102,7 +149,7 @@ The justification is pre-computed, following the principle of never doing at run
 
 Added a very basic kerning algorithm whereby a character can decide if it admits a character a pixel closer to the right, and a character can decide if it is such a character that can be admitted a pixel closer, to the left.
 
-![Alt text](/kerning.png)
+![Alt text](/blog/kerning.png)
 
 The extra code to decide whether to kern or not. The widths of all characters were reduced by one in the tables- the extra pixel is added back in when (in the vast majority of cases) the two adjacent characters do not kern together.
 
@@ -126,7 +173,7 @@ The more complex scheme where there are two classes of adjacency (over/under and
 
 So rendering from compressed strings in a variety of fonts is almost there. I wanted a certain feel to the game and variable width fonts were an absolute must. Since no-one is reading this blog, this screen shot will not give anything of the game away. The deadline for the IF competition is September, so that's a certain motivation, but it also means I won't be checking in the actual game data here until after.
 
-![Alt text](/three-fonts.png)
+![Alt text](/blog/three-fonts.png)
 
 ~~~~
            (sta16.zp :str1 :A2)
@@ -321,7 +368,7 @@ VICKY (I was going to go for V.I.C.K.Y. Perhaps there's a movie in there somewhe
 
 Look, here is a test rendering I dumped in using a 'medieval' style font. Sadly I think that at 12 pixels high, it will be too big, there being room for only 15 lines (the original, 8-bit break on which it was based is even bigger). Note the horrific horizontal spacing- variable width rendering of fonts is next on the agenda. For some of you, the brown and yellow colour scheme will bring back memories redolent of languorous summers spent indoors waiting for tapes to load. I had a Spectrum, so I feel nothing. Perhaps resentment, not greatly dulled by time.
 
-![Alt text](/capture.png)
+![Alt text](/blog/capture.png)
 
 UPDATE - As you can see three additional fonts have been added, 10 pixels high. There are some flaws. But, meh, fix it when it needs fixing. It will be okay at the sanding stage.
 

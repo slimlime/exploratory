@@ -11,6 +11,13 @@ These images should compress nicely for the game as they have a lot of space. To
 - If foreground attribute == background attribute => bitmap is empty for that cell
 - If foreground has more pixels than background, invert the cell
 
+## Dithering
+
+![Alt text](/porsche1.png) 
+![Alt text](/porsche2.png)
+
+There seems to be a glitch where the bottom of the image hasn't been processed, also, the green of the grass hasn't really come through so I think there is more work to do on the colour-diff function. But I am liking the terrible aesthetic of this. Will all add to the crushing atmosphere when playing it in silence while it rains outside in the middle of the night.
+
 # 10/6/2017 Future, past and present
 
 After the SSD disaster of 8th June, Marceline is back from the dead with a spanky new 1TB drive. Here are some lessons

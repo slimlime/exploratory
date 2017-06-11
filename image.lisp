@@ -19,43 +19,66 @@
 ;; for each 8x8 block. For each block, for each color combination, calculate the 'error'
 ;; and pick the one which minimises it- each pixel having been assigned either fg or bg
 
+;; Experimental results RGB - Sum of squares. Rubbish
+;;                      RGB - Sum of abs      OK. No green.
+;;                      YUV - Sum of abs      Rubbish
+;;                      YUV - Squares         Better, still no green in the Porsche
+;;                                            but Lena has lost her ghastly pallour
+
+(defun abs-diff (x1 y1 z1 x2 y2 z2)
+  (+ (abs (- x1 x2))
+     (abs (- y1 y2))
+     (abs (- z1 z2))))
+
 (defun square (x)
   (* x x))
 
-(defun colour-diff (c1 c2)
+(defun square-diff (x1 y1 z1 x2 y2 z2)
+  (+ (square (- x1 x2))
+     (square (- y1 y2))
+     (square (- z1 z2))))
+
+(defun rgb2yuv (r g b)
+  (let ((y (+ (*  0.257 r) (*  0.504 g) (*  0.098 b) 16))
+	(u (+ (* -0.148 r) (* -0.291 g) (*  0.439 b) 128))
+	(v (+ (*  0.439 r) (* -0.368 g) (* -0.071 b) 128)))
+    (values y u v)))
+
+(defun yuv (r1 g1 b1 r2 g2 b2)
+  (multiple-value-bind (y1 u1 v1)
+      (rgb2yuv r1 g1 b1)
+    (multiple-value-bind (y2 u2 v2)
+	(rgb2yuv r2 g2 b2)
+      (square-diff y1 u1 v1 y2 u2 v2))))
+
+(defun colour-diff (c1 c2 &optional (f #'abs-diff))
   (let ((r1 (ash c1 -16))
 	(g1 (logand #xff (ash c1 -8)))
 	(b1 (logand #xff c1))
 	(r2 (ash c2 -16))
 	(g2 (logand #xff (ash c2 -8)))
 	(b2 (logand #xff c2)))
-    ;; Now we could convert to YUV or CIELAB. I prefer the little known
-    ;; YAGNILABs colour space:
-    ;; CLASSIFIED
-    ;; In 1976, YAGNILABs was set up to investigate quantum bogo dynamics. Its
-    ;; findings were confiscated by the military a year later and have never been
-    ;; released to the public, only leaking onto conspiracy and occult websites.
-    ;; Initial documents seemed to indicate that YAGNILAB was working on a
-    ;; Ytrrium-Arsenide-Gallium space laser, a finding that was debunked in a
-    ;; senatorial hearing when the scientists couldn't answer any questions about
-    ;; the laser as they kept saying the word 'Arsenide' repeatedly and giggling.
-    ;; It is now widely believed that YAGNILABs spent the entire defence budget on
-    ;; sumptuous lunches and trips to various secretive MK-ULTRA linked strip clubs
-    ;; located under the Antarctic permafrost.
-    (+ (abs (- r1 r2))
-       (abs (- g1 g2))
-       (abs (- b1 b2)))))
 
-;; YAGNILABs may have to be reactivated...
+    (funcall f r1 g1 b1 r2 g2 b2)))
 
-;; TODO if fg==bg then byte =0, this will aid the compression
+;; Now we could convert to YUV or CIELAB. I prefer the little known
+;; YAGNILABs colour space:
+;; CLASSIFIED
+;; In 1976, YAGNILABs was set up to investigate quantum bogo dynamics. Its
+;; findings were confiscated by the military a year later and have never been
+;; released to the public, only leaking onto conspiracy and occult websites.
+;; Initial documents seemed to indicate that YAGNILAB was working on a
+;; Ytrrium-Arsenide-Gallium space laser, a finding that was debunked in a
+;; senatorial hearing when the scientists couldn't answer any questions about
+;; the laser as they kept saying the word 'Arsenide' repeatedly and giggling.
+;; It is now widely believed that YAGNILABs spent the entire defence budget on
+;; sumptuous lunches and trips to various secretive MK-ULTRA linked strip clubs
+;; located under the Antarctic permafrost.
 
-
-
-
-(defun posterize-block (x y sx img out)
+(defun posterize-block (x y sx img out reduce-popcount)
   (let ((best-diff 13000000)
-	(best-c 0))
+	(best-c 0)
+	(popcount 0))
     (loop for c from 0 to 255 do
 	 (let ((diff 0)
 	       (fg (aref *c64-colours* (ash c -4)))
@@ -70,27 +93,40 @@
 	     (setf best-c c))))
     (loop for j from y to (+ 7 y) do
 	 (let ((bit #x80)
-	       (byte 0))
-	   (loop for i from x to (+ 7 x) do
-		(let ((img-col (aref img (+ i (* sx j))))
-		      (fg (aref *c64-colours* (ash best-c -4)))
-		      (bg (aref *c64-colours* (logand best-c #xf))))
-		  (when (> (colour-diff fg img-col)
-			   (colour-diff bg img-col))
-		    (incf byte bit))
-		  (setf bit (ash bit -1))))
+	       (byte 0)
+	       (fg (aref *c64-colours* (ash best-c -4)))
+	       (bg (aref *c64-colours* (logand best-c #xf))))
+	   (unless (= fg bg)
+	     (loop for i from x to (+ 7 x) do
+		  (let ((img-col (aref img (+ i (* sx j)))))
+		    (when (< (colour-diff fg img-col)
+			     (colour-diff bg img-col))
+		      (incf popcount)
+		      (incf byte bit))
+		    (setf bit (ash bit -1)))))
 	   (setf (aref out (+ (* j (floor sx 8)) (floor x 8))) byte)))
+    (when (and reduce-popcount
+	       (> popcount 32))
+	;;invert to reduce number of set bits
+      (setf best-c (logior (logand #xf0 (ash best-c 4))
+			   (ash best-c -4)))
+      (loop for j from y to (+ 7 y) do
+	   (let ((byte (aref out (+ (* j (floor sx 8)) (floor x 8)))))
+	     (setf (aref out (+ (* j (floor sx 8)) (floor x 8)))
+		   (logxor #xff byte)))))
     best-c))
 
-(defun posterize-image (sx sy img)
+(defun posterize-image (sx sy img &key (reduce-popcount t))
   (let ((attributes nil)
 	(bitmap (make-array (* (floor sx 8) sy))))
     (loop for j from 0 to (1- sy) by 8 do
 	 (loop for i from 0 to (1- sx) by 8 do
-	      (push (posterize-block i j sx img bitmap) attributes)))
+	      (push (posterize-block i j sx img bitmap reduce-popcount)
+		    attributes)))
     (list bitmap (nreverse attributes))))
 	    
 (defun copy2screen (result sx)
+  ; for testing purposes. This is a blit rubbish.
   (loop for i from 0 to 7999 do
        (setmem (+ i #x8000) 0))
   (loop for i from 0 to 1000 do

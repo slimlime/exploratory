@@ -1,7 +1,3 @@
-(defparameter *c64-colours* #(#x000000 #xFFFFFF #x68372B #x70A4B2
-			      #x6F3D86 #x588D43 #x352879 #xB8C76F
-			      #x6F4F25 #x433900 #x9A6759 #x444444
-			      #x6C6C6C #x9AD284 #x6C5EB5 #x959595))
 (defparameter *colours* (make-array 16))
 (defparameter *render-width* (* 2 +screen-width+))
 (defparameter *render-height* (* 2 +screen-height+))
@@ -16,8 +12,6 @@
 ;; 4 - purple  5 - green       6 - blue       7 - yellow
 ;; 8 - orange  9 - brown       A - light red  B - dark grey
 ;; C - grey    D - light green E - light blue F - light grey
-
-;; http://unusedino.de/ec64/technical/misc/vic656x/colors/
 
 (defun map-c64-colours (surface-fp)
   (loop for i from 0 to 15 do
@@ -36,7 +30,7 @@
 				       :bpp 24)))
       (let* ((redraw nil)
 	     (timer (make-timer #'(lambda () (setf redraw t)))))
-	(schedule-timer timer 2 :repeat-interval 1)
+	(schedule-timer timer 0 :repeat-interval 1)
 	
 	(sdl:with-events ()
 	  (:idle ()
@@ -51,8 +45,8 @@
 				       (attribute (getmem (+ *char-memory-address*
 							     (mod ptr 40)
 							     (* 40 (floor ptr 320)))))
-				       (bg (aref *colours* (ash attribute -4)))
-				       (fg (aref *colours* (logand #xf attribute))))
+				       (fg (aref *colours* (ash attribute -4)))
+				       (bg (aref *colours* (logand #xf attribute))))
 				  (loop while (not (= 0 bit)) do
 				       (let ((color (if (= 0 (logand bit byte)) bg fg))) 
 					 (lispbuilder-sdl-base::write-pixel p x y color)

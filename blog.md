@@ -1,6 +1,103 @@
-# 11/6/2017 PM - Gallery
+# 11/6/2017 Disco-Era Image Compression for the 6502 with LISP
+--------------------------------------------------------------
+
+As you have been following my blog, you will know that I have been building a set of 6502 assembler utilities in LISP with the aim of building an adventure game. Today I am thinking about image compression. (See [here](#assembler) and [here](#gallery))
+
+Typically [LZ77](https://en.wikipedia.org/wiki/LZ77_and_LZ78)  compression involves a stream of symbols, with a special symbol that indicates "hmm, this pattern of symbols looks familiar, I saw it X symbols ago, and it was the same for Y symbols." So it is very easy to decompress. One simply writes out the symbols until the special symbol is encountered, then nip back to the previous occurance -X symbols ago, write out Y symbols, then continue. Of course, for symbols we mean "bytes".
+
+One of the reasons I did not use LZ77 for the text-compression is that we never actually write out the string to memory. There is no way to 'nip-back' as there is nothing to nip back to. We simply render a character's bit pattern to the screen then forget we ever saw it. Decompressing images is slightly different- we actually are writing out a byte pattern to memory, and it will stay there, but with one problem. There are gaps. Gaps where other things live in the screen memory, e.g. the aforementioned text.
+
+We simply can't afford to write a generic decompressor which outputs to some dynamic memory buffer and then copy this data onto the screen taking the gaps into account. As with the text rendering, de-compressing an image has to go directly from the soup to the nuts. We need to solve the problem of the gaps.
+
+~~~~
+    |---Text-----------|---Image---| 
+    8       16      24      32
+    12345678123456781234567812345678  
+0                      XXXXXXXXXXXXX                       
+40    GAPS             X BONAFIDE  X
+80          GAPS       X IMAGE MEM X
+120                    XXXXXXXXXXXXX
+160                    
+200
+240
+...
+~~~~
+
+For this game, images will be roughly 104x104 pixels (though I don't want that to be fixed just yet- additionally there will be a 320x200 image as the start page). So I am proposing to use the following scheme.
+
+a) Search the image data for the least frequent byte, the LFB, to use as the special symbol.
+
+~~~~
+   Happy Hack
+   ----------
+   Since any occurrance of the LSB would be a special case in the de-compressor
+   we will simply change any occurrance of the LSB to something else. Something
+   that differs by no more than one bit. No special case required. Tell the
+   artist to suck it up, if they can drag themselves away from the wacom.
+~~~~
+
+b) Encode previously seen patterns as
+
+~~~~
+   LFB	  	     
+   ROW            - How many rows up do we go? (including 0)
+   		    In the decompressor we will have to multiply this by 40
+   COLUMN         - How many bytes in do we start?
+   WIDTH          - How many bytes to copy?
+~~~~
+   
+   What are the constraints on each field?
+   
+~~~~
+   WIDTH < 40 (6 BITS MAX)
+   COLUMN < 40 (6 BITS MAX)
+   ROW < 8 BITS MAX
+~~~~
+   
+   So let us pluck some numbers out of the aether.
+   
+~~~~
+   WIDTH 4 bits, giving 1-16 bytes?
+   ROW   6 bits, can go back up 6 bits
+   COL   6 bits, can spread across the whole width
+
+   TOTAL 16 bits
+~~~~
+
+So, each instance of the LFB is 3 bytes, so no point in encoding patterns less than 4 bytes long. So the width nybble can actually encode 4-19 bytes. Pretty good!
+
+There is some inefficiency in the ROW COL addressing scheme, we can address at most 40 columns * 63 rows = 2520 addresses, whereas 12 bits should be able to address 2^12, or 4096 positions.
+
+Hmm, sounds like a lot, especially for an image that is 1352 bytes (+ 169 colour attribute bytes). So in actual fact, we have some headroom. We don't *need* to address 2520 positions. So what can we do? Well, for a start since we *know* (see note) that we are blitting to a 40 column screen (C64 hi-res mode), we can simply precompute the screen offset so we end up with a scheme like this.
+
+~~~~
+   LFB
+   DELTA
+   WIDTH
+~~~~
+
+Where DELTA is the number of bytes to go up *in screen memory*. We don't care that there are vast areas of the screen that are invalid addresses- we have to accept this inefficiency in the previous scheme anyway. Now we don't need to do any tricky multiplications, just mask off the width nybble and do a 16 bit subtraction to the zero page to get the address of our previously seen pattern.
+
+Final encoding scheme, 8 bit LFB indicating a pattern, 4 bits of width and 12 bits of delta.
+
+~~~~
+   0        1               2      
+   76543210 7654   3210     76543210
+   LFB      WIDTH  HI-DELTA LO-DELTA
+~~~~
+
+How efficient is it in terms of addressing? Well, the efficiency depends on the size of the image. For a full screen image, the delta can address 4096 bytes, pretty much half the screen- every address will be part of the source image. For the 104x104 pixel images, not so much. But we already decided that for a simple row column scheme, we needed 12 bits, so we are no worse off, but we have vastly simplified the calculation. It is tempting to scavenge a bit from the hi-delta and give it to the width. It would mean we could copy an entire row! I may experiment and see if it makes a difference. One thing I am not prepared to do, is go to variable bit width symbols. Too complex both conceptually and computationally for this application- Yaggers.
+
+Note - This is where ad-hoc program assembly comes into its own. Typically one would write a generic function with loads of parameters, e.g. for screen-width on the basis that you should not build in the special cases. Indeed, one would probably be fired if one did not do this (although I have seen a function called SendBatchOf1000Entries in production code. In this instance the culprit was in charge of hiring and firing. The tragedy is that a real programmer would have batched up 1024 entries.)
+
+So we are agreed- this level of genericity is acceptable in our normal humdrum non-assembly-programming lives, but not in 6502. 6502 is *so* constrained that even this level of parameterisation is expensive both in terms of CPU-cycles and brain-cycles. Here we must not violate the classic programmers' maxim "Never do at runtime what ought to be done at compile time." (I think it was Miley Cyrus who said this first). So, I will write a *general* function in LISP which will be parameterised on screen-width, which will generate some *specific* 6502 code and *specific* image data which only works for a screen of width X. This is indeed the best of both worlds.
+
+
+# 11/6/2017 PM - Image Gallery
 
 Always the danger is that you complete a piece of work and then start playing around with it for hours on end rather than doing the next bit. So here is a gallery of images I converted, for research purposes. Images for the game are going to be 104x104 to start with, maybe there will be some variation if needed. Additionally there will be a title page, so I included an image of an eerie gas station to give an idea of what it will be like.
+
+### Gallery
 
 Eerie gas-station
 

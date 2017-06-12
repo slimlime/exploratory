@@ -55,8 +55,8 @@
 	(u (+ (* -0.148 r) (* -0.291 g) (*  0.439 b)))
 	(v (+ (*  0.439 r) (* -0.368 g) (* -0.071 b))))
 ;    (values y u v)))
-    (values (* 2.5 y) (* 1.75 u) (* 1.25 v))))
-;    (values y (* 1.75 u) (* 1.25 v))))
+;    (values (* 2.5 y) (* 1.75 u) (* 1.25 v))))
+    (values y (* 1.75 u) (* 1.25 v))))
     
 ;; Good values for lena 2.5 1.75 1.25 - this gives nice value for porsche too
 ;; cellardoor 2.5 1.75 1.25
@@ -125,7 +125,7 @@
 	   (setf (aref out (+ (* j (floor sx 8)) (floor x 8))) byte)))
     (when (and reduce-popcount
 	       (> popcount 32))
-	;;invert to reduce number of set bits
+	;;invert to reduce number of set bits. Saved a whol 50 bytes for the maxine image
       (setf best-c (logior (logand #xf0 (ash best-c 4))
 			   (ash best-c -4)))
       (loop for j from y to (+ 7 y) do
@@ -171,7 +171,4 @@
 	 (when (= x (floor sx 8))
 	   
 	   (incf ptr (- 40 x))
-	   (setf x 0))
-
-	   )))
-
+	   (setf x 0)))))

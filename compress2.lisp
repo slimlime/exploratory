@@ -14,7 +14,8 @@
 (defparameter *max-offset* 15) ; 1-15 -> 1-15 (0 encodes the row above)
 
 (defun is-match (x y)
-  ;(< (logcount (logxor x y)) 2))
+  ;(and (= y (logior x y))
+  ;     (< (logcount (logxor x y)) 3)))
 
   (= x y))
 
@@ -95,3 +96,34 @@
 		 (vector-push-extend byte out)
 		 (incf q)))))
     out))
+
+(defun blit (buf width)
+  ; for testing purposes. This is a blit rubbish.
+  (loop for i from 0 to 7999 do
+       (setmem (+ i #x8000) 0))
+  ;(loop for i from 0 to 1000 do
+  ;     (setmem (+ i #x7000) 0))
+
+  ;(let ((ptr #x7000)
+;	(x 0))
+;    (loop for att in (second result) do
+;	 (setmem ptr att)
+;	 (incf ptr)
+;	 (incf x)
+;	 (when (= x (floor sx 8))
+;	   (incf ptr (- 40 x))
+;	   (setf x 0))))
+
+  
+  (let ((ptr #x8000)
+	(x 0))
+    (loop for b across buf do
+	 
+	 (setmem ptr b)
+	 (incf ptr)
+	 (incf x)
+	 (when (= x width)
+	   
+	   (incf ptr (- 40 x))
+	   (setf x 0)))))
+

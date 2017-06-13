@@ -108,10 +108,14 @@ Offset = 1-30 => 1-30 bytes on the same row
 
 I have a sneaking suspicion that when I try this out, it will be better to use 5 bits for the width and 3 bits for the offset since the images are only 13 bytes wide and we can't make use of offsets larger than that. The earlier tests allowed the patterns to match straddling the rows. Let us see if this bears out...
 
-## One more thing...
 
-If there are a lot of patterns at the row above, perhaps there are patterns of length two. If we had a single byte that could represent a pattern match of two then we would be able to save some more bytes.
+Compression results, all files 1352 bytes (+ 169 attribute bytes which is not included)
 
+~~~~
 
+stairs 1070
+face 817
+porsche 1141
 
+~~~~
 

@@ -10,60 +10,65 @@
 	     (setf lfb i)))
       lfb)))
 
-(defparameter *max-pattern-length* 19) ;Fits in a nybble, minimum length 4
-(defparameter *max-offset* 4095) ;Fits in 12 bits
+(defparameter *max-length* 10)
+(defparameter *max-offset* 41)
 
 ;;todo modulo offset
 ;;todo don't span line
 
+(defparameter *width-freq* nil)
+(defparameter *offset-freq* nil)
+
 (defun compress (buf)
+  (setf *width-freq* (make-array *max-offset* :initial-element 0))
+  (setf *offset-freq* (make-array *max-offset* :initial-element 0))
+  
   (let ((eob (1- (length buf)))
 	(lfb (lfb buf))
 	(lfb-dummy 0) ;meh- could just adjust lfb by one bit...
-	 (out (make-array 0
-			  :adjustable t
-			  :fill-pointer 0
-			  :element-type '(unsigned-byte 8)))
+	(out (make-array 0
+			 :adjustable t
+			 :fill-pointer 0
+			 :element-type '(unsigned-byte 8)))
 	(word 0)
 	(lookup (make-hash-table)))
     (format t "Compressing. LFB=#x~2,'0X~%" lfb)
     (loop for i from 0 to eob do
-	 ;this is inefficient, should build lookup as we go.. but, yaggers
-	 (setf word (logior (ash (logand #xffffff word) 8)
+	 (setf word (logior (ash (logand #xffff word) 8)
 			    (aref buf i)))
-	 (when (> i 2)
-	   (push (- i 3) (gethash word lookup))))
+	 (when (> i 1)
+	   (push (- i 2) (gethash word lookup))))
     (loop for i from 0 to eob do
 	 (let ((best-offset 0)
 	       (best-len 0))
 	   (when (<= i (- eob 3))
-	     (setf word (logior (ash (aref buf i) 24)
-				(ash (aref buf (+ 1 i)) 16)
-				(ash (aref buf (+ 2 i)) 8)
-				(aref buf (+ 3 i)))) 
+	     (setf word (logior (ash (aref buf i) 16)
+				(ash (aref buf (+ 1 i)) 8)
+				(aref buf (+ 2 i)))) 
 	     (dolist (p (gethash word lookup))
 	       (let ((offset (- i p 1))
 		     (len 0)
 		     (q i))
 		 (when (and (>= offset 0)
-			    (<= offset *max-offset*))
+			    (<= offset *max-offset*))  
 		   (loop while (and (<= q eob)
 				    (= (aref buf p)
 				       (aref buf q))
-				    (< len *max-pattern-length*)) do
+				    (< len *max-length*)) do
 			(incf p)
 			(incf q)
 			(incf len))
 		   (when (> len best-len)
-		     ;;todo break out early if best-len=19
 		     (setf best-len len)
 		     (setf best-offset offset))))))
-	   (if (> best-len 3)
+	   (if (> best-len 2)
 	       (progn
+		 (format t "Found ~a @ ~a ~%" best-len best-offset)
+		 (incf (aref *width-freq* best-len))
+		 (incf (aref *offset-freq* best-offset))
 		 (vector-push-extend lfb out)
-		 (vector-push-extend (logior (ash (- best-len 4) 4)
-					     (ash best-offset -8)) out)
-		 (vector-push-extend (logand #xff best-offset) out)
+		 (vector-push-extend (logior (ash (- best-len 3) 5)
+					     best-offset) out)
 		 (incf i (1- best-len)))
 	       (vector-push-extend (if (= lfb (aref buf i))
 				       lfb-dummy

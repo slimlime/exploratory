@@ -1,0 +1,15 @@
+Initial compression results.
+
+Using the scheme where we encode an already seen pattern as
+
+~~~~
+
+LFB
+4 BITS WIDTH
+4 BITS HI-OFFSET
+8 BITS LO-OFFSET
+
+~~~~
+
+
+The pretty bobbed face goes from 1352->869 bytes. This is ok, but I was aiming for less than two pages of memory for each image. Given that there are attribute values to add, another 169 bytes, it isn't looking good. So I performed a bit of analysis on the values. It's all very well going back 4096 bytes to look for a pattern match and this does indeed improve the compression, but not by as much as one would think. Additionally, patterns are usually quite short, so the widths follow a distribution. Some compression schemes use a variable bit encoding for the width field which follows more closely the distribution of observed widths.

@@ -16,19 +16,24 @@
 ;;todo modulo offset
 ;;todo don't span line
 
+(defparameter *width-freq* nil)
+(defparameter *offset-freq* nil)
+
 (defun compress (buf)
+  (setf *width-freq* (make-array *max-pattern-length* :initial-element 0))
+  (setf *offset-freq* (make-array *max-offset* :initial-element 0))
   (let ((eob (1- (length buf)))
 	(lfb (lfb buf))
-	(lfb-dummy 0) ;meh- could just adjust lfb by one bit...
-	 (out (make-array 0
-			  :adjustable t
-			  :fill-pointer 0
-			  :element-type '(unsigned-byte 8)))
+	(lfb-dummy 0)	     ;meh- could just adjust lfb by one bit...
+	(out (make-array 0
+			 :adjustable t
+			 :fill-pointer 0
+			 :element-type '(unsigned-byte 8)))
 	(word 0)
 	(lookup (make-hash-table)))
     (format t "Compressing. LFB=#x~2,'0X~%" lfb)
     (loop for i from 0 to eob do
-	 ;this is inefficient, should build lookup as we go.. but, yaggers
+					;this is inefficient, should build lookup as we go.. but, yaggers
 	 (setf word (logior (ash (logand #xffffff word) 8)
 			    (aref buf i)))
 	 (when (> i 2)
@@ -60,6 +65,8 @@
 		     (setf best-offset offset))))))
 	   (if (> best-len 3)
 	       (progn
+		 (incf (aref *width-freq* best-len))
+		 (incf (aref *offset-freq* best-offset))
 		 (vector-push-extend lfb out)
 		 (vector-push-extend (logior (ash (- best-len 4) 4)
 					     (ash best-offset -8)) out)

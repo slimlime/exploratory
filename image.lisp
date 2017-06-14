@@ -94,7 +94,7 @@
 ;; located under the Antarctic permafrost.
 
 (defun posterize-block (x y sx img out reduce-popcount)
-  (let ((best-diff 13000000)
+  (let ((best-diff most-positive-fixnum)
 	(best-c 0)
 	(popcount 0))
     (loop for c from 0 to 255 do
@@ -132,6 +132,11 @@
 	   (let ((byte (aref out (+ (* j (floor sx 8)) (floor x 8)))))
 	     (setf (aref out (+ (* j (floor sx 8)) (floor x 8)))
 		   (logxor #xff byte)))))
+    (when (= 0 popcount)
+      ;; all the bits are zero so let us set the foreground colour to
+      ;; be the same as the background colour
+      (setf best-c (logior (logand #xf0 (ash best-c 4))
+			   (logand #x0f best-c))))
     best-c))
 
 (defun posterize-image (sx sy img &key (reduce-popcount t))

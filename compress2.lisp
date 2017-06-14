@@ -13,26 +13,30 @@
 (defparameter *max-length* 18) ; 0-15 -> 3-18
 (defparameter *max-offset* 15) ; 1-15 -> 1-15 (0 encodes the row above)
 
-(defun is-match (x y)
-  ;(and (= y (logior x y))
-  ;     (< (logcount (logxor x y)) 3)))
+(defun is-match (p q)
+  ;(and (= q (logior p q))
+  ;     (< (logcount (logxor p q)) 3)))
 
-  (= x y))
+  (= p q))
 
 ;; where q>p, look for a match at p
 (defun match (buf eob p q)
   (let ((len 0))
     (loop while (and (<= q eob)
 		     (< len *max-length*)
-		     (is-match (aref buf p)
-			       (aref buf q))) do
+		     (is-match
+		      (aref buf p)
+		      (aref buf q))) do
  	 (incf len)
 	 (incf p)
 	 (incf q))
     len))
 
+;todo stop at end of line
 (defun compress (buf width)
-  (let ((eob (1- (length buf)))
+  (let ((offsets (make-array (1+ *max-offset*) :initial-element 0))
+	(lengths (make-array (1+ *max-length*) :initial-element 0)) 
+	(eob (1- (length buf)))
 	(lfb (lfb buf))
 	(lfb-dummy 0) ;meh- could just adjust lfb by one bit...
 	(out (make-array 0
@@ -60,7 +64,8 @@
 		    (setf best-offset (- i p)))))
 	   (if (> best-len 2)
 	       (progn
-		 (format t "Found ~a @ ~a ~%" best-len best-offset)
+		 (incf (aref lengths best-len))
+		 (incf (aref offsets best-offset))
 		 (incf i (1- best-len))
 		 (vector-push-extend lfb out)
 		 (vector-push-extend (logior (ash (- best-len 3) 4)
@@ -68,6 +73,8 @@
 	       (vector-push-extend (if (= (aref buf i) lfb)
 				       lfb-dummy
 				       (aref buf i)) out))))
+    (format t "Lengths - ~a~%" lengths)
+    (format t "Offsets - ~a~%" offsets)
     out))
 
 (defun decompress (buf width)
@@ -84,11 +91,9 @@
 		 (setf byte (aref buf (incf i)))
 		 (let ((len-1 (+ 2 (ash byte -4)))
 		       (off (logand #xf byte)))
-		   (format t "Unpacking ~a @ ~a ~%" (1+ len-1) off)
 		   (when (= 0 off)
 		     (setf off width))
 		   (setf off (- q off))
-		   (format t "Going from ~a to ~a ~%" off (+ len-1 off))
 		   (loop for p from off to (+ len-1 off) do
 			(vector-push-extend (aref out p) out)
 			(incf q))))
@@ -96,6 +101,17 @@
 		 (vector-push-extend byte out)
 		 (incf q)))))
     out))
+
+(defun lentest (f)
+  (format t "file ~a ~a~%"
+	  f
+	  (let ((img (posterize-image 104 104 (load-image f 104 104) :reduce-popcount t)))
+	    (length (compress (first img) (/ 104 8))))))
+
+(defun test ()
+  (lentest "/home/dan/Downloads/cellardoor.bmp")
+  (lentest "/home/dan/Downloads/porsche.bmp")
+  (lentest "/home/dan/Downloads/face.bmp"))
 
 (defun blit (buf width)
   ; for testing purposes. This is a blit rubbish.

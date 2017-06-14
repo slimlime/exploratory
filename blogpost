@@ -119,3 +119,27 @@ porsche 1141
 
 ~~~~
 
+Next is the redundancy in the attributes. We know from the conversion routine that we can have attributes that have the same foreground and background colour. This implies that the bitmap data is for this square.
+
+We have already seen that inverting the attribute from foreground to background to reduce the number of set bits can save a few bytes (838 vs 817 for the face), but we should also insist that the foreground colour = the background colour when there are no set bits.
+
+Omitting the bytes where the attribute is one colour gives the following results
+
+~~~~
+
+stairs 1068
+porsche 1098
+face 787
+
+~~~~
+
+Nothing to write home about in terms of improvement; probably not worth it in terms of the complexity it would involve in the decompressor. A pointer would have to be set up to track the attribute to test for emptiness.
+
+I am quite disappointed by the level of compression so far so now I am going to try some more extreme tricks before moving on.
+
+
+
+
+
+
+For comparison, here is the byte data compressed by a full LZW compressor which is common to things like WinZip and for a long time was the best all round compression algorithm with reasonable compression, speed and complexity.

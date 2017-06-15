@@ -1,3 +1,202 @@
+## 15/6/2017 The Compresssion Rabbit Hole
+
+I have spent the last two days down the compression rabbit hole. The further down you go, the fewer bytes there are to be had and the more desperate the search becomes. Rather than bore you all with the details, here is the very simple scheme I will be using. It meets these criteria,
+
+- It's better than nothing
+- It promises more in the future, should we need it
+- It should be very simple to implement the decompressor in 6502
+
+So, yaggers comes to the rescue once more. (If you want to see how I got to this sorry state, check out the excruciatingly detailed post which immediately precedes this.)
+
+As you can see, by choosing the simple scheme we are leaving potentially a few hundred bytes on the table. This is a good thing however, as we can now get on with our lives. It also means that if we are really struggling toward the end we can do a bit of improvement here to help out.
+
+
+
+~~~~
+           Original   Simple   Best   Attributes Simple Total   %
+
+cellardoor     1352     1073    995          169    131  1204  79
+porsche        1352     1182   1042          169    154  1336  87
+maxine         1352     1054    762          169    154  1213  80
+
+~~~~
+
+![Alt text](/blog/stairs.png) ![Alt text](/blog/porsche.png) ![Alt text](/blog/maxine.png)
+
+We signal a pattern that has been seen before with a special byte, the LFB. This least frequent byte is output as the first byte of the compressed output so the decompressor knows what it is looking for. Following that are literal bytes. Each time we see a pattern that we have seen before either on that row, or on the scanline directly above, we emit the LFB followed by a byte with the following structure.
+
+(Note, if we ever see the LFB in the wild, that is, in the input data we are replacing it with a 0...)
+
+~~~~
+
+    Length  Offset
+Bit 7654    3210
+
+~~~~
+
+The hi-nybble specifies the length, with the values 0-15 encoding lengths of 3-18. The lo-nybble contains the offset from the current position where 0 encodes the special position of the line directly above. Offsets cannot go past the beginning of the row, and patterns cannot go past the end of the row. This limits the compression we get, but makes the decompressor very much simpler (in the 6502 implementation at least, in the LISP test decompressor it doesn't really make a difference).
+
+
+## 14/6/2017 Boring very detailed post about image compression investigations.
+
+This post is just some free-form experimentation. This is the black hole I was talking about in tomorrow's post; the experimentation is endless.
+
+Using the scheme where we encode an already seen pattern as
+
+~~~~
+
+LFB
+4 BITS WIDTH
+4 BITS HI-OFFSET
+8 BITS LO-OFFSET
+
+~~~~
+
+
+The pretty bobbed face goes from 1352->869 bytes. This is ok, but I was aiming for less than two pages of memory for each image. Given that there are attribute values to add, another 169 bytes, it isn't looking good. So I performed a bit of analysis on the values. It's all very well going back 4096 bytes to look for a pattern match and this does indeed improve the compression, but not by as much as one would think. Additionally, patterns are usually quite short, so the widths follow a distribution. Some compression schemes use a variable bit encoding for the width field which follows more closely the distribution of observed widths.
+
+Here is the pattern width histogram for the face,
+
+~~~~
+
+#(0 0 0 0 33 28 15 18 8 11 10 4 6 0 0 0 0 0 1)
+
+~~~~
+
+As you can see there are no patterns at length 0-3 as they would be a net loss, then lots of patterns upto length 12, not so many after that and this is with searching the entire image!
+
+This begs the question- are there more patterns of length 3? And do we care about searching the whole image? Images are highly spatially coherent- each pixel has a higher likelyhood of being like a pixel near to it. Searching massive spans is hardly worth it.
+
+## Two byte encoding
+
+~~~~
+
+LFB
+3 BITS WIDTH
+5 BITS OFFSET
+
+~~~~
+
+Two bytes, so now three byte patterns are on the menu, as long as they are within 31 bytes. (31 bytes is enough for a row in the kind of images we are compressing).
+
+Here is the updated histogram,
+
+~~~~
+#(0 0 0 26 31 21 12 12 11 11 17)
+~~~~
+
+And the surprise, the pretty face is now down from 1352->814 bytes. So, extending the search window is not worth the expense of an exta byte for every occurance of a pattern.
+
+Here is more of a surprise, if we change it so that we only search up to 15 bytes back and
+have a max length of 19, i.e. we use a nybble for the width and a nybble for the offset we get 806 bytes. Shocking. If we reduce it any further we will have RLE!!
+
+~~~~
+
+#(0 0 0 24 35 22 9 12 11 10 4 4 7 0 0 0 0 0 1 0)
+
+~~~~
+
+On the face of it, this histogram is suggesting that there are no gains to be had by increasing the width field even further, but for the sake of perversity let's do it anyway. 5 bits for width, 3 bits for offset.
+
+The histogram again,
+
+~~~~
+
+#(0 0 0 53 43 29 4 3 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
+
+~~~~
+
+Sanity has now prevailed- there is some merit in searching back further than 7 bytes. The new compressed size is 1089.
+
+So the best scheme so far is,
+
+~~~~
+
+LFB
+4 BITS WIDTH, i.e. 3-18 bytes
+4 BITS OFFSET, i.e. 1-16 bytes
+
+~~~~
+
+I mentioned before that images have high spatial coherence and unlike text (which is also spatially coherent) have two dimensions. To exploit this fact we can guess that the row above is likely very similar to the row we are now on. Perhaps we can match with the row directly above us?
+
+Extending the offset in the test compressor to 40 bytes (these images are 13 bytes wide) gives this histogram for *offsets*. Note that we cannot actually encode offsets of up to 40 bytes, I am just running the compressor to see how many patterns it can match and at what offsets.
+
+~~~~
+
+Offset histogram.       WOW!
+
+7 2 0 0 4 5 7 4 0 0 1 3 90 0 0 2 1 1 0 0 0 1 0 1 1 4 0 0 0 1 1 1 0 0 0 1 1 3
+  0 0 0
+
+~~~~
+
+Look at that, a massive peak at exactly 13 bytes! This is the coherence I was talking about, pixels are very much more likely to be the same as the pixel directly above them than any other randomly chosen pixel.
+
+## Gaps
+
+In an earlier post I described how we have to go directly from the stored image data to the screen. This means that we can't directly use the offsets we have calculated- the screen buffer has a different width than the image buffer. From the results I have found here my solution will be to use the following encoding scheme
+
+0        1
+76543210 7654  3210
+LFB      Width Offset
+
+Where
+
+Width  = 0-15 => 3-19 bytes
+Offset = 1-30 => 1-30 bytes on the same row
+         0, to indicate the byte directly above. This is equivalent to an offset equal to the image width.
+
+I have a sneaking suspicion that when I try this out, it will be better to use 5 bits for the width and 3 bits for the offset since the images are only 13 bytes wide and we can't make use of offsets larger than that. The earlier tests allowed the patterns to match straddling the rows. Let us see if this bears out...
+
+
+Compression results, all files 1352 bytes (+ 169 attribute bytes which is not included)
+
+~~~~
+
+stairs 1070
+face 817
+porsche 1141
+
+~~~~
+
+Next is the redundancy in the attributes. We know from the conversion routine that we can have attributes that have the same foreground and background colour. This implies that the bitmap data is for this square.
+
+We have already seen that inverting the attribute from foreground to background to reduce the number of set bits can save a few bytes (838 vs 817 for the face), but we should also insist that the foreground colour = the background colour when there are no set bits.
+
+Omitting the bytes where the attribute is one colour gives the following results
+
+~~~~
+
+stairs 1068
+porsche 1098
+face 787
+
+~~~~
+
+Nothing to write home about in terms of improvement; probably not worth it in terms of the complexity it would involve in the decompressor. A pointer would have to be set up to track the attribute to test for emptiness.
+
+I am disappointed by the level of compression so far so now I am going to try some more extreme tricks before moving on.
+
+- Using an extra LFB to exploit 2 byte coincidence on the line above
+
+Whenever we see two bytes the same directly above us, we can use a single byte to represent it. Also included is if we use 3 special bytes, the additional one signalling a three byte ocorrespondence.
+
+~~~~
+
+        2 LFBs 3 LFBs
+stairs  1022      995
+porsche 1092     1042
+face    786       762
+
+~~~~
+
+Not bad, it's certainly easier to handle in the decompressor than the attribute hack and it gives us about the same gain.
+
+In the end I decided to go with one LSB and pattern matching on the same row minus and offset, and pattern matching directly on the row above. The other schemes add complexity, and complexity in the decoder is what we don't want. Adopting this scheme will make the 6502 decompresser very simple indeed and it should be fast, not much slower than copying from memory.
+
+Note on compressing the colour attributes. Each image has 169 of colour attributes, this does not compress well at all, typically saving ~20 bytes. Depending on how much overhead is involved in calling into the decompressor, I may just not bother.
+
 # 11/6/2017 Disco-Era Image Compression for the 6502 with LISP
 --------------------------------------------------------------
 

@@ -10,76 +10,141 @@
 	     (setf lfb i)))
       lfb)))
 
-(defparameter *max-pattern-length* 19) ;Fits in a nybble, minimum length 4
-(defparameter *max-offset* 4095) ;Fits in 12 bits
+(defparameter *max-length* 18) ; 0-15 -> 3-18
+(defparameter *max-offset* 15) ; 1-15 -> 1-15 (0 encodes the row above)
 
-;;todo modulo offset
-;;todo don't span line
+;; where q>p, look for a match at p
+(defun match (buf eob p q)
+  (let ((len 0))
+    (loop while (and (<= q eob)
+		     (< len *max-length*)
+		     (=
+		      (aref buf p)
+		      (aref buf q)))
+       do
+ 	 (incf len)
+	 (incf p)
+	 (incf q))
+    len))
 
-(defparameter *width-freq* nil)
-(defparameter *offset-freq* nil)
-
-(defun compress (buf)
-  (setf *width-freq* (make-array *max-pattern-length* :initial-element 0))
-  (setf *offset-freq* (make-array *max-offset* :initial-element 0))
-  (let ((eob (1- (length buf)))
+;todo, don't allow match width to wrap at end of line
+(defun compress (buf width)
+  (let ((offsets (make-array (1+ *max-offset*) :initial-element 0))
+	(lengths (make-array (1+ *max-length*) :initial-element 0)) 
+	(eob (1- (length buf)))
 	(lfb (lfb buf))
-	(lfb-dummy 0)	     ;meh- could just adjust lfb by one bit...
+	(lfb-dummy 0) ;meh- could just adjust lfb by one bit...
+	(out (make-array 0
+			 :adjustable t
+			 :fill-pointer 0
+			 :element-type '(unsigned-byte 8))))
+    (vector-push-extend lfb out)
+    (vector-push-extend (if (= (aref buf 0) lfb)
+			    lfb-dummy
+			    (aref buf 0))
+			out)
+    (loop for i from 1 to eob do
+	 (let ((best-len 0)
+	       (best-offset 0))
+	   ;; look for a match on the row above
+	   (when (>= i width)
+	     (setf best-len (match buf eob (- i width) i)))
+	   ;; look for matches from the beginning of the row
+	   ;; or from the maximum offset back on the row
+	   (loop for p from (max
+			     (- i *max-offset*)
+			     (* width (floor i width)))
+	      to (1- i) do
+		(let ((len (match buf eob p i)))
+		  (when (> len best-len)
+		    (setf best-len len)
+		    (setf best-offset (- i p)))))
+	   (if (> best-len 2)
+	       (progn
+		 (incf i (1- best-len))
+		 (vector-push-extend lfb out)
+		 (vector-push-extend (logior (ash (- best-len 3) 4)
+					     best-offset)
+				     out))
+	       (vector-push-extend (if (= (aref buf i) lfb)
+				       lfb-dummy
+				       (aref buf i))
+				   out))))
+    out))
+
+(defun decompress (buf width)
+  (let ((lfb (aref buf 0))
 	(out (make-array 0
 			 :adjustable t
 			 :fill-pointer 0
 			 :element-type '(unsigned-byte 8)))
-	(word 0)
-	(lookup (make-hash-table)))
-    (format t "Compressing. LFB=#x~2,'0X~%" lfb)
-    (loop for i from 0 to eob do
-					;this is inefficient, should build lookup as we go.. but, yaggers
-	 (setf word (logior (ash (logand #xffffff word) 8)
-			    (aref buf i)))
-	 (when (> i 2)
-	   (push (- i 3) (gethash word lookup))))
-    (loop for i from 0 to eob do
-	 (let ((best-offset 0)
-	       (best-len 0))
-	   (when (<= i (- eob 3))
-	     (setf word (logior (ash (aref buf i) 24)
-				(ash (aref buf (+ 1 i)) 16)
-				(ash (aref buf (+ 2 i)) 8)
-				(aref buf (+ 3 i)))) 
-	     (dolist (p (gethash word lookup))
-	       (let ((offset (- i p 1))
-		     (len 0)
-		     (q i))
-		 (when (and (>= offset 0)
-			    (<= offset *max-offset*))
-		   (loop while (and (<= q eob)
-				    (= (aref buf p)
-				       (aref buf q))
-				    (< len *max-pattern-length*)) do
-			(incf p)
-			(incf q)
-			(incf len))
-		   (when (> len best-len)
-		     ;;todo break out early if best-len=19
-		     (setf best-len len)
-		     (setf best-offset offset))))))
-	   (if (> best-len 3)
+	(q 0))
+    (loop for i from 1 to (1- (length buf)) do
+	 (let ((byte (aref buf i)))
+	   (if (= byte lfb)
 	       (progn
-		 (incf (aref *width-freq* best-len))
-		 (incf (aref *offset-freq* best-offset))
-		 (vector-push-extend lfb out)
-		 (vector-push-extend (logior (ash (- best-len 4) 4)
-					     (ash best-offset -8)) out)
-		 (vector-push-extend (logand #xff best-offset) out)
-		 (incf i (1- best-len)))
-	       (vector-push-extend (if (= lfb (aref buf i))
-				       lfb-dummy
-				       (aref buf i)) out))))
-    (format t "~a->~a~%" (length buf) (length out))
+		 (setf byte (aref buf (incf i)))
+		 (let ((len-1 (+ 2 (ash byte -4)))
+		       (off (logand #xf byte)))
+		   (when (= 0 off)
+		     (setf off width))
+		   (setf off (- q off))
+		   (loop for p from off to (+ len-1 off) do
+			(vector-push-extend (aref out p) out)
+			(incf q))))
+	       (progn
+		 (vector-push-extend byte out)
+		 (incf q)))))
     out))
 
-(defun test (arr exp)
-  (assert (equalp (compress arr) exp)))
+(defun lentest (f)
+  (format t "file ~a ~a~%"
+	  f
+	  (let ((img (posterize-image 104 104 (load-image f 104 104) :reduce-popcount t)))
+	    (length (compress (first img) (/ 104 8)))
+	    (length (compress (coerce (second img) 'vector) 13))
+	    )))
+
+(defun test ()
+  (lentest "/home/dan/Downloads/cellardoor.bmp")
+  (lentest "/home/dan/Downloads/porsche.bmp")
+  (lentest "/home/dan/Downloads/face.bmp"))
+
+(defun blit (buf width)
+  ; for testing purposes. This is a blit rubbish.
+  (loop for i from 0 to 7999 do
+       (setmem (+ i #x8000) 0))
+  ;(loop for i from 0 to 1000 do
+  ;     (setmem (+ i #x7000) 0))
+
+  ;(let ((ptr #x7000)
+;	(x 0))
+;    (loop for att in (second result) do
+;	 (setmem ptr att)
+;	 (incf ptr)
+;	 (incf x)
+;	 (when (= x (floor sx 8))
+;	   (incf ptr (- 40 x))
+;	   (setf x 0))))
+
+  
+  (let ((ptr #x8000)
+	(x 0))
+    (loop for b across buf do
+	 
+	 (setmem ptr b)
+	 (incf ptr)
+	 (incf x)
+	 (when (= x width)
+	   
+	   (incf ptr (- 40 x))
+	   (setf x 0)))))
+
+
+(defun test (arr exp &key (width 100))
+  (let ((c (compress arr width)))
+    (assert (equalp (subseq (compress arr width) 1) exp))
+    (assert (equalp arr (decompress c width)))))
 
 ;; no matches
 (test #(1) #(1))
@@ -87,68 +152,45 @@
 (test #(1 2 3) #(1 2 3))
 (test #(1 2 3 4) #(1 2 3 4))
 ;; simple matches
-(test #(1 2 3 4 1 2 3) #(1 2 3 4 1 2 3))
-(test #(1 2 3 4 1 2 3 4) #(1 2 3 4 0 #x00 3))
-(test #(1 2 3 4 1 2 3 4 1) #(1 2 3 4 0 #x10 3))
+(test #(1 2 3 4 1 2 3) #(1 2 3 4 0 #x04))
+(test #(1 2 3 4 1 2 3 4) #(1 2 3 4 0 #x14))
+(test #(1 2 3 4 1 2 3 4 1) #(1 2 3 4 0 #x24))
 ;; run-on
-(test #(1 1 1 1 1) #(1 0 #x00 0))
-(test #(1 1 1 1 1 1) #(1 0 #x10 0))
-(test #(1 1 1 1 1 1 1) #(1 0 #x20 0))
+(test #(1 1 1 1 1) #(1 0 #x11))
+(test #(1 1 1 1 1 1) #(1 0 #x21))
+(test #(1 1 1 1 1 1 1) #(1 0 #x31))
 ;; run-on pattern
 (test #(1 2 3 1 2 3 1 2 3 1 2 3)
-      #(1 2 3 0 #x50 2))
+      #(1 2 3 0 #x63))
 ;; back to back
-(test #(1 2 3 4 9 9 9 9 1 2 3 4  1 2 3 4  )
-      #(1 2 3 4 9 9 9 9 0 #x00 7 0 #x00 3))
-;; back to back
-(test #(1 2 3 4 5 9 9 9 9 1 2 3 4 5 1 2 3 4 5 )
-      #(1 2 3 4 5 9 9 9 9 0 #x10 8 0 #x10 4))
+(test #(1 2 3 4 9 9 9 1 2 3 4  1 2 3 4  )
+      #(1 2 3 4 9 9 9 0 #x17 0 #x1B))
 ;; best match
 (test #(1 2 3 4 5 9 9 9 1 2 3 4  8 8 8 1 2 3 4 5)
-      #(1 2 3 4 5 9 9 9 0 #x00 7 8 8 8 0 #x10 14))
+      #(1 2 3 4 5 9 9 9 0 #x18   8 8 8 0 #x2F))
 ;; best match second position
 (test #(1 2 3 4 9 9 9 1 2 3 4  5 8 8 8 1 2 3 4 5)
-      #(1 2 3 4 9 9 9 0 #x00 6 5 8 8 8 0 #x10 7))
+      #(1 2 3 4 9 9 9 0 #x17   5 8 8 8 0 #x28))
 ;; match in compressed section
 (test #(1 2 3 4 5 6 1 2 3 4 5 6 7 8 5 6 7 8)
-      #(1 2 3 4 5 6 0 #x20 5    7 8 0 #x00 3))
-;; match 19 ok
-(test #(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19
-	1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19)
-      #(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19
-	0 #xF0 18))
-;; match 20 ok
-(test #(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
-	1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
-      #(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
-	0 #xF0 19                                       20))
-;; simple matches with extra
-(test #(1 2 3 4 1 2 3 9) #(1 2 3 4 1 2 3 9))
-(test #(1 2 3 4 1 2 3 4 9) #(1 2 3 4 0 #x00 3 9))
-(test #(1 2 3 4 1 2 3 4 1 9) #(1 2 3 4 0 #x10 3 9))
-;; run-on with extra
-(test #(1 1 1 1 1 9) #(1 0 #x00 0 9))
-(test #(1 1 1 1 1 1 9) #(1 0 #x10 0 9))
-(test #(1 1 1 1 1 1 1 9) #(1 0 #x20 0 9))
-;; run-on pattern with extra
-(test #(1 2 3 1 2 3 1 2 3 1 2 3 9)
-      #(1 2 3 0 #x50 2 9))
-;; back to back with extra
-(test #(1 2 3 4 9 9 9 9 1 2 3 4  1 2 3 4 11)
-      #(1 2 3 4 9 9 9 9 0 #x00 7 0 #x00 3 11))
-;; best match with extra
-(test #(1 2 3 4 5 9 9 9 1 2 3 4  8 8 8 1 2 3 4 5 11)
-      #(1 2 3 4 5 9 9 9 0 #x00 7 8 8 8 0 #x10 14 11))
-;; best match second position with extra
-(test #(1 2 3 4 9 9 9 1 2 3 4  5 8 8 8 1 2 3 4 5 11)
-      #(1 2 3 4 9 9 9 0 #x00 6 5 8 8 8 0 #x10 7 11))
-;; match in compressed section with extra
-(test #(1 2 3 4 5 6 1 2 3 4 5 6 7 8 5 6 7 8 11)
-      #(1 2 3 4 5 6 0 #x20 5    7 8 0 #x00 3 11))
-;; match 19 ok with extra
-(test #(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19
-	1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
-      #(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19
-	0 #xF0 18 20))
+      #(1 2 3 4 5 6 0 #x36      7 8 0 #x14))
+;; match row above
 
+(test #(1 2 3 4 5 6 7 8 9 10
+        2 3 4 4 5 6 7 9 9 10)
+      #(1 2 3 4 5 6 7 8 9 10
+	2 3 4 0 #x10 9 9 10) :width 10)
 
+(test #(1 2 3 4 5 6 7 8 9 9 10
+        2 3 4 4 5 6 7 1 9 9 10)
+      #(1 2 3 4 5 6 7 8 9 9 10
+	2 3 4 0 #x10  1 0 #x00) :width 11)
+
+;; match row above doesn't run on
+
+(test #(1 2 3 4 5 6 7 8 9 10
+        2 3 4 5 6 7 7 8 9 10
+        2 3 4)
+      #(1 2 3 4 5 6 7 8 9 10
+	2 3 4 5 6 7 #x10
+	2 3 4) :width 10)

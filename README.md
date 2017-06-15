@@ -1,4 +1,6 @@
-# 6502 Exploratory Code
+# 6502 Adventure Game
+
+Read the [blog](blog.md), it's where the real action is happening.
 
 ## Assembler
 

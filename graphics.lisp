@@ -3,7 +3,7 @@
 (defun update-vicky ()
   (let ((buf (monitor-buffer))) ;need to abstract out the memory, ditch cl-6502
     (loop for i from 0 to +char-memory-length+ do
-	 (setf (aref buf (+ i *char-memory-address*)) #xBD))
+	 (setf (aref buf (+ i *char-memory-address*)) #x79))
     "Update VICKY from the monitor buffer"
     (setmem-copy buf)))
 
@@ -277,7 +277,7 @@
 (defun odyssey ()
   (reset-compiler)
   (reset-symbol-table)
-  (let ((font :future))
+  (let ((font :past))
     (flet ((pass ()
 	   
 	     (org #x600)

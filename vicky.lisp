@@ -8,11 +8,6 @@
   (sdl-cffi::sdl-map-rgb (sdl-base:pixel-format surface-fp)
 			 b g r))
 
-;; 0 - black   1 - white       2 - red        3 - cyan
-;; 4 - purple  5 - green       6 - blue       7 - yellow
-;; 8 - orange  9 - brown       A - light red  B - dark grey
-;; C - grey    D - light green E - light blue F - light grey
-
 (defun map-c64-colours (surface-fp)
   (loop for i from 0 to 15 do
        (setf (aref *colours* i)

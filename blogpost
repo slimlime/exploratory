@@ -1,4 +1,39 @@
-Initial compression results.
+15/6/2017 The Compresssion Rabbit Hole
+
+I have spent the last two days down the compression rabbit hole. The further down you go, the fewer bytes there are to be had and the more desperate the search becomes. Rather than bore you all with the details, here is the very simple scheme I will be using. It meets these criteria,
+
+- It's better than nothing
+- It promises more in the future, should we need it
+- It should be very simple to implement the decompressor in 6502
+
+So, yaggers comes to the rescue once more. (If you want to see how I got to this sorry state, check out the excruciatingly detailed post which immediately precedes this.)
+
+As you can see, by choosing the simple scheme we are leaving potentially a few hundred bytes on the table. This is a good thing however, as we can now get on with our lives. It also means that if we are really struggling toward the end we can do a bit of improvement here to help out.
+
+~~~~
+           Original   Simple   Best   Attributes Simple Total   %
+
+cellardoor     1352     1073    995          169    131  1204  79
+porsche        1352     1182   1042          169    154  1336  87
+face           1352     1054    762          169    154  1213  80
+
+~~~~
+
+We signal a pattern that has been seen before with a special byte, the LFB. This least frequent byte is output as the first byte of the compressed output so the decompressor knows what it is looking for. Following that are literal bytes. Each time we see a pattern that we have seen before either on that row, or on the scanline directly above, we emit the LFB followed by a byte with the following structure.
+
+(Note, if we ever see the LFB in the wild, that is, in the input data we are replacing it with a 0...)
+
+~~~~
+
+    Length  Offset
+Bit 7654    3210
+
+~~~~
+
+The hi-nybble specifies the length, with the values 0-15 encoding lengths of 3-18. The lo-nybble contains the offset from the current position where 0 encodes the special position of the line directly above. Offsets cannot go past the beginning of the row, and patterns cannot go past the end of the row. This limits the compression we get, but makes the decompressor very much simpler (in the 6502 implementation at least, in the LISP test decompressor it doesn't really make a difference).
+
+
+14/6/2017 Boring very detailed post about image compression investigations.
 
 Using the scheme where we encode an already seen pattern as
 
@@ -154,4 +189,4 @@ Not bad, it's certainly easier to handle in the decompressor than the attribute 
 
 In the end I decided to go with one LSB and pattern matching on the same row minus and offset, and pattern matching directly on the row above. The other schemes add complexity, and complexity in the decoder is what we don't want. Adopting this scheme will make the 6502 decompresser very simple indeed and it should be fast, not much slower than copying from memory.
 
-Compressing. the attributes. Each image has 169 of colour attributes, this does not compress well at all, typically saving ~20 bytes. Depending on how much overhead is involved in calling into the decompressor.sdsd
+Note on compressing the colour attributes. Each image has 169 of colour attributes, this does not compress well at all, typically saving ~20 bytes. Depending on how much overhead is involved in calling into the decompressor, I may just not bother.

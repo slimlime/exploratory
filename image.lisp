@@ -146,7 +146,7 @@
 	 (loop for i from 0 to (1- sx) by 8 do
 	      (push (posterize-block i j sx img bitmap reduce-popcount)
 		    attributes)))
-    (list bitmap (nreverse attributes))))
+    (list bitmap (coerce (nreverse attributes) 'vector))))
 	    
 (defun copy2screen (result sx)
   ; for testing purposes. This is a blit rubbish.
@@ -157,7 +157,7 @@
 
   (let ((ptr #x7000)
 	(x 0))
-    (loop for att in (second result) do
+    (loop for att across (second result) do
 	 (setmem ptr att)
 	 (incf ptr)
 	 (incf x)

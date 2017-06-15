@@ -27,7 +27,6 @@
 	 (incf q))
     len))
 
-;todo, don't allow match width to wrap at end of line
 (defun compress (buf width)
   (let ((eob (1- (length buf)))
 	(lfb (lfb buf))
@@ -97,39 +96,39 @@
 
 (defun lentest (f)
   (let ((img (posterize-image 104 104 (load-image f 104 104) :reduce-popcount t)))
+    (copy2screen img 104)
+    (vicky)   
     (format t "file ~a ~a ~a~%"
 	    f
 	    (length (compress (first img) (/ 104 8)))
-	    (length (compress (coerce (second img) 'vector) 13))
-	    )))
+	    (length (compress (coerce (second img) 'vector) 13)))
+    (copy2screen (list (decompress (compress (first img) 13) 13)
+		       (decompress (compress (second img) 13) 13))
+		 104)
+    (vicky)))
 
 (defun test-images ()
   (lentest "/home/dan/Downloads/cellardoor.bmp")
   (lentest "/home/dan/Downloads/porsche.bmp")
   (lentest "/home/dan/Downloads/face.bmp"))
 
-(defun blit (buf width)
-  ; for testing purposes. This is a blit rubbish.
+(defun blit (bitmap attributes width)
   (loop for i from 0 to 7999 do
        (setmem (+ i #x8000) 0))
-  ;(loop for i from 0 to 1000 do
-  ;     (setmem (+ i #x7000) 0))
-
-  ;(let ((ptr #x7000)
-;	(x 0))
-;    (loop for att in (second result) do
-;	 (setmem ptr att)
-;	 (incf ptr)
-;	 (incf x)
-;	 (when (= x (floor sx 8))
-;	   (incf ptr (- 40 x))
-;	   (setf x 0))))
-
-  
+  (loop for i from 0 to 1000 do
+       (setmem (+ i #x7000) 0))
+  (let ((ptr #x7000)
+	(x 0))
+    (loop for att in attributes do
+	 (setmem ptr att)
+	 (incf ptr)
+	 (incf x)
+	 (when (= x (floor sx 8))
+	   (incf ptr (- 40 x))
+	   (setf x 0))))
   (let ((ptr #x8000)
 	(x 0))
     (loop for b across buf do
-	 
 	 (setmem ptr b)
 	 (incf ptr)
 	 (incf x)
@@ -137,7 +136,6 @@
 	   
 	   (incf ptr (- 40 x))
 	   (setf x 0)))))
-
 
 (defun test (arr exp &key (width 100))
   (let ((c (compress arr width)))
@@ -192,3 +190,39 @@
       #(1 2 3 4 5 6 7 8 9 10
 	2 3 4 5 6 7 0 #x10
 	2 3 4) :width 10)
+
+;; A cache of converted images, since it takes so long to posterize them
+(defparameter *image-cache* (make-hash-table :test 'equal))
+
+;; Define an image
+(defun dimg (label file sx sy)
+  (assert (= 0 (mod sx 8)))
+  (assert (= 0 (mod sy 8)))
+  (let ((img (gethash file *image-cache*)))
+    (when (null img)
+      (setf img (posterize-image sx sy (load-image file sx sy)))
+      (setf (gethash file *image-cache*) img))
+    (let ((data (compress (first img) (/ sx 8)))
+	  (att  (compress (second img) (/ sx 8))))
+      (label label :image-pixels)
+      (add-hint (length data) (format nil "~a pixels (~a)" file (length data)))
+      (loop for c across data do
+	   (push-byte c))
+      (label label :image-colours)
+      (add-hint (length att) (format nil "~a colours (~a)" file (length att)))
+      (loop for c across att do
+	   (push-byte c)))))
+
+(defun image-decompressor ()
+  (with-namespace :img-decompress
+    WIP
+  
+
+  
+
+
+      
+    
+      
+  
+	     

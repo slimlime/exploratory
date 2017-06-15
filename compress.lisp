@@ -14,9 +14,9 @@
 (defparameter *max-offset* 15) ; 1-15 -> 1-15 (0 encodes the row above)
 
 ;; where q>p, look for a match at p
-(defun match (buf eob p q)
+(defun match (buf width eob p q)
   (let ((len 0))
-    (loop while (and (<= q eob)
+    (loop while (and (<= q (min eob (1- (* width (ceiling q width)))))
 		     (< len *max-length*)
 		     (=
 		      (aref buf p)
@@ -29,9 +29,7 @@
 
 ;todo, don't allow match width to wrap at end of line
 (defun compress (buf width)
-  (let ((offsets (make-array (1+ *max-offset*) :initial-element 0))
-	(lengths (make-array (1+ *max-length*) :initial-element 0)) 
-	(eob (1- (length buf)))
+  (let ((eob (1- (length buf)))
 	(lfb (lfb buf))
 	(lfb-dummy 0) ;meh- could just adjust lfb by one bit...
 	(out (make-array 0
@@ -48,14 +46,14 @@
 	       (best-offset 0))
 	   ;; look for a match on the row above
 	   (when (>= i width)
-	     (setf best-len (match buf eob (- i width) i)))
+	     (setf best-len (match buf width eob (- i width) i)))
 	   ;; look for matches from the beginning of the row
 	   ;; or from the maximum offset back on the row
 	   (loop for p from (max
 			     (- i *max-offset*)
 			     (* width (floor i width)))
 	      to (1- i) do
-		(let ((len (match buf eob p i)))
+		(let ((len (match buf width eob p i)))
 		  (when (> len best-len)
 		    (setf best-len len)
 		    (setf best-offset (- i p)))))
@@ -98,14 +96,14 @@
     out))
 
 (defun lentest (f)
-  (format t "file ~a ~a~%"
-	  f
-	  (let ((img (posterize-image 104 104 (load-image f 104 104) :reduce-popcount t)))
+  (let ((img (posterize-image 104 104 (load-image f 104 104) :reduce-popcount t)))
+    (format t "file ~a ~a ~a~%"
+	    f
 	    (length (compress (first img) (/ 104 8)))
 	    (length (compress (coerce (second img) 'vector) 13))
 	    )))
 
-(defun test ()
+(defun test-images ()
   (lentest "/home/dan/Downloads/cellardoor.bmp")
   (lentest "/home/dan/Downloads/porsche.bmp")
   (lentest "/home/dan/Downloads/face.bmp"))
@@ -192,5 +190,5 @@
         2 3 4 5 6 7 7 8 9 10
         2 3 4)
       #(1 2 3 4 5 6 7 8 9 10
-	2 3 4 5 6 7 #x10
+	2 3 4 5 6 7 0 #x10
 	2 3 4) :width 10)

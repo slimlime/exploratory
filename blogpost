@@ -90,11 +90,11 @@ Offset histogram.       WOW!
 
 ~~~~
 
-Look at that, a massive peak at exactly 13 bytes! Now that is what I call coherence. This is the coherence I was talking about, pixels are very much more likely to be the same as the pixel directly above them than any other randomly chosen pixel.
+Look at that, a massive peak at exactly 13 bytes! This is the coherence I was talking about, pixels are very much more likely to be the same as the pixel directly above them than any other randomly chosen pixel.
 
 ## Gaps
 
-In an earlier post I described how we have to go directly from the stored image data to the screen. This means that we can't directly used the offsets we have calculated- the screen buffer has a different width than the image buffer. From the results I have found here my solution will be to use the following encoding scheme
+In an earlier post I described how we have to go directly from the stored image data to the screen. This means that we can't directly use the offsets we have calculated- the screen buffer has a different width than the image buffer. From the results I have found here my solution will be to use the following encoding scheme
 
 0        1
 76543210 7654  3210
@@ -135,11 +135,23 @@ face 787
 
 Nothing to write home about in terms of improvement; probably not worth it in terms of the complexity it would involve in the decompressor. A pointer would have to be set up to track the attribute to test for emptiness.
 
-I am quite disappointed by the level of compression so far so now I am going to try some more extreme tricks before moving on.
+I am disappointed by the level of compression so far so now I am going to try some more extreme tricks before moving on.
 
+- Using an extra LFB to exploit 2 byte coincidence on the line above
 
+Whenever we see two bytes the same directly above us, we can use a single byte to represent it. Also included is if we use 3 special bytes, the additional one signalling a three byte ocorrespondence.
 
+~~~~
 
+        2 LFBs 3 LFBs
+stairs  1022      995
+porsche 1092     1042
+face    786       762
 
+~~~~
 
-For comparison, here is the byte data compressed by a full LZW compressor which is common to things like WinZip and for a long time was the best all round compression algorithm with reasonable compression, speed and complexity.
+Not bad, it's certainly easier to handle in the decompressor than the attribute hack and it gives us about the same gain.
+
+In the end I decided to go with one LSB and pattern matching on the same row minus and offset, and pattern matching directly on the row above. The other schemes add complexity, and complexity in the decoder is what we don't want. Adopting this scheme will make the 6502 decompresser very simple indeed and it should be fast, not much slower than copying from memory.
+
+Compressing. the attributes. Each image has 169 of colour attributes, this does not compress well at all, typically saving ~20 bytes. Depending on how much overhead is involved in calling into the decompressor.

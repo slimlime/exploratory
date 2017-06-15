@@ -13,26 +13,21 @@
 (defparameter *max-length* 18) ; 0-15 -> 3-18
 (defparameter *max-offset* 15) ; 1-15 -> 1-15 (0 encodes the row above)
 
-(defun is-match (p q)
-  ;(and (= q (logior p q))
-  ;     (< (logcount (logxor p q)) 3)))
-
-  (= p q))
-
 ;; where q>p, look for a match at p
 (defun match (buf eob p q)
   (let ((len 0))
     (loop while (and (<= q eob)
 		     (< len *max-length*)
-		     (is-match
+		     (=
 		      (aref buf p)
-		      (aref buf q))) do
+		      (aref buf q)))
+       do
  	 (incf len)
 	 (incf p)
 	 (incf q))
     len))
 
-;todo stop at end of line
+;todo, don't allow match width to wrap at end of line
 (defun compress (buf width)
   (let ((offsets (make-array (1+ *max-offset*) :initial-element 0))
 	(lengths (make-array (1+ *max-length*) :initial-element 0)) 
@@ -46,7 +41,8 @@
     (vector-push-extend lfb out)
     (vector-push-extend (if (= (aref buf 0) lfb)
 			    lfb-dummy
-			    (aref buf 0)) out)
+			    (aref buf 0))
+			out)
     (loop for i from 1 to eob do
 	 (let ((best-len 0)
 	       (best-offset 0))
@@ -57,24 +53,23 @@
 	   ;; or from the maximum offset back on the row
 	   (loop for p from (max
 			     (- i *max-offset*)
-			     (* width (floor i width))) to (1- i) do
+			     (* width (floor i width)))
+	      to (1- i) do
 		(let ((len (match buf eob p i)))
 		  (when (> len best-len)
 		    (setf best-len len)
 		    (setf best-offset (- i p)))))
 	   (if (> best-len 2)
 	       (progn
-		 (incf (aref lengths best-len))
-		 (incf (aref offsets best-offset))
 		 (incf i (1- best-len))
 		 (vector-push-extend lfb out)
 		 (vector-push-extend (logior (ash (- best-len 3) 4)
-					     best-offset) out))
+					     best-offset)
+				     out))
 	       (vector-push-extend (if (= (aref buf i) lfb)
 				       lfb-dummy
-				       (aref buf i)) out))))
-    (format t "Lengths - ~a~%" lengths)
-    (format t "Offsets - ~a~%" offsets)
+				       (aref buf i))
+				   out))))
     out))
 
 (defun decompress (buf width)
@@ -106,7 +101,9 @@
   (format t "file ~a ~a~%"
 	  f
 	  (let ((img (posterize-image 104 104 (load-image f 104 104) :reduce-popcount t)))
-	    (length (compress (first img) (/ 104 8))))))
+	    (length (compress (first img) (/ 104 8)))
+	    (length (compress (coerce (second img) 'vector) 13))
+	    )))
 
 (defun test ()
   (lentest "/home/dan/Downloads/cellardoor.bmp")
@@ -143,3 +140,57 @@
 	   (incf ptr (- 40 x))
 	   (setf x 0)))))
 
+
+(defun test (arr exp &key (width 100))
+  (let ((c (compress arr width)))
+    (assert (equalp (subseq (compress arr width) 1) exp))
+    (assert (equalp arr (decompress c width)))))
+
+;; no matches
+(test #(1) #(1))
+(test #(1 2) #(1 2))
+(test #(1 2 3) #(1 2 3))
+(test #(1 2 3 4) #(1 2 3 4))
+;; simple matches
+(test #(1 2 3 4 1 2 3) #(1 2 3 4 0 #x04))
+(test #(1 2 3 4 1 2 3 4) #(1 2 3 4 0 #x14))
+(test #(1 2 3 4 1 2 3 4 1) #(1 2 3 4 0 #x24))
+;; run-on
+(test #(1 1 1 1 1) #(1 0 #x11))
+(test #(1 1 1 1 1 1) #(1 0 #x21))
+(test #(1 1 1 1 1 1 1) #(1 0 #x31))
+;; run-on pattern
+(test #(1 2 3 1 2 3 1 2 3 1 2 3)
+      #(1 2 3 0 #x63))
+;; back to back
+(test #(1 2 3 4 9 9 9 1 2 3 4  1 2 3 4  )
+      #(1 2 3 4 9 9 9 0 #x17 0 #x1B))
+;; best match
+(test #(1 2 3 4 5 9 9 9 1 2 3 4  8 8 8 1 2 3 4 5)
+      #(1 2 3 4 5 9 9 9 0 #x18   8 8 8 0 #x2F))
+;; best match second position
+(test #(1 2 3 4 9 9 9 1 2 3 4  5 8 8 8 1 2 3 4 5)
+      #(1 2 3 4 9 9 9 0 #x17   5 8 8 8 0 #x28))
+;; match in compressed section
+(test #(1 2 3 4 5 6 1 2 3 4 5 6 7 8 5 6 7 8)
+      #(1 2 3 4 5 6 0 #x36      7 8 0 #x14))
+;; match row above
+
+(test #(1 2 3 4 5 6 7 8 9 10
+        2 3 4 4 5 6 7 9 9 10)
+      #(1 2 3 4 5 6 7 8 9 10
+	2 3 4 0 #x10 9 9 10) :width 10)
+
+(test #(1 2 3 4 5 6 7 8 9 9 10
+        2 3 4 4 5 6 7 1 9 9 10)
+      #(1 2 3 4 5 6 7 8 9 9 10
+	2 3 4 0 #x10  1 0 #x00) :width 11)
+
+;; match row above doesn't run on
+
+(test #(1 2 3 4 5 6 7 8 9 10
+        2 3 4 5 6 7 7 8 9 10
+        2 3 4)
+      #(1 2 3 4 5 6 7 8 9 10
+	2 3 4 5 6 7 #x10
+	2 3 4) :width 10)

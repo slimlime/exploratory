@@ -97,15 +97,15 @@
 (defun lentest (f)
   (let ((img (posterize-image 104 104 (load-image f 104 104) :reduce-popcount t)))
     (copy2screen img 104)
-    (vicky)   
+    ;;(vicky)   
     (format t "file ~a ~a ~a~%"
 	    f
 	    (length (compress (first img) (/ 104 8)))
 	    (length (compress (coerce (second img) 'vector) 13)))
     (copy2screen (list (decompress (compress (first img) 13) 13)
 		       (decompress (compress (second img) 13) 13))
-		 104)
-    (vicky)))
+		 104)))
+    ;;(vicky)))
 
 (defun test-images ()
   (lentest "/home/dan/Downloads/garage2.bmp")
@@ -267,7 +267,6 @@
     (LDY 0)
     (LDA.ZP :imgw)
     (STA.ZP :w)
-    (LDA *image-height-bytes*)
     (label :copy-byte)
     (LDA.IZX :src "X should be zero")
     (inc16.zp :src)

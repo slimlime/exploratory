@@ -1,14 +1,16 @@
 ;; Read a string, ignoring newlines and return a new string
 ;; with newlines inserted so it fits into a line
 
-;; todo handle kerning
-
-
 ;; test width function for debugging
 (defun test-width (w)
   (* 8 (length w)))
 
+(defun test-sw (y)
+  (declare (ignorable y))
+  +screen-width+)
+
 (defun font-width (font)
+  ;todo handle kerning
   #'(lambda (word)
       (let ((w 0))
 	(loop for c across word do
@@ -16,7 +18,9 @@
 	     (incf w))
 	w)))
 
-(defun justify (s &key (dy 11) (sw 320) (width #'test-width))
+;;sw function gets the width at the y specified y position,
+;;this is so we can draw up to the edge of an image
+(defun justify (s &key (dy 11) (sw #'test-sw) (width #'test-width))
   (let ((len (length s))
 	(i 0)
 	(x 0)
@@ -30,12 +34,14 @@
 				    :fill-pointer 0
 				    :adjustable t)))
 		 (loop while (and (< i len)
-				  (not (is-space (aref s i)))) do
+				  (not (is-space (aref s i))))
+		    do
 		      (vector-push-extend (aref s i) w)
 		      (incf i))
 		 ;gobble up spaces
 		 (loop while (and (< i len)
-				  (is-space (aref s i))) do
+				  (is-space (aref s i)))
+		    do
 		      (incf i))
 		 (if (> (length w) 0) w nil))))
       (let ((spc (funcall width " "))
@@ -47,7 +53,7 @@
 	       (unless w
 		 (return))
 	       (let* ((dx (funcall width w))
-		      (fits (<= (+ dx x) sw)))
+		      (fits (<= (+ dx x) (funcall sw y))))
 		 (if fits
 		     (progn
 		       (unless (= x 0)
@@ -61,6 +67,12 @@
 	       (loop for c across w do
 		    (vector-push-extend c js)))))
 	js))))
+
+(defun justify-with-image (s imgw imgh font)
+  (justify s :sw #'(lambda (y)
+		     (- +screen-width+ (if (<= y (1+ imgh)) imgw 0)))
+	   :width (font-width font)))
+
 
 
 (defparameter *odyssey*

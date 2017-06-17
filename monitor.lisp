@@ -1,8 +1,14 @@
 ;monitor
 
-;step function
+;; ideas
+;; a watch variable function
+;; a local variables dump, which basically sees which namespace we
+;; are in and dumps all aliased zero-page variables
+
+
+;;step function
 (defparameter *monitor-step* nil)
-;function to return values containing pc, sp, sr, a, x, y
+;;function to return values containing pc, sp, sr, a, x, y
 (defparameter *monitor-get-state* nil)
 (defparameter *monitor-context-bytes* 8)
 (defparameter *monitor-watches* nil)

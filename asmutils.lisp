@@ -30,6 +30,15 @@
   (SBC (hi value))
   (STA.ZP (hi-add zp)))
 
+(defun add16.zp (value zp)
+  (CLC)
+  (LDA.ZP (lo-add zp))
+  (ADC (lo value))
+  (STA.ZP (lo-add zp))
+  (LDA.ZP (hi-add zp))
+  (ADC (hi value))
+  (STA.ZP (hi-add zp)))
+
 
 (defun cpy16.zp (from to)
   "Copy a zero page word to another using A"

@@ -7,10 +7,17 @@
     "Update VICKY from the monitor buffer"
     (setmem-copy buf)))
 
-(defun typeset ()
-  
-  ; some scratch area from the zero page
-  ; I am going to define this in a preamble
+(defun zeropage ()
+
+  ;; Scratch Area
+  ;;
+  ;; This contains essentially 'local variables'
+  ;; How local they are depends on the use-case
+  ;; e.g. there are two co-operating functions
+  ;; in the string rendering- they take care to
+  ;; share the scratch area as they call each other
+  ;; Self contained functions can just use them
+  ;; as they see fit.
 
   (zp-w :A0)
   (zp-w :A1)
@@ -20,7 +27,10 @@
   (zp-b :D0)
   (zp-b :D1)
   (zp-b :D2)
+  (zp-b :D3))
 
+(defun typeset ()
+  
   ; some non-scratch zpg
 
   (zp-w :font)
@@ -279,7 +289,7 @@
   (reset-symbol-table)
   (let ((font :past))
     (flet ((pass ()
-	   
+	     (zeropage)	     
 	     (org #x600)
 	     (CLD)
 	     (label :render-test2)
@@ -295,7 +305,8 @@
 	     (typeset)
 	     (font-data)
 
-	     (dcs :str (justify *odyssey* :width (font-width font)))))
+	     (dcs :str (justify-with-image *odyssey* 104 104 font))))
+	     ;(dcs :str (justify *odyssey* :width (font-width font)))))
       (build #'pass))) 
   
   (monitor-reset #x600)
@@ -307,7 +318,7 @@
   (reset-symbol-table)
 
   (flet ((pass ()
-	   
+	   (zeropage)
 	   (org #x600)
 	   (CLD)
 	   (label :render-test2)
@@ -370,6 +381,7 @@
   (reset-symbol-table)
   
   (flet ((pass ()
+	   (zeropage)
 	   (org #x600)
 	   (CLD)
 	   (label :render-test)

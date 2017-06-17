@@ -108,34 +108,10 @@
     (vicky)))
 
 (defun test-images ()
+  (lentest "/home/dan/Downloads/garage2.bmp")
   (lentest "/home/dan/Downloads/cellardoor.bmp")
   (lentest "/home/dan/Downloads/porsche.bmp")
   (lentest "/home/dan/Downloads/face.bmp"))
-
-(defun blit (bitmap attributes width)
-  (loop for i from 0 to 7999 do
-       (setmem (+ i #x8000) 0))
-  (loop for i from 0 to 1000 do
-       (setmem (+ i #x7000) 0))
-  (let ((ptr #x7000)
-	(x 0))
-    (loop for att in attributes do
-	 (setmem ptr att)
-	 (incf ptr)
-	 (incf x)
-	 (when (= x (floor sx 8))
-	   (incf ptr (- 40 x))
-	   (setf x 0))))
-  (let ((ptr #x8000)
-	(x 0))
-    (loop for b across buf do
-	 (setmem ptr b)
-	 (incf ptr)
-	 (incf x)
-	 (when (= x width)
-	   
-	   (incf ptr (- 40 x))
-	   (setf x 0)))))
 
 (defun test (arr exp &key (width 100))
   (let ((c (compress arr width)))
@@ -213,10 +189,84 @@
       (loop for c across att do
 	   (push-byte c)))))
 
+(defparameter *image-width-bytes* 13)
+
+;; Render an image to the screen
 (defun image-decompressor ()
-  (with-namespace :img-decompress
-    WIP
-  
+  (label :draw-image)
+  (with-namespace :image
+    (alias :src :A0)
+    (alias :raster :A1)
+    (alias :prev :A2)
+    (alias :lfb :D0)
+    (alias :w :D1)
+    (alias :h :D2)
+    (alias :tmp :D3)
+    (sta16.zp *screen-memory-address* :raster)
+    (LDY 0)
+    (LDA.IZY :src)
+    (STA.ZP :lfb)
+    (inc16.zp :src)
+    (label :copy-row)
+    (LDX 0)
+    (LDY 0)
+    (LDA *image-width-bytes*)
+    (STA.ZP :w)
+    (label :copy-byte)
+    (LDA.IZX :src "X should be zero")
+    (inc16.zp :src)
+    (CMP.ZP :lfb)
+    (BEQ :pattern)
+    (STA.IZY :raster)
+    (INY)
+    (DEC.ZP :w)
+    (BNE :copy-byte)
+    (add16.zp (/ +screen-width+ 8) :raster)
+    (DEC.ZP :h)
+    (BNE :copy-row)
+    (RTS)
+    (label :pattern)
+    (LDA.IZX :src)
+    (dc "Get the pattern offset from the lo-nybble")
+    (AND.IMM #x0F)
+    (BNE :same-row)
+    (dc "Pattern is on the row above")
+    (ADC (/ +screen-width+ 8))
+    (label :same-row)
+    (STA.ZP :tmp)
+    (LDA.ZP (lo-add :raster))
+    (SEC)
+    (SBC.ZP :tmp)
+    (STA.ZP (lo-add :prev))
+    (LDA.ZP (hi-add :raster))
+    (SBC 0)
+    (STA.ZP (hi-add :prev))
+    (dc "Get the length from high nybble")
+    (LDA.IZX :src)
+    (LSR)
+    (LSR)
+    (LSR)
+    (LSR)
+    (CLC)
+    (ADC 3)
+    (TAX)
+    (dc "Advance past the match byte")
+    (inc16.zp :src)
+    (dc "Now we have offset in PREV and length in X")
+    (label :pattern-next)
+    (LDA.IZY :prev)
+    (STA.IZY :raster)
+    (INY)
+    (DEC.ZP :w)
+    (BEQ :copy-row "End of pattern and row")
+    (DEX)
+    (BEQ :copy-byte "End of pattern")
+    (BNE :pattern-next)))
+
+    
+
+    
+    
 
   
 

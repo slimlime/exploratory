@@ -168,7 +168,12 @@
 	2 3 4) :width 10)
 
 ;; A cache of converted images, since it takes so long to posterize them
-(defparameter *image-cache* (make-hash-table :test 'equal))
+(defparameter *image-cache* nil)
+
+(defun reset-image-cache ()
+  (setf *image-cache* (make-hash-table :test 'equal)))
+
+(reset-image-cache)
 
 ;; Define an image
 (defun dimg (label file sx sy)
@@ -189,20 +194,70 @@
       (loop for c across att do
 	   (push-byte c)))))
 
-(defparameter *image-width-bytes* 13)
+(defun draw-image (image w h)
+  (assert (= 0 (mod w 8)))
+  (assert (= 0 (mod h 8)))
+  (with-namespace :decompress
+  ;;we don't really need to emit this much assembly for the call
+    (LDA (/ w 8))
+    (STA.ZP :imgw)
+    (sta16.zp (cons :image-pixels image) :src)
+    (sta16.zp (+ (/ +screen-width+ 8)
+		 (- (/ w 8))
+		 *screen-memory-address*)
+	      :dest)
+    (LDA h)
+    (JSR :decompress)
+    (sta16.zp (cons :image-colours image) :src)
+    (sta16.zp (+ (/ +screen-width+ 8)
+		 (- (/ w 8))
+		 *char-memory-address*)
+	      :dest)
+    (LDA (/ h 8))
+    (JSR :decompress)))
 
+(defun cls ()
+  "Function to clear the char memory with A"
+  (label :cls)
+  (with-namespace :cls
+    (sta16.zp *char-memory-address* :A0)
+    (LDY 0)
+    (label :page1)
+    (STA.IZY :A0)
+    (INY)
+    (BNE :page1)
+    (INC.ZP (hi-add :A0))
+    (label :page2)
+    (STA.IZY :A0)
+    (INY)
+    (BNE :page2)
+    (INC.ZP (hi-add :A0))
+    (label :page3)
+    (STA.IZY :A0)
+    (INY)
+    (BNE :page3)
+    (INC.ZP (hi-add :A0))
+    (LDY (- 1000 1 (* 3 256)))
+    (label :page4)
+    (STA.IZY :A0)
+    (DEY)
+    (BNE :page4)
+    (STA.IZY :A0)))
+    
 ;; Render an image to the screen
 (defun image-decompressor ()
-  (label :draw-image)
-  (with-namespace :image
+  (label :decompress)
+  (with-namespace :decompress
     (alias :src :A0)
-    (alias :raster :A1)
+    (alias :dest :A1)
     (alias :prev :A2)
     (alias :lfb :D0)
     (alias :w :D1)
     (alias :h :D2)
     (alias :tmp :D3)
-    (sta16.zp *screen-memory-address* :raster)
+    (alias :imgw :D4)
+    (dc "Expect the height in A")
+    (STA.ZP :h)
     (LDY 0)
     (LDA.IZY :src)
     (STA.ZP :lfb)
@@ -210,35 +265,38 @@
     (label :copy-row)
     (LDX 0)
     (LDY 0)
-    (LDA *image-width-bytes*)
+    (LDA.ZP :imgw)
     (STA.ZP :w)
+    (LDA *image-height-bytes*)
     (label :copy-byte)
     (LDA.IZX :src "X should be zero")
     (inc16.zp :src)
     (CMP.ZP :lfb)
     (BEQ :pattern)
-    (STA.IZY :raster)
+    (STA.IZY :dest)
     (INY)
     (DEC.ZP :w)
     (BNE :copy-byte)
-    (add16.zp (/ +screen-width+ 8) :raster)
+    (label :row-end)
+    (add16.zp (/ +screen-width+ 8) :dest)
     (DEC.ZP :h)
     (BNE :copy-row)
     (RTS)
     (label :pattern)
-    (LDA.IZX :src)
+    (LDA.IZX :src "X should be zero")
     (dc "Get the pattern offset from the lo-nybble")
     (AND.IMM #x0F)
     (BNE :same-row)
     (dc "Pattern is on the row above")
+    (CLC)
     (ADC (/ +screen-width+ 8))
     (label :same-row)
-    (STA.ZP :tmp)
-    (LDA.ZP (lo-add :raster))
+    (STA.ZP :tmp)  ;could we negate and add? rather than tmp
+    (LDA.ZP (lo-add :dest))
     (SEC)
     (SBC.ZP :tmp)
     (STA.ZP (lo-add :prev))
-    (LDA.ZP (hi-add :raster))
+    (LDA.ZP (hi-add :dest))
     (SBC 0)
     (STA.ZP (hi-add :prev))
     (dc "Get the length from high nybble")
@@ -255,18 +313,61 @@
     (dc "Now we have offset in PREV and length in X")
     (label :pattern-next)
     (LDA.IZY :prev)
-    (STA.IZY :raster)
+    (STA.IZY :dest)
     (INY)
     (DEC.ZP :w)
-    (BEQ :copy-row "End of pattern and row")
+    (BEQ :row-end "End of pattern and row")
     (DEX)
     (BEQ :copy-byte "End of pattern")
     (BNE :pattern-next)))
 
-    
+(defun draw-test ()
+  (reset-compiler)
+  (reset-symbol-table)
+  (let ((font :past))
+    (flet ((pass ()
+	     (zeropage)	     
+	     (org #x600)
+	     (CLD)
+	     (label :render-test2)
+	     
+	     (sta16.zp :str '(:typeset-cs . :str))
+	     (sta16.zp (cons :font font) :font)
+	     (sta16.zp #x8000 '(:typeset . :raster))
 
-    
-    
+	     (JSR :typeset-cs)
+
+	     (LDA #x79)
+	     (JSR :cls)
+
+	     (draw-image :odd 104 104)
+	     
+	     (BRK)
+
+	     (cls)
+	     (typeset)
+	     (image-decompressor)
+
+	     (dimg :odd "/home/dan/Downloads/odd.bmp" 104 104)
+	     
+	     (dcs :str (justify-with-image *odyssey*
+					   104 104 font))
+
+	     (font-data)
+	     (label :end)
+
+
+	     
+	     ))
+      
+      
+      (build #'pass))) 
+
+  (monitor-reset #x600)
+  (monitor-run)
+
+  (let ((buf (monitor-buffer))) ;need to abstract out the memory, ditch cl-6502
+    (setmem-copy buf)))   
 
   
 

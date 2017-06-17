@@ -1,10 +1,10 @@
 (defparameter *line-spacing* (* (1+ *font-height*) 40))
 
+
 (defun update-vicky ()
   (let ((buf (monitor-buffer))) ;need to abstract out the memory, ditch cl-6502
     (loop for i from 0 to +char-memory-length+ do
 	 (setf (aref buf (+ i *char-memory-address*)) #x79))
-    "Update VICKY from the monitor buffer"
     (setmem-copy buf)))
 
 (defun zeropage ()
@@ -27,7 +27,8 @@
   (zp-b :D0)
   (zp-b :D1)
   (zp-b :D2)
-  (zp-b :D3))
+  (zp-b :D3)
+  (zp-b :D4))
 
 (defun typeset ()
   
@@ -305,8 +306,7 @@
 	     (typeset)
 	     (font-data)
 
-	     (dcs :str (justify-with-image *odyssey* 104 104 font))))
-	     ;(dcs :str (justify *odyssey* :width (font-width font)))))
+	     (dcs :str (justify *odyssey* :width (font-width font)))))
       (build #'pass))) 
   
   (monitor-reset #x600)

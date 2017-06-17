@@ -165,7 +165,7 @@
 	   (incf ptr (- 40 x))
 	   (setf x 0))))
 
-  
+
   (let ((ptr #x8000)
 	(x 0))
     (loop for b across (first result) do

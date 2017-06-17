@@ -1,3 +1,91 @@
+## 17/6/2017 Decompress
+
+Exciting news! The decompressor works, and here is the proof. The layout of the actual game will be very similar to the this, except there will be a location title and a space for live-actions and user input at the bottom.
+
+![Alt text](blog/odysseus.png)
+
+Here is some disassembly for you to peruse. This is the best bit of programming, you spend ages thinking about something that is mathematically plausible and should work in theory and then type out some meagre list of instructions which actually goes about doing it.  It helps that the algorithm is tested in LISP so that we don't have to spend ages going round the reasonably slow edit-compile-debug cycle for 6502. For this simple function I didn't need to use the single step monitor once. As usual, the problems were mostly of the OBOE variety.
+
+~~~~
+
+ ;+ DECOMPRESS
+             ;Expect the height in A
+  DECOMPRESS 09E6 850A    STA $0A
+             09E8 A000    LDY #$00
+             09EA B100    LDA ($00),Y
+             09EC 8508    STA $08
+             09EE E600    INC $00            ;SRC
+             09F0 D002    BNE $09F4          ;COPY-ROW
+             09F2 E601    INC $01            ;SRC + 1
+    COPY-ROW 09F4 A200    LDX #$00
+             09F6 A000    LDY #$00
+             09F8 A50C    LDA $0C
+             09FA 8509    STA $09
+             09FC A90D    LDA #$0D
+   COPY-BYTE 09FE A100    LDA ($00,X)        ;X should be zero
+             0A00 E600    INC $00            ;SRC
+             0A02 D002    BNE $0A06
+             0A04 E601    INC $01            ;SRC + 1
+             0A06 C508    CMP $08
+             0A08 F019    BEQ $0A23          ;PATTERN
+             0A0A 9102    STA ($02),Y
+             0A0C C8      INY
+             0A0D C609    DEC $09
+             0A0F D0ED    BNE $09FE          ;COPY-BYTE
+     ROW-END 0A11 18      CLC
+             0A12 A502    LDA $02            ;DEST
+             0A14 6928    ADC #$28
+             0A16 8502    STA $02            ;DEST
+             0A18 A503    LDA $03            ;DEST + 1
+             0A1A 6900    ADC #$00
+             0A1C 8503    STA $03            ;DEST + 1
+             0A1E C60A    DEC $0A
+             0A20 D0D2    BNE $09F4          ;COPY-ROW
+             0A22 60      RTS
+     PATTERN 0A23 A100    LDA ($00,X)        ;X should be zero
+             ;Get the pattern offset from the lo-nybble
+             0A25 290F    AND #$0F
+             0A27 D003    BNE $0A2C          ;SAME-ROW
+             ;Pattern is on the row above
+             0A29 18      CLC
+             0A2A 6928    ADC #$28
+    SAME-ROW 0A2C 850B    STA $0B
+             0A2E A502    LDA $02            ;DEST
+             0A30 38      SEC
+             0A31 E50B    SBC $0B
+             0A33 8504    STA $04            ;PREV
+             0A35 A503    LDA $03            ;DEST + 1
+             0A37 E900    SBC #$00
+             0A39 8505    STA $05            ;PREV + 1
+             ;Get the length from high nybble
+             0A3B A100    LDA ($00,X)
+             0A3D 4A      LSR
+             0A3E 4A      LSR
+             0A3F 4A      LSR
+             0A40 4A      LSR
+             0A41 18      CLC
+             0A42 6903    ADC #$03
+             0A44 AA      TAX
+             ;Advance past the match byte
+             0A45 E600    INC $00            ;SRC
+             0A47 D002    BNE $0A4B          ;PATTERN-NEXT
+             0A49 E601    INC $01            ;SRC + 1
+             ;Now we have offset in PREV and length in X
+PATTERN-NEXT 0A4B B104    LDA ($04),Y
+             0A4D 9102    STA ($02),Y
+             0A4F C8      INY
+             0A50 C609    DEC $09
+             0A52 F0BD    BEQ $0A11          ;ROW-END ;End of pattern and row
+             0A54 CA      DEX
+             0A55 F0A7    BEQ $09FE          ;COPY-BYTE ;End of pattern
+             0A57 D0F2    BNE $0A4B          ;PATTERN-NEXT
+             ;- DECOMPRESS
+         ODD 0A59 09      /home/dan/Downloads/odd.bmp pixels (1166)
+         ODD 0EE7 00      /home/dan/Downloads/odd.bmp colours (162)
+         STR 0F89 CF      DCS 'Tell me, O muse, of that
+
+~~~~
+
 ## 15/6/2017 The Compresssion Rabbit Hole
 
 I have spent the last two days down the compression rabbit hole. The further down you go, the fewer bytes there are to be had and the more desperate the search becomes. Rather than bore you all with the details, here is the very simple scheme I will be using. It meets these criteria,

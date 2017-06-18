@@ -1,3 +1,55 @@
+## 18/6/2017 What's Next?
+
+Having definitely, finally, ultimately finished with image compression and laid several coding demons to rest it is time to see what else is left. Oh yes! Almost everything.
+
+Now I know only Kevin is reading this blog (and even then I think he just *says* he does and is really spending his time watching karate movies), but here it is.
+
+### Parsing
+
+User input will be parsed. I have the idea that there will be 256 words maximum in the game. 256 is a good solid number.
+
+Input will be parsed in the following way.
+
+Each character will be read and added to a 16 bit hash. Reading will stop on a space, an end-of-line or 4 characters, whichever is first.
+The 16 bit hash will be used to look up a word from a choice of upto 256. I seem to remember perfect hashing being a thing. Perhaps that will be useful. I'll Google for it later. 251 also sounds like a good number, but probably 256.
+
+Once we have an 8 bit code for the word, it will be converted into its prime synonym. There may be a word for this from the field of philosophy, sememe. It's a rubbish word so I will be sticking to Prime Synonym. If anyone knows a better term for a unit of semantic meaning then please feel free to correct me with a lengthy article in the next edition of British Journal of Philosophical Meanderings.
+
+~~~~
+
+12 DOG
+27 ALSATION   ->  12 DOG
+38 PUPPY
+
+99 CUDDLE
+3F STROKE     ->  3F STROKE
+3E PET
+
+~~~~
+
+This will continue until all words have been read.
+
+Now we can write LISP code like, (defresponse :pet :dog "The dog licks your face") and should the user type any of the following,
+"STROKE ALSATION", "CUDDLE PUPPY" or even simply "PET DOG" they will be treated to a message of inter-species affection. Since the words will only have to occur in the order they are required to occur in, and other words will be ignored, the following will also result in canine unpleasantness. "PET BIG DOG", or "PET XDGXVR DOG BLIBBLE". If the user is typing stuff like that they have bigger problems than worrying about the parsing capabilities of a computer game.
+
+I have no idea what to do about homonyms. Probably nothing. I have also no idea what to do with hash collisions. Also probably nothing. Hopefully there will be some humourous unintentional mix-ups between verbs and non-human animals. Given that most word combos will only have certain meaning in certain game states, this may not be a problem worth worrying about. So I am not.
+
+### Screen Layout
+
+I have a design for the final layout of each location.
+
+A title in the top left or right, and an image on the opposite side.
+12 lines of text, justified around the image, which will stay on the screen at all times.
+4 lines of 'live text', e.g. actions and results of user input
+1 line of user input, which will scroll into the live text above when return is pressed.
+
+Also todo
+
+- 6502 emulator which works with Parenscript
+- Javascript HTML5 canvas screen driver to simulate a VIC-II hi-res mode
+- Game state model
+- Inventory. I hated the object model in old adventure games, so in this one there will be no dropping stuff, unless actually required. There will be an inventory, with pictures, because I really want to have a picture of a packet of Chee-Zows. I think the user can press a key and it will change the whole screen to inventory then go back, rather than showing a list.
+
 ## 18/6/2017 Improved decompressor
 
 Having been very disappointed with the compression ratio, particularly for the face image which is mostly whitespace, I decided to improve the decompressor so it could handle pattern matches that span over a scanline. First attempt was a disaster, there was too much state knocking about and too many edge cases. The re-write uses a co-routine style (not technically a co-routine) where there are to co-operating bits of code. One advances the data pointer and the pattern pointer, and the other emits bytes to the screen and takes care of scanline wrapping. This was much simpler to understand, though there is now an inefficiency in that we are doing a JSR for each byte emitted. Since this is an adventure game rather than a sprite shoot-em-up, it will probably be ok.

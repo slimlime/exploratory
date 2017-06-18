@@ -49,6 +49,10 @@
 
 ; The 3 font tables are going to take up about 2K!
 
+;; todo the font-data has to be called before the justify functions
+;;      can be used. Which is a bit rubbish if we want to put them
+;;      later in memory. Need to remove this dependency.
+
 (defun font-data ()
 
   (dc "Font tables. First byte of each character is the width")

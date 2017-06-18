@@ -97,17 +97,18 @@
 (defun lentest (f)
   (let ((img (posterize-image 104 104 (load-image f 104 104) :reduce-popcount t)))
     (copy2screen img 104)
-    ;;(vicky)   
+    (vicky)   
     (format t "file ~a ~a ~a~%"
 	    f
 	    (length (compress (first img) (/ 104 8)))
 	    (length (compress (coerce (second img) 'vector) 13)))
     (copy2screen (list (decompress (compress (first img) 13) 13)
 		       (decompress (compress (second img) 13) 13))
-		 104)))
-    ;;(vicky)))
+		 104)
+    (vicky)))
 
 (defun test-images ()
+  (lentest "/home/dan/Downloads/odd.bmp")
   (lentest "/home/dan/Downloads/garage2.bmp")
   (lentest "/home/dan/Downloads/cellardoor.bmp")
   (lentest "/home/dan/Downloads/porsche.bmp")
@@ -220,7 +221,9 @@
   "Function to clear the char memory with A"
   (label :cls)
   (with-namespace :cls
+    (TAY)
     (sta16.zp *char-memory-address* :A0)
+    (TYA)
     (LDY 0)
     (label :page1)
     (STA.IZY :A0)
@@ -242,7 +245,8 @@
     (STA.IZY :A0)
     (DEY)
     (BNE :page4)
-    (STA.IZY :A0)))
+    (STA.IZY :A0)
+    (RTS)))
     
 ;; Render an image to the screen
 (defun image-decompressor ()
@@ -280,6 +284,7 @@
     (add16.zp (/ +screen-width+ 8) :dest)
     (DEC.ZP :h)
     (BNE :copy-row)
+    (label :done)
     (RTS)
     (label :pattern)
     (LDA.IZX :src "X should be zero")
@@ -288,11 +293,10 @@
     (BNE :same-row)
     (dc "Pattern is on the row above")
     (CLC)
-    (ADC (/ +screen-width+ 8))
+    (ADC (1- (/ +screen-width+ 8)) "1- screen width, carry will be clear")
     (label :same-row)
     (STA.ZP :tmp)  ;could we negate and add? rather than tmp
     (LDA.ZP (lo-add :dest))
-    (SEC)
     (SBC.ZP :tmp)
     (STA.ZP (lo-add :prev))
     (LDA.ZP (hi-add :dest))
@@ -315,7 +319,16 @@
     (STA.IZY :dest)
     (INY)
     (DEC.ZP :w)
-    (BEQ :row-end "End of pattern and row")
+    (BNE :not-row-end)
+    (dc "Came to the end of the row")
+    (add16.zp (/ +screen-width+ 8) :dest)
+    (add16.zp (/ +screen-width+ 8) :prev)
+    (DEC.ZP :h)
+    (BEQ :done)
+    (LDA.ZP :imgw)
+    (STA.ZP :w)
+    (LDY 0)
+    (label :not-row-end)
     (DEX)
     (BEQ :copy-byte "End of pattern")
     (BNE :pattern-next)))
@@ -347,26 +360,22 @@
 	     (typeset)
 	     (image-decompressor)
 
+	     (font-data)
+	     
 	     (dimg :odd "/home/dan/Downloads/odd.bmp" 104 104)
 	     
 	     (dcs :str (justify-with-image *odyssey*
 					   104 104 font))
 
-	     (font-data)
-	     (label :end)
-
-
-	     
-	     ))
+	     (label :end)))
       
       
-      (build #'pass))) 
+      (build #'pass)))
 
   (monitor-reset #x600)
   (monitor-run)
 
-  (let ((buf (monitor-buffer))) ;need to abstract out the memory, ditch cl-6502
-    (setmem-copy buf)))   
+  (setmem-copy (monitor-buffer)))
 
   
 

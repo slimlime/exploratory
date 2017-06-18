@@ -48,14 +48,14 @@
 	     (setf best-len (match buf eob (- i width) i)))
 	   ;; look for matches from the beginning of the row
 	   ;; or from the maximum offset back on the row
-	   #|(loop for p from (max
+	   (loop for p from (max
 			     (- i *max-offset*)
 			     (* width (floor i width)))
 	      to (1- i) do
 		(let ((len (match buf eob p i)))
 		  (when (> len best-len)
 		    (setf best-len len)
-		    (setf best-offset (- i p)))))|#
+		    (setf best-offset (- i p)))))
 	   (if (> best-len 2)
 	       (progn
 		 (incf i (1- best-len))

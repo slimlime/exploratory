@@ -10,7 +10,7 @@
 	     (setf lfb i)))
       lfb)))
 
-(defparameter *max-length* 1) ; 0-15 -> 3-18
+(defparameter *max-length* 18) ; 0-15 -> 3-18
 (defparameter *max-offset* 15) ; 1-15 -> 1-15 (0 encodes the row above)
 
 ;; where q>p, look for a match at p
@@ -48,14 +48,14 @@
 	     (setf best-len (match buf eob (- i width) i)))
 	   ;; look for matches from the beginning of the row
 	   ;; or from the maximum offset back on the row
-	   (loop for p from (max
+	   #|(loop for p from (max
 			     (- i *max-offset*)
 			     (* width (floor i width)))
 	      to (1- i) do
 		(let ((len (match buf eob p i)))
 		  (when (> len best-len)
 		    (setf best-len len)
-		    (setf best-offset (- i p)))))
+		    (setf best-offset (- i p)))))|#
 	   (if (> best-len 2)
 	       (progn
 		 (incf i (1- best-len))
@@ -118,7 +118,7 @@
   (let ((c (compress arr width)))
     (assert (equalp (subseq (compress arr width) 1) exp))
     (assert (equalp arr (decompress c width)))))
-#|
+
 ;; no matches
 (test #(1) #(1))
 (test #(1 2) #(1 2))
@@ -159,15 +159,14 @@
       #(1 2 3 4 5 6 7 8 9 9 10
 	2 3 4 0 #x10  1 0 #x00) :width 11)
 
-;; match row above doesn't run on
+;; match row above does run on
 
 (test #(1 2 3 4 5 6 7 8 9 10
         2 3 4 5 6 7 7 8 9 10
         2 3 4)
       #(1 2 3 4 5 6 7 8 9 10
-	2 3 4 5 6 7 0 #x10
-	2 3 4) :width 10)
-|#
+	2 3 4 5 6 7 0 #x40) :width 10)
+
 ;; A cache of converted images, since it takes so long to posterize them
 (defparameter *image-cache* nil)
 
@@ -261,6 +260,7 @@
     (alias :imgh :D2) ;; image height
     (alias :src-y :D3)    ;; source pattern column
     (alias :dest-y :D4)   ;; destination column
+    (alias :tmp :D5)  ;; temp for subtraction
     
     (STA.ZP :imgh "Store the height")
 
@@ -270,6 +270,9 @@
     (LDA.IZX :data)
     (STA.ZP :lfb)
 
+    (dc "Get a byte from the data and either emit")
+    (dc "it to the screen or check for the special")
+    (dc "LFB which signals a pattern")
     (label :next)
     (inc16.zp :data)
     (LDA.IZX :data)
@@ -278,12 +281,64 @@
     (JSR :emit)
     (JMP :next)
 
+    (dc "Found a pattern. Extract the offset and")
+    (dc "set up a src pointer and a column to copy from")
+    
     (label :pattern)
-    (brk)
     (inc16.zp :data)
     (LDA.IZX :data)
-    (AND #xF)
+    (AND.IMM #xF)
+    (BEQ :row-above)
+    (dc "Pattern is on the same row, so we use the same")
+    (dc "scanline pointer for the source, but offset the")
+    (dc "column index by the amount in the lo-nybble")
+    (EOR #xFF)
+    (SEC)
+    (ADC.ZP :dest-y)
+    (STA.ZP :src-y)
+    (cpy16.zp :dest :src)
+    (JMP :copy)
+    (label :row-above)
+    (LDA.ZP (lo-add :dest))
+    (SEC)
+    (SBC (/ +screen-width+ 8))
+    (STA.ZP (lo-add :src))
+    (LDA.ZP (hi-add :dest))
+    (SBC 0)
+    (STA.ZP (hi-add :src))
+    (LDA.ZP :dest-y)
+    (STA.ZP :src-y)
+    (label :copy)
+    (dc "Get the pattern width from the hi-nybble")
+    (LDA.IZX :data)
+    (LSR)
+    (LSR)
+    (LSR)
+    (LSR)
+    (CLC)
+    (ADC 3)
+    (TAX)
+    (label :next-pattern)
+    (LDA.ZP :src-y)
+    (CMP.ZP :imgw)
+    (BNE :not-wrapped)
+    (add16.zp (/ +screen-width+ 8) :src)
+    (LDA 0)
+    (STA.ZP :src-y)
+    (label :not-wrapped)
+    (TAY)
+    (LDA.IZY :src)
+    (LDY.ZP :dest-y)
+    (STA.IZY :dest)
+    (JSR :emit)
+    (INC.ZP :src-y)
+    (DEX)
+    (BNE :next-pattern)
+    (BEQ :next)
 
+    ;; This bit emits a byte and takes care that the output
+    ;; pointer dest and its column dest-y wrap at the end
+    ;; of the scanline.
     
     (label :emit)
     (dc "Emit a byte to the screen")

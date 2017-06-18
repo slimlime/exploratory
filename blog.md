@@ -1,3 +1,47 @@
+## 18/6/2017 Improved decompressor
+
+Having been very disappointed with the compression ratio, particularly for the face image which is mostly whitespace, I decided to improve the decompressor so it could handle pattern matches that span over a scanline. First attempt was a disaster, there was too much state knocking about and too many edge cases. The re-write uses a co-routine style (not technically a co-routine) where there are to co-operating bits of code. One advances the data pointer and the pattern pointer, and the other emits bytes to the screen and takes care of scanline wrapping. This was much simpler to understand, though there is now an inefficiency in that we are doing a JSR for each byte emitted. Since this is an adventure game rather than a sprite shoot-em-up, it will probably be ok.
+
+~~~~
+           Original   Simple   Improved
+	   
+cellardoor     1352     1073   1070
+porsche        1352     1182   1141
+maxine         1352     1054    817
+garagedoor     1352             777
+odysseus       1352            1054
+
+~~~~
+
+All that was required in the compression routine was to remove the check for the end of the scanline.
+
+### Neat return trick.
+
+In a normal language, like C, if you are deep within a call stack and you want to escape, it's tricky, you have to return all the way up and hope you don't get shafted by one of the functions that calls you. In assembler, it's easy,
+
+~~~~
+
+    (DEC.ZP :imgh)
+    (BNE :emit-end)
+    (dc "We are done, pop the stack return directly to caller")
+    (PLA)
+    (PLA)
+    (RTS)
+
+~~~~
+
+The code that emits bytes detected the end of the image, so why bother going up a really boring call stack? This means less code checking for conditions in places that would rather concentrate on something else. Of course this is a total violation of all the rules that have grown up around programming. Who cares? One of the principles of this blog is LIBRARY not FRAMEWORK. Let us use the things that work for us, not vice-versa.
+
+### Reverse Subtraction
+
+Another neat trick for you 6502 nuts is reverse subtraction. Here we want to subtract an offset, which is in the accumulator from a column number stored in the zeropage. One way to do it is by storing the offset in a temporary location, loading the column number then doing SBC with the temporary. Or, you can remember that A - B = A + (-B) = (-B) + A. School maths, it wasn't a waste of time. (h/t CODEBASE 64 and NESDEV)
+
+~~~~
+    (EOR #xFF)
+    (SEC)
+    (ADC.ZP :dest-y)
+~~~~
+
 ## 17/6/2017 Decompress
 
 Exciting news! The decompressor works, and here is the proof. The layout of the actual game will be very similar to the this, except there will be a location title and a space for live-actions and user input at the bottom.

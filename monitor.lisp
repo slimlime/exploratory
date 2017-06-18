@@ -68,7 +68,8 @@
 	     (let ((op (gethash (aref *compiler-buffer* pc)
 				*reverse-opcodes*)))
 	       ;(format t "~2,'0X ~a~%" pc op)
-	       (when (and op (eq break-on (car op)))
+	       (when (or (= pc (resolve break-on :no-assert t))
+			 (and op (eq break-on (car op))))
 		 (return)))
 	     (funcall *monitor-step*)))
 	   (when print

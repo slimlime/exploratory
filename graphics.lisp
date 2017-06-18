@@ -28,7 +28,9 @@
   (zp-b :D1)
   (zp-b :D2)
   (zp-b :D3)
-  (zp-b :D4))
+  (zp-b :D4)
+  (zp-b :D5)
+  (zp-b :D6))
 
 (defun typeset ()
   

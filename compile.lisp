@@ -81,8 +81,7 @@
   (assert-address add)
   (aref *compiler-buffer* add))
 
-
-(defun resolve (arg)
+(defun resolve (arg &key (no-assert nil))
   (if (numberp arg)
       (values arg t)
       (let ((addr nil))
@@ -107,7 +106,8 @@
 		  (setf addr (gethash arg *compiler-labels*)))))
 	  ;; on the first pass only, allow
 	  ;; labels to be null (resolve to 0 if so)
-	  (when (and (null addr) 
+	  (when (and (null addr)
+		     (null no-assert)
 		     *compiler-final-pass*)
 	    (assert nil nil (format nil "The label ~a was not resolved (aliased-label [~a])" arg aliased-label)))
 	  (if addr

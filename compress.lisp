@@ -10,13 +10,13 @@
 	     (setf lfb i)))
       lfb)))
 
-(defparameter *max-length* 18) ; 0-15 -> 3-18
+(defparameter *max-length* 1) ; 0-15 -> 3-18
 (defparameter *max-offset* 15) ; 1-15 -> 1-15 (0 encodes the row above)
 
 ;; where q>p, look for a match at p
-(defun match (buf width eob p q)
+(defun match (buf eob p q)
   (let ((len 0))
-    (loop while (and (<= q (min eob (1- (* width (ceiling q width)))))
+    (loop while (and (<= q eob)
 		     (< len *max-length*)
 		     (=
 		      (aref buf p)
@@ -45,14 +45,14 @@
 	       (best-offset 0))
 	   ;; look for a match on the row above
 	   (when (>= i width)
-	     (setf best-len (match buf width eob (- i width) i)))
+	     (setf best-len (match buf eob (- i width) i)))
 	   ;; look for matches from the beginning of the row
 	   ;; or from the maximum offset back on the row
 	   (loop for p from (max
 			     (- i *max-offset*)
 			     (* width (floor i width)))
 	      to (1- i) do
-		(let ((len (match buf width eob p i)))
+		(let ((len (match buf eob p i)))
 		  (when (> len best-len)
 		    (setf best-len len)
 		    (setf best-offset (- i p)))))
@@ -118,7 +118,7 @@
   (let ((c (compress arr width)))
     (assert (equalp (subseq (compress arr width) 1) exp))
     (assert (equalp arr (decompress c width)))))
-
+#|
 ;; no matches
 (test #(1) #(1))
 (test #(1 2) #(1 2))
@@ -167,7 +167,7 @@
       #(1 2 3 4 5 6 7 8 9 10
 	2 3 4 5 6 7 0 #x10
 	2 3 4) :width 10)
-
+|#
 ;; A cache of converted images, since it takes so long to posterize them
 (defparameter *image-cache* nil)
 
@@ -194,28 +194,6 @@
       (add-hint (length att) (format nil "~a colours (~a)" file (length att)))
       (loop for c across att do
 	   (push-byte c)))))
-
-(defun draw-image (image w h)
-  (assert (= 0 (mod w 8)))
-  (assert (= 0 (mod h 8)))
-  (with-namespace :decompress
-  ;;we don't really need to emit this much assembly for the call
-    (LDA (/ w 8))
-    (STA.ZP :imgw)
-    (sta16.zp (cons :image-pixels image) :src)
-    (sta16.zp (+ (/ +screen-width+ 8)
-		 (- (/ w 8))
-		 *screen-memory-address*)
-	      :dest)
-    (LDA h)
-    (JSR :decompress)
-    (sta16.zp (cons :image-colours image) :src)
-    (sta16.zp (+ (/ +screen-width+ 8)
-		 (- (/ w 8))
-		 *char-memory-address*)
-	      :dest)
-    (LDA (/ h 8))
-    (JSR :decompress)))
 
 (defun cls ()
   "Function to clear the char memory with A"
@@ -247,92 +225,87 @@
     (BNE :page4)
     (STA.IZY :A0)
     (RTS)))
-    
+
+(defun draw-image (image w h)
+  (assert (= 0 (mod w 8)))
+  (assert (= 0 (mod h 8)))
+  (with-namespace :decompress
+  ;;we don't really need to emit this much assembly for the call
+    (LDA (/ w 8))
+    (STA.ZP :imgw)
+    (sta16.zp (cons :image-pixels image) :data)
+    (sta16.zp (+ (/ +screen-width+ 8)
+		 (- (/ w 8))
+		 *screen-memory-address*)
+	      :dest)
+    (LDA h)
+    (JSR :decompress)
+    (sta16.zp (cons :image-colours image) :data)
+    (sta16.zp (+ (/ +screen-width+ 8)
+		 (- (/ w 8))
+		 *char-memory-address*)
+	      :dest)
+    (LDA (/ h 8))
+    (JSR :decompress)))
+
 ;; Render an image to the screen
 (defun image-decompressor ()
+  ;;expecting the image height in A
   (label :decompress)
   (with-namespace :decompress
-    (alias :src :A0)
-    (alias :dest :A1)
-    (alias :prev :A2)
-    (alias :lfb :D0)
-    (alias :w :D1)
-    (alias :h :D2)
-    (alias :tmp :D3)
-    (alias :imgw :D4)
-    (dc "Expect the height in A")
-    (STA.ZP :h)
-    (LDY 0)
-    (LDA.IZY :src)
-    (STA.ZP :lfb)
-    (inc16.zp :src)
-    (label :copy-row)
+    (alias :data :A0) ;; source image
+    (alias :dest :A1) ;; current screen position
+    (alias :src :A2)  ;; pattern address
+    (alias :lfb :D0)  ;; special least frequent byte
+    (alias :imgw :D1) ;; image width
+    (alias :imgh :D2) ;; image height
+    (alias :src-y :D3)    ;; source pattern column
+    (alias :dest-y :D4)   ;; destination column
+    
+    (STA.ZP :imgh "Store the height")
+
+    (dc "Get the LFB")
     (LDX 0)
-    (LDY 0)
-    (LDA.ZP :imgw)
-    (STA.ZP :w)
-    (label :copy-byte)
-    (LDA.IZX :src "X should be zero")
-    (inc16.zp :src)
+    (STX.ZP :dest-y)
+    (LDA.IZX :data)
+    (STA.ZP :lfb)
+
+    (label :next)
+    (inc16.zp :data)
+    (LDA.IZX :data)
     (CMP.ZP :lfb)
     (BEQ :pattern)
-    (STA.IZY :dest)
-    (INY)
-    (DEC.ZP :w)
-    (BNE :copy-byte)
-    (label :row-end)
-    (add16.zp (/ +screen-width+ 8) :dest)
-    (DEC.ZP :h)
-    (BNE :copy-row)
-    (label :done)
-    (RTS)
-    (label :pattern)
-    (LDA.IZX :src "X should be zero")
-    (dc "Get the pattern offset from the lo-nybble")
-    (AND.IMM #x0F)
-    (BNE :same-row)
-    (dc "Pattern is on the row above")
-    (CLC)
-    (ADC (1- (/ +screen-width+ 8)) "1- screen width, carry will be clear")
-    (label :same-row)
-    (STA.ZP :tmp)  ;could we negate and add? rather than tmp
-    (LDA.ZP (lo-add :dest))
-    (SBC.ZP :tmp)
-    (STA.ZP (lo-add :prev))
-    (LDA.ZP (hi-add :dest))
-    (SBC 0)
-    (STA.ZP (hi-add :prev))
-    (dc "Get the length from high nybble")
-    (LDA.IZX :src)
-    (LSR)
-    (LSR)
-    (LSR)
-    (LSR)
-    (CLC)
-    (ADC 3)
-    (TAX)
-    (dc "Advance past the match byte")
-    (inc16.zp :src)
-    (dc "Now we have offset in PREV and length in X")
-    (label :pattern-next)
-    (LDA.IZY :prev)
-    (STA.IZY :dest)
-    (INY)
-    (DEC.ZP :w)
-    (BNE :not-row-end)
-    (dc "Came to the end of the row")
-    (add16.zp (/ +screen-width+ 8) :dest)
-    (add16.zp (/ +screen-width+ 8) :prev)
-    (DEC.ZP :h)
-    (BEQ :done)
-    (LDA.ZP :imgw)
-    (STA.ZP :w)
-    (LDY 0)
-    (label :not-row-end)
-    (DEX)
-    (BEQ :copy-byte "End of pattern")
-    (BNE :pattern-next)))
+    (JSR :emit)
+    (JMP :next)
 
+    (label :pattern)
+    (brk)
+    (inc16.zp :data)
+    (LDA.IZX :data)
+    (AND #xF)
+
+    
+    (label :emit)
+    (dc "Emit a byte to the screen")
+    (LDY.ZP :dest-y)
+    (STA.IZY :dest)
+    (INY)
+    (TYA)
+    (CMP.ZP :imgw)
+    (BNE :emit-end)
+    (dc "Scanline wrap")
+    (add16.zp (/ +screen-width+ 8) :dest)
+    (LDY 0)
+    (DEC.ZP :imgh)
+    (BNE :emit-end)
+    (dc "We are done, pop the stack return directly to caller")
+    (PLA)
+    (PLA)
+    (RTS)
+    (label :emit-end)
+    (STY.ZP :dest-y)
+    (RTS)))
+    
 (defun draw-test ()
   (reset-compiler)
   (reset-symbol-table)
@@ -347,7 +320,7 @@
 	     (sta16.zp (cons :font font) :font)
 	     (sta16.zp #x8000 '(:typeset . :raster))
 
-	     (JSR :typeset-cs)
+	     ;;(JSR :typeset-cs)
 
 	     (LDA #x79)
 	     (JSR :cls)

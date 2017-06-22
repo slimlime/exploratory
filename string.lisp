@@ -132,24 +132,26 @@
 
 (defun dcs (label str)
   "Define compressed string"
-  (if *symbol-table*
-      ;if the string table is built, emit the string and supply
-      ;the label
-      (progn
-	(when label
-	  (label label))
-	(let ((len 0))
-	  (encode-string str #'(lambda (i word)
-				 (declare (ignore word i))
-				 (incf len)))
-	  (when *compiler-final-pass*
-	    (push (cons *compiler-ptr* str) *compiled-strings*))
-	  (add-hint len (format nil "DCS '~a'" str))
-	  (encode-string str #'(lambda (i word)
-				 (declare (ignore word))
-				 (push-byte i)))))
-      ;in the first pass, add the string to the table
-      (process-string str)))
+  (let ((address *compiler-ptr*))
+    (if *symbol-table*
+	;;if the string table is built, emit the string and supply
+	;;the label
+	(progn
+	  (when label
+	    (label label))
+	  (let ((len 0))
+	    (encode-string str #'(lambda (i word)
+				   (declare (ignore word i))
+				   (incf len)))
+	    (when *compiler-final-pass*
+	      (push (cons *compiler-ptr* str) *compiled-strings*))
+	    (add-hint len (format nil "DCS '~a'" str))
+	    (encode-string str #'(lambda (i word)
+				   (declare (ignore word))
+				   (push-byte i)))))
+	;;in the first pass, add the string to the table
+	(process-string str))
+    address))
 
 (defun emit-char-label (c)
   (format nil "EMIT-~a" c))

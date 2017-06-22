@@ -17,4 +17,8 @@
 (defconstant +char-memory-length+ 1000)
 (defconstant +screen-memory-length+ 8000)
 (defconstant +screen-width+ 320)
+(defconstant +screen-width-bytes+ 40)
 (defconstant +screen-height+ 200)
+
+(defun scradd (row col)
+  (+ *screen-memory-address* (* +screen-width-bytes+ row) col))

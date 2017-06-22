@@ -103,4 +103,5 @@
 (defparameter *monitor-reset* #'monitor-setup-for-cl-6502)
 
 (defun monitor-reset (org &key (buffer *compiler-buffer*))
-  (funcall *monitor-reset* buffer org))
+  (funcall *monitor-reset* buffer (resolve org))
+  (values))

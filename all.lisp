@@ -14,8 +14,9 @@
   (bload "vicky-shared.lisp")
   (bload "justify.lisp")
   (bload "image.lisp")
+  (bload "graphics.lisp")
   (bload "compress.lisp")
-  (bload "graphics.lisp"))
+  (bload "location.lisp"))
 
 (defun load-vicky ()
   (ql:quickload 'lispbuilder-sdl)

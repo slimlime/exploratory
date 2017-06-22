@@ -35,7 +35,8 @@
 (defun typeset ()
   
   ; some non-scratch zpg
-
+  ;; todo, this can actually be scratch
+  
   (zp-w :font)
 
   (when *symbol-table*

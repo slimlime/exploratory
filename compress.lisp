@@ -194,6 +194,10 @@
       (loop for c across att do
 	   (push-byte c)))))
 
+(defun call-cls (colour)
+  (LDA colour)
+  (JSR :cls))
+
 (defun cls ()
   "Function to clear the char memory with A"
   (label :cls)
@@ -225,27 +229,26 @@
     (STA.IZY :A0)
     (RTS)))
 
-(defun draw-image (image w h)
+(defun draw-image (image w h &optional (img-align :right))
   (assert (= 0 (mod w 8)))
   (assert (= 0 (mod h 8)))
   (with-namespace :decompress
-  ;;we don't really need to emit this much assembly for the call
-    (LDA (/ w 8))
-    (STA.ZP :imgw)
-    (sta16.zp (cons :image-pixels image) :data)
-    (sta16.zp (+ (/ +screen-width+ 8)
-		 (- (/ w 8))
-		 *screen-memory-address*)
-	      :dest)
-    (LDA h)
-    (JSR :decompress)
-    (sta16.zp (cons :image-colours image) :data)
-    (sta16.zp (+ (/ +screen-width+ 8)
-		 (- (/ w 8))
-		 *char-memory-address*)
-	      :dest)
-    (LDA (/ h 8))
-    (JSR :decompress)))
+    (print img-align)
+    ;;we don't really need to emit this much assembly for the call
+    (let ((offset (if (eq img-align :right)
+		      (+ (/ +screen-width+ 8) (- (/ w 8)))
+		      0)))
+
+      (LDA (/ w 8))
+      (STA.ZP :imgw)
+      (sta16.zp (cons :image-pixels image) :data)
+      (sta16.zp (+ offset *screen-memory-address*) :dest)
+      (LDA h)
+      (JSR :decompress)
+      (sta16.zp (cons :image-colours image) :data)
+      (sta16.zp (+ offset *char-memory-address*) :dest)
+      (LDA (/ h 8))
+      (JSR :decompress))))
 
 ;; Render an image to the screen
 (defun image-decompressor ()
@@ -364,7 +367,7 @@
 (defun draw-test ()
   (reset-compiler)
   (reset-symbol-table)
-  (let ((font :past))
+  (let ((font :present))
     (flet ((pass ()
 	     (zeropage)	     
 	     (org #x600)
@@ -375,7 +378,7 @@
 	     (sta16.zp (cons :font font) :font)
 	     (sta16.zp #x8000 '(:typeset . :raster))
 
-	     ;;(JSR :typeset-cs)
+	     (JSR :typeset-cs)
 
 	     (LDA #x79)
 	     (JSR :cls)

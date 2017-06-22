@@ -5,6 +5,7 @@
 ;; for the justification algorithm to lookup the widths
 (defparameter *font-widths* (make-hash-table :test 'equal))
 (defparameter *font-height* 10)
+(defparameter *line-height* (1+ *font-height*))
 
 (defun byte-width (b)
   (when (= 1 (logand 1 b)) (return-from byte-width 8))

@@ -1,3 +1,14 @@
+## 28/6/2017 User input
+
+Having spent some time thinking about user input I finally have a scheme in mind that I am happy with.
+
+- Monospaced fonts for user input
+- Generated binary tree for word and synonym detection
+
+I decided that monospaced font would be more readable (a few have complained about the wibbly wobbly fonts. It's for character p-shaw!) It also makes backspace much easier to handle as we can just subtract one from the current position and clear the current character. I will see whether I want the live text ("Gandalf cleaves your skull, time passes" etc) to be in the same font. I think yes.
+
+A character of user input will be read in and then a series of CMPs and branch instructions will follow until we are at an impasse and need to read another character to differentiate between words. Synonyms will lead to the same value, but be at a different place in the tree. Each sentence will be a maximum of three bytes long. A linear search will be made to find out if the sentence actually means anything in the context of the room, then another search made to see if it makes any sense globally. For example, PUSH BUTTON will be location dependent, EXAMINE ROPE will probably not be. Or maybe it will. That is an interesting question.
+
 ## 18/6/2017 What's Next?
 
 Having definitely, finally, ultimately finished with image compression and laid several coding demons to rest it is time to see what else is left. Oh yes! Almost everything.

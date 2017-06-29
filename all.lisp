@@ -16,7 +16,8 @@
   (bload "image.lisp")
   (bload "graphics.lisp")
   (bload "compress.lisp")
-  (bload "location.lisp"))
+  (bload "location.lisp")
+  (bload "parse.lisp"))
 
 (defun load-vicky ()
   (ql:quickload 'lispbuilder-sdl)

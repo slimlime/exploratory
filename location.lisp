@@ -7,15 +7,6 @@
 (defparameter *act-font* :present)
 (defparameter *act-colour* #x10)
 
-(defun call-typeset (cstr font y)
-  (sta16.zp cstr '(:typeset-cs . :str))
-  (sta16.zp (cons :font font) :font)
-  (sta16.zp (+ *screen-memory-address*
-	       (* (/ +screen-width+ 8) y))
-	    '(:typeset . :raster))
-  (JSR :typeset-cs))
-
-;;TODO scroll live messages
 ;;TODO render live message
 ;;TODO enter user character, delete user character
 ;;TODO left image align
@@ -26,31 +17,42 @@
 (defun live-row (i)
   (+ 3 (* (+ i 13) *line-height*)))
 
-(defun scroll ()
-  (label :scroll)
+(defun scroller (label lines)
+  (label label)
   (call-memcpy (scradd (live-row 1) 0)
 	       (scradd (live-row 0) 0)
-	       (* 4 +screen-width-bytes+ *line-height*))
-  (call-memset 55 (scradd (live-row 4) 0)
-	       (* +screen-width-bytes+ *line-height*)))
+	       (* lines +screen-width-bytes+ *line-height*))
+  (call-memset 0 (scradd (live-row lines) 0)
+	       (* +screen-width-bytes+ *line-height*))
+  (RTS))
 
+(defun live-message (cstr)
+  (label :live-message)
+  (JSR :scroll-text)
+  (sta16.zp cstr '(:typeset-cs . :str))
+  (sta16.zp (scradd (live-row 3) 0) '(:typeset . :raster))
+  (JSR :typeset-cs))
+				      
 (defun dloc (name title img-file img-align text
 	     &key (font *act-font*) (colour *act-colour*))
   (with-namespace name
     (label :draw)
     (dc (format nil "Draw ~a (~a)" title name))
-    (call-cls colour)
+    (cls colour)
+    (sta16.zp :font font)
     (call-typeset :title font 0)
     (call-typeset :text font (+ 1 *line-height*))
-    (draw-image :image 104 104 img-align)
-    (RTS)
-    (dc (format nil "Image data for ~a (~a)" title name))
-    (dimg :image img-file 104 104)
-    (dcs :title title)
-    (dcs :text
-	 (if img-file
-	     (justify-with-image text 104 (- 104 (+ 1 *line-height*)) font)
-	     (justify-with-image text 0 0 font)))))
+    ;; todo get image width and height from file
+    (let ((sx 104) (sy 104))      
+      (draw-image :image sx sy img-align)
+      (RTS)
+      (dc (format nil "Image data for ~a (~a)" title name))
+      (dimg :image img-file sx sy)
+      (dcs :title title)
+      (dcs :text
+	   (if img-file
+	       (justify-with-image text sx (- sy (+ 1 *line-height*)) font)
+	       (justify-with-image text 0 0 font))))))
 
 (defun location-test ()
   (reset-compiler)
@@ -74,7 +76,7 @@
 	   (call-typeset "User input"
 			 :past (+ 3 (* 17 *line-height*)))
 
-	   (scroll)
+	   (JSR :scroll-text)
 
 	   (BRK)
 
@@ -84,8 +86,9 @@
 			"Live 4"
 			"User input"))
 	     (dcs v v))
-	   
-	   (cls)
+
+	   (scroller :scroll-all 4)
+	   (scroller :scroll-text 3)
 	   (memcpy)
 	   (memset)
 	   (typeset)

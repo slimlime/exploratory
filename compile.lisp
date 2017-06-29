@@ -114,6 +114,12 @@
 	      (values addr t)
 	      (values 0 nil))))))
 
+(defun resolves (label)
+  (multiple-value-bind (addr resolves)
+      (resolve label :no-assert t)
+    (declare (ignorable addr))
+    resolves))
+
 (defun hexdump (add &optional (len 32))
   (unless (numberp add)
     (setf add (resolve add)))

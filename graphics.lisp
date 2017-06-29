@@ -1,6 +1,5 @@
 (defparameter *line-spacing* (* (1+ *font-height*) 40))
 
-
 (defun update-vicky ()
   (let ((buf (monitor-buffer))) ;need to abstract out the memory, ditch cl-6502
     (loop for i from 0 to +char-memory-length+ do
@@ -280,13 +279,14 @@
     (LDA.IZY :char)
     (STA.ZP :prev-width)
     (RTS)))
-
+;;TODO make this build specific to this file, and make specific versions
+;;for elsewhere
 (defun build (pass)
-    (funcall pass)
-    (build-symbol-table)
-    (funcall pass)
-    (setf *compiler-final-pass* t)
-    (funcall pass))
+  (funcall pass)
+  (build-symbol-table)
+  (funcall pass)
+  (setf *compiler-final-pass* t)
+  (funcall pass))
 
 (defun odyssey ()
   (reset-compiler)

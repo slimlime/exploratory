@@ -1,3 +1,133 @@
+## 29/6/2017 Binary Tree Parser
+
+Having abandoned my dreams of some brilliant logic-net where a sequence of occult ANDs, ORs and EORs convert a few bytes of input into a byte that represents a word and all its synonyms, I decided on a binary tree.
+
+Here is the table of synonymous words defined in the LISP,
+
+~~~~
+
+  (defword :PRESS :PUSH)
+  (defword :GET :PICK :TAKE)
+  (defword :OPEN)
+  (defword :CLOSE :SHUT)
+  (defword :SAY :SPEAK :TELL)
+  (defword :UP :CLIMB)
+  (defword :DOWN :DESCEND)
+  (defword :OPERATE :USE)
+
+~~~~
+
+These words are added into a hash-table and assigned a code. Synonymous words are assigned the same code.
+
+I then sort the list of words ready for building the parse tree. A recursive function splits the word list in half as best it can. It keeps splitting until it reaches a word list where all the words begin with the same letter, or it has found a unique word. If it finds a unique word, it can generate some 6502 code to emit the synonym code. If it finds a bunch of words that all begin with the same letter, it moves on to the next letter, much as if it were doing a lexical comparison.
+
+Here is the (untested) 6502 to parse this list of words and return a number which corresponds to the words meaning. An obvious improvement would be to not emit the same LDA/RTS pairs for already seen synonyms, we could simply branch to it directly. An egregious example of this is at 0627-062C.
+
+~~~~
+
+             ;+ PARSER
+       PARSE 0601 A000    LDY #$00
+             0603 B100    LDA ($00),Y
+             ;; CLIMB...OPERATE (7) or PICK...USE (10)?
+             0605 C90F    CMP #$0F           ;[0] >= O
+             0607 B039    BCS $0642          ;2
+             ;; CLIMB...DOWN (4) or GET...OPERATE (3)?
+             0609 C904    CMP #$04           ;[0] >= D
+             060B B020    BCS $062D          ;3
+             ;; CLIMB...CLOSE (2) or DESCEND...DOWN (2)?
+             060D C903    CMP #$03           ;[0] >= C
+             060F B00E    BCS $061F          ;4
+             ;; CLIMB...CLIMB (1) or CLOSE...CLOSE (1)?
+             0611 A002    LDY #$02
+             0613 B100    LDA ($00),Y
+             0615 C909    CMP #$09           ;[2] >= I
+             0617 B003    BCS $061C          ;5
+             0619 A905    LDA #$05           ;UP
+             061B 60      RTS
+           5 061C A903    LDA #$03           ;CLOSE
+             061E 60      RTS
+             ;; DESCEND...DESCEND (1) or DOWN...DOWN (1)?
+           4 061F A001    LDY #$01
+             0621 B100    LDA ($00),Y
+             0623 C905    CMP #$05           ;[1] >= E
+             0625 B003    BCS $062A          ;6
+             0627 A906    LDA #$06           ;DOWN
+             0629 60      RTS
+           6 062A A906    LDA #$06           ;DOWN
+             062C 60      RTS
+             ;; GET...GET (1) or OPEN...OPERATE (2)?
+           3 062D C907    CMP #$07           ;[0] >= G
+             062F B003    BCS $0634          ;7
+             0631 A901    LDA #$01           ;GET
+             0633 60      RTS
+             ;; OPEN...OPEN (1) or OPERATE...OPERATE (1)?
+           7 0634 A003    LDY #$03
+             0636 B100    LDA ($00),Y
+             0638 C90E    CMP #$0E           ;[3] >= N
+             063A B003    BCS $063F          ;8
+        OPEN 063C A902    LDA #$02           ;OPEN
+             063E 60      RTS
+           8 063F A907    LDA #$07           ;OPERATE
+             0641 60      RTS
+             ;; PICK...SPEAK (6) or TAKE...USE (4)?
+           2 0642 C913    CMP #$13           ;[0] >= S
+             0644 B02E    BCS $0674          ;9
+             ;; PICK...PUSH (3) or SAY...SPEAK (3)?
+             0646 C910    CMP #$10           ;[0] >= P
+             0648 B015    BCS $065F          ;10
+             ;; PICK...PICK (1) or PRESS...PUSH (2)?
+             064A A001    LDY #$01
+             064C B100    LDA ($00),Y
+             064E C909    CMP #$09           ;[1] >= I
+             0650 B003    BCS $0655          ;11
+             0652 A901    LDA #$01           ;GET
+             0654 60      RTS
+             ;; PRESS...PRESS (1) or PUSH...PUSH (1)?
+          11 0655 C912    CMP #$12           ;[1] >= R
+             0657 B003    BCS $065C          ;12
+             0659 A900    LDA #$00           ;PRESS
+             065B 60      RTS
+          12 065C A900    LDA #$00           ;PRESS
+             065E 60      RTS
+             ;; SAY...SAY (1) or SHUT...SPEAK (2)?
+          10 065F A001    LDY #$01
+             0661 B100    LDA ($00),Y
+             0663 C901    CMP #$01           ;[1] >= A
+             0665 B003    BCS $066A          ;13
+             0667 A904    LDA #$04           ;SAY
+             0669 60      RTS
+             ;; SHUT...SHUT (1) or SPEAK...SPEAK (1)?
+          13 066A C908    CMP #$08           ;[1] >= H
+             066C B003    BCS $0671          ;14
+       CLOSE 066E A903    LDA #$03           ;CLOSE
+             0670 60      RTS
+          14 0671 A904    LDA #$04           ;SAY
+             0673 60      RTS
+             ;; TAKE...TELL (2) or UP...USE (2)?
+           9 0674 C914    CMP #$14           ;[0] >= T
+             0676 B00E    BCS $0686          ;15
+             ;; TAKE...TAKE (1) or TELL...TELL (1)?
+             0678 A001    LDY #$01
+             067A B100    LDA ($00),Y
+             067C C901    CMP #$01           ;[1] >= A
+             067E B003    BCS $0683          ;16
+         GET 0680 A901    LDA #$01           ;GET
+             0682 60      RTS
+          16 0683 A904    LDA #$04           ;SAY
+             0685 60      RTS
+             ;; UP...UP (1) or USE...USE (1)?
+          15 0686 A001    LDY #$01
+             0688 B100    LDA ($00),Y
+             068A C910    CMP #$10           ;[1] >= P
+             068C B003    BCS $0691          ;17
+          UP 068E A905    LDA #$05           ;UP
+             0690 60      RTS
+          17 0691 A907    LDA #$07           ;OPERATE
+             0693 60      RTS
+             ;- PARSER
+
+~~~~
+
 ## 28/6/2017 User input
 
 Having spent some time thinking about user input I finally have a scheme in mind that I am happy with.

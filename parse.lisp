@@ -2,14 +2,14 @@
 
 ;; A lookup between words and their meaning ids
 
-(defparameter *word-id-count* 0)
+(defparameter *word-id-count* nil)
 (defparameter *word-ids* nil)
 (defparameter *id-meanings* nil)
 
 (defun reset-parser ()
   (setf *word-ids* (make-hash-table :test 'equal))
   (setf *id-meanings* (make-hash-table))
-  (setf *word-id-count* 0))
+  (setf *word-id-count* 1))
 
 (defun defword (word &rest synonyms)
   (setf word (symbol-name word))
@@ -43,7 +43,7 @@
   (push-byte 0))
 
 (defun parser ()
-  (label :parse)
+  (label :parse-word)
   (with-namespace :parser
     (alias :word :A0)
     (let ((words (make-array 0 :fill-pointer 0 :adjustable t))
@@ -131,7 +131,7 @@
 
 	   (LDY 0)
 	   
-	   (JSR :parse)
+	   (JSR :parse-word)
 	   (STA.AB :output)
 	   (BRK)
 	   
@@ -160,51 +160,112 @@
 (defword :UP :CLIMB)
 (defword :DOWN :DESCEND)
 (defword :OPERATE :USE)
+(defword :CYLINDER)
+(defword :DOOR)
 
-(defun test (word id)
+(defun test-parse-word (word id)
   (assert (= (parse-test word) id)))
+
+;TODO ensure we don't match DOOR to DESCEND
+
+;(assert (= (parse-test "DOOR") 0))
 
 ;; Test all words in the list
 
-(maphash #'(lambda (k v) (test k v)) *word-ids*)
-#|
-(defun input-parse ()
-  ;;temp storage for position
-  (alias :pos :D0)
+(maphash #'(lambda (k v) (test-parse-word k v)) *word-ids*)
 
-  (LDX 0 "X is our word pointer")
+;; This function will take an input buffer and parse
+;; the words out of it.
 
-  (dc "Clear the parsed words buffer")
-  (dotimes (i *max-words*)
-    (STX.AB (+ (resolve :words) i)))
-	   
-  ;;the input address, but we could make this absolute
-  ;;as we are only ever going to read input from one place
-  (sta16.zp :input '(:parser . :word))
-  (dc "Start at the beginning of the input")
-  (LDY #xff)
-  (label :next)
-  (INY)
-  (TYA)
-  (CMP *max-input-length* "Input buffer end?")
-  (BEQ :done)
-  (dc "Skip to the next word")
-  (LDA.IZY :input)
-  (BEQ :next-char)
-  (dc "We have found a word?")
-  (STY.ZP :pos "Save the position")
-  (JSR :parse)
-  (STA.ABX :words)
-  (INX)
-  (TXA)
-  (CMP *max-words*)
-  (BEQ :done)
-  (LDY.ZP :pos "Restore pointer")
-  (JMP :next)
-	   
-  (label :words)
+(defun parse-words ()
+  (label :parse-input)
+  (with-namespace :parse-input
+    (alias :pos :D0)
+    (LDX 0 "X is our word pointer")
+    (dc "Clear the parsed words buffer")
+    (dotimes (i *max-words*)
+      (STX.AB (+ (resolve :words) i)))
+    ;;the input address, but we could make this absolute
+    ;;as we are only ever going to read input from one place
+    (sta16.zp :input '(:parser . :word))
+    (dc "Start at the beginning of the input")
+    (LDY #xff)
+    (label :next)
+    (INY)
+    (TYA)
+    (CMP *max-input-length* "Input buffer end?")
+    (BEQ :done)
+    (dc "Skip spaces to the next word")
+    (LDA.IZY '(:parser . :word))
+    (BEQ :next)
+    (dc "We have found a word?")
+    (STY.ZP :pos "Save the position")
+    (JSR :parse-word)
+    (STA.ABX :words)
+    (INX)
+    (TXA)
+    (CMP *max-words* "Reached our word limit?")
+    (BEQ :done)
+    (LDY.ZP :pos "Restore pointer")
+    (dc "Find the end of the word")
+    (label :next1)
+    (INY)
+    (TYA)
+    (CMP *max-input-length* "Input buffer end?")
+    (BEQ :done)
+    (LDA.IZY '(:parser . :word))
+    (BNE :next1)
+    (BEQ :next)
+    (label :done)
+    (RTS)
 
-  (dotimes (i *max-words*)
-    (db nil 0))) 
-	 |# 
+    (dc "The parsed words are put here")
+    (dbs :words *max-words*)
+    (dc "The user input buffer")
+    (dbs :input *max-input-length*)))
+
+(defun parse-words-tester (input)
+  (reset-compiler)
+  (reset-symbol-table)
+  
+  (flet ((pass ()
+	   (zeropage)	     
+	   (org #x600)
+	   (CLD)
+	   (label :start)
+	   (JSR :parse-input)
+	   (BRK)
+	   (parser)
+	   (parse-words)
+	   (label :end)))
     
+    (build #'pass))
+
+  ;; install the string into the input buffer
+
+  (loop for c across input
+        for i from 0 to *max-input-length* do       
+       (setf (aref *compiler-buffer* (+ i (resolve '(:parse-input . :input))))
+	     (to-alphabet-pos c)))
+  
+  (monitor-reset #x600)
+  (monitor-run)
+  
+  (coerce (subseq (monitor-buffer)
+		  (resolve '(:parse-input . :words))
+		  (+ -1 (resolve '(:parse-input . :words)) *max-words*))
+	  'list))
+
+(defun test-parse-input (input expected)
+  (format t "Testing ~a~%" input)
+  (loop
+     for e in expected
+     for r in (parse-words-tester input) do
+       (unless (eq '? e)
+	 (assert (equal r (gethash (symbol-name e) *word-ids*))))))
+
+(test-parse-input "OPEN DOOR" '(:OPEN :DOOR))
+(test-parse-input "PUSH CYLINDER" '(:PUSH :CYLINDER))
+(test-parse-input "PRESS CYLINDER" '(:PUSH :CYLINDER))
+(test-parse-input "OPEN FRABJOUS DOOR" '(:OPEN ? :DOOR))
+(test-parse-input "OPEN DOOR CLOSE" '(:OPEN :DOOR :CLOSE))

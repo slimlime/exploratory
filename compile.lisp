@@ -226,6 +226,12 @@
   (dolist (byte bytes)
     (push-byte byte)))
 
+(defun dbs (label count &optional (byte 0))
+  (add-hint count (format nil "DBS (~a)" count))
+  (when label (label label))
+  (dotimes (i count)
+    (push-byte byte)))
+
 (defun dw (label &rest words)
   (add-hint (* 2 (length words))
 	    (format nil "DW ~{$~4,'0X~^, ~}" words))

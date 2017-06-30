@@ -1,3 +1,28 @@
+## 30/6/2017 Words, words everywhere
+
+So now the following unit-tests pass. (Performed in the usual way of assembling the 6502 then running the emulator and seein what output is produced)
+
+~~~~
+
+(test-parse-input "OPEN DOOR" '(:OPEN :DOOR))
+(test-parse-input "PUSH CYLINDER" '(:PUSH :CYLINDER))
+(test-parse-input "PRESS CYLINDER" '(:PUSH :CYLINDER))
+(test-parse-input "OPEN FRABJOUS DOOR" '(:OPEN ? :DOOR))
+(test-parse-input "OPEN DOOR CLOSE" '(:OPEN :DOOR :CLOSE))
+
+~~~~
+
+Now we are in a position to write code like
+
+~~~~
+
+(defsentence '(:CLOSE :DOOR) (response "You slam the door. It falls off its hinges"))
+
+~~~~
+
+The code for the parse is not going to scale well though- it will grow so large the branches will be more than 127 bytes apart. I will fix it when it happens...
+
+
 ## 29/6/2017 Binary Tree Parser
 
 Having abandoned my dreams of some brilliant logic-net where a sequence of occult ANDs, ORs and EORs convert a few bytes of input into a byte that represents a word and all its synonyms, I decided on a binary tree.

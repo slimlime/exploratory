@@ -162,10 +162,13 @@
   (setf (aref *compiler-buffer* *compiler-ptr*) (logand byte #xff))
   (incf *compiler-ptr*))
 
+(defun to-ubyte (sbyte)
+  (if (< sbyte 0)
+      (+ sbyte 256)
+      sbyte))
+
 (defun push-sbyte (byte)
-  (when (< byte 0)
-    (incf byte 256))
-  (push-byte byte))
+  (push-byte (to-ubyte byte)))
 
 (defun push-address (add)
   (if *compiler-final-pass*
@@ -352,11 +355,11 @@
       ;if a number is passed then it is relative
       (push-sbyte label)
       (if *compiler-final-pass*
-	  (multiple-value-bind (addr resolved) (resolve label)
-	    (push-sbyte (if resolved (- addr (1+ *compiler-ptr*))
-			    0)))
+	  (let ((offset (- (resolve label) (1+ *compiler-ptr*))))
+	    (assert (>= offset #x-80) nil "Relative offset is < -#x80")
+	    (assert (<= offset #x7f) nil "Relative offset is > #x7f")
+	    (push-sbyte offset))
 	  (push-sbyte 0))))
-
 
 (defun rel-addr (offset bra-addr)
   (+ 2 bra-addr (if (> offset #x7F)

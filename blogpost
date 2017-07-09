@@ -1,0 +1,291 @@
+#4/7/2017 Making a hash of it
+
+Binary trees are awesome. So symmetrical, it is almost like they are leveraging a basic principle of the universe to achieve magic. At 9 bytes per word, my strategy for parsing was never going to work once I started to add in extra words. Once the distance between the nodes became too great the BCS instructions could no work without a trampoline (128 bytes max). Unfortunately my assembler didn't warn me, and the program was jumping around to random locations. I have added a check into so that the -128, +127 range is asserted rather than just silently building code that doesn't work.
+
+More seriously, I do not want to use 3K to store the parser for just a few hundred words. A hybrid strategy presents itself. My original idea was to use a custom Pearson hash that took words and hashed them to ids, with synonymous words receiving the same id. I am convinced this is possible, but I don't have the brain cycles to figure out how to do it. No matter I thought, I can just make a regular hash-table of 256 entries (which is the maximum number of word-meanings I am going to allow).
+
+The following hash is quite respectable- it uses the first four letters of the word and rotates them to fill up a byte. Hashes usually use some sort of mixing scheme involving multiplication by primes, or tables of random numbers. This scheme uses the full power of 6502.
+
+~~~~
+
+LDA $WORD,Y
+ASL
+INY
+EOR $WORD,Y
+ASL
+INY
+EOR $WORD,Y
+ASL
+INY
+EOR $WORD, Y
+
+~~~~
+
+Read the literature on such schemes. They will tell you that this is rubbish. That is because in the grey towers of academe they have abandoned Yagni for madness. In fact, to be fair they are right, for lots of things, namely cryptography, collisions etc, it is a rubbish scheme. However, we have a static list of words we need to disambiguate and all the processing power we need when compiling, but almost none at runtime. Collisions are a problem, here is a word list...
+
+~~~~
+
+PRESS PUSH PROD POKE
+GET PICK TAKE
+OPEN
+CLOSE SHUT
+SAY SPEAK TELL ASK
+UP CLIMB
+DOWN DESCEND
+OPERATE USE
+CYLINDER
+DOOR
+DOG
+PORSCHE CAR
+STAIRS
+MAXINE SISTER GIRL WOMAN LADY
+TABLE
+EXAMINE LOOK INSPECT
+IN ENTER
+CHAIR SEAT
+CHEEZOWS
+COLA
+COKE
+WOTSITS CHEETOS
+DICE
+FIGURES
+OPENER REMOTE CONTROL
+KEYS KEY
+WINDOW
+WHEEL TIRE TYRE
+STEED HORSE STALLION
+SWORD WEAPON
+SHIELD
+LIGHT BULB
+N NORTH
+S SOUTH
+E EAST
+W WEST
+CHAD CHADRIC CHADRIX IMPERATOR LORD
+I INVENTORY
+
+~~~~
+
+78 words, with a goodly proportion of synonyms. Sadly, this hash gives 24 collisions. (Some words collide with their own synonyms, which is rather serendipitous)
+
+Now we are going to proceed in a scientific manner, by trying things until we get the answer we want. The first thing to do, is add in a fudge factor to each letter.
+
+~~~~
+
+LDA #$FUDGE_1
+LDY 0
+CLC
+ADC $WORD,Y
+ASL
+STA $TMP
+LDA #$FUDGE_2
+INY
+CLC
+ADC $WORD,Y
+EOR $TMP
+ASL
+STA $TMP
+LDA #$FUDGE_3
+INY
+CLC
+ADC $WORD,Y
+EOR $TMP
+ASL
+STA $TMP
+LDA #$FUDGE_4
+CLC
+ADC $WORD, Y
+EOR $TMP
+RTS
+
+~~~~
+
+By brute force we can calculate these fudge factors. Here's some output from the test run...
+
+~~~~
+
+Collisions 6
+ (worst was 44) Fudge Factors (2 1 2 49)
+
+~~~~
+
+A mere six collisions, that's less than 10%! We can disambiguate these collisions by using the binary tree code. So the process is  going to be,
+
+- Calculate a simple hash value using the first four letters
+- Look up the word meaning in a 256 byte table
+- If the value is "0" then call into the binary tree to make a final determination
+
+
+## Negatory
+
+We have four factors we can adjust, but on my Celeriac powered Lenovo, I can't brute force them all in a time less than the age of the universe. What I did try was a few negative numbers, in the range -16 to 16. This produced 4 collisions,
+
+~~~~
+
+CL-USER> (build-hash-table)
+Collisions 4
+ (worst was 46) Fudge Factors (-16 7 5 -15)
+Collisions:(OPENER OPEN CHEETOS CHEEZOWS)
+(-16 7 5 -15)
+
+~~~~
+
+As you can see, this is really 0 collisions, since we only care about the first four letters. The only words that need to be disambiguated are longer than four characters. On the basis of artistic restraint, it is REALLY tempting to make them the same, but I want to put a 'humorous' message in the game if the player tries to TAKE CHEETOS. For copyright reasons, you cannot take the Cheetos. Cheezows on the other hand are perfectly acceptable as I made them up and they are not in any way similar to the other orange maize based snack popular with D&D players.
+
+Five character hash
+
+~~~~
+
+(defun hash (word a b c d)
+  (flet ((g (i) (to-alphabet-pos (elt word i))))
+    (let ((len (length word))
+	  (h (+ (g 0) a)))
+      (when (> len 1) (setf h (logxor (ash h 1) (+ (g 1) b))))
+      (when (> len 2) (setf h (logxor (ash h 1) (+ (g 2) c))))
+      (when (> len 3) (setf h (logxor (ash h 1) (+ (g 3) d))))
+      (when (> len 4) (setf h (logxor h (- 128 (g 4)))))
+      (logand #xff h))))
+
+~~~~
+
+Don't ask where the -128 for the fifth character came from. Just look at the results. Let us call this 'graduate-in-a-box' hashing.
+
+~~~~
+
+CL-USER> (build-hash-table)
+Collisions 0
+ (worst was 42) Fudge Factors (-15 10 -14 -10)
+Collisions:NIL
+(-15 10 -14 -10)
+
+~~~~
+
+Which leaves a quandry, as although this current set of words has no collisions, it no doubt will in the future when I add more words. Theoretically we could come up with a 'perfect-hash' if the number of words is less than 256. For now, I will keep the binary tree disambiguator around as the code is actually working. The other whispered solution is... to let them collide...
+
+#9/6/2017 Some output!
+
+Look at the value of the accumulator, and the value of the word meaning for SWORD. Next will be to make it test every word, then add something that definitely makes a collision and try to disambiguate it with the binary tree code.
+
+~~~~
+
+CL-USER> (hash-test "SWORD")
+PRESS=#x1 (#xF2) PUSH=#x1 (#x80) PROD=#x1 (#x80) POKE=#x1 (#x6D) GET=#x2 (#xF8) 
+PICK=#x2 (#xAF) TAKE=#x2 (#x5) OPEN=#x3 (#x82) CLOSE=#x4 (#x88) SHUT=#x4 (#x6C) 
+SAY=#x5 (#xD) SPEAK=#x5 (#x24) TELL=#x5 (#xEA) ASK=#x5 (#xF) UP=#x6 (#x16) 
+CLIMB=#x6 (#x73) DOWN=#x7 (#xDA) DESCEND=#x7 (#x1C) OPERATE=#x8 (#xF1) USE=#x8 (#xD5) 
+CYLINDER=#x9 (#x5D) DOOR=#xA (#xC6) DOG=#xB (#x1F) PORSCHE=#xC (#x10) CAR=#xC (#xC2) 
+STAIRS=#xD (#x2F) MAXINE=#xE (#x45) SISTER=#xE (#x17) GIRL=#xE (#x86) WOMAN=#xE (#x5F) 
+LADY=#xE (#x27) TABLE=#xF (#x95) EXAMINE=#x10 (#xAA) LOOK=#x10 (#x8F) INSPECT=#x10 (#xC7) 
+IN=#x11 (#xEC) ENTER=#x11 (#x49) CHAIR=#x12 (#x9F) SEAT=#x12 (#xF0) CHEEZOWS=#x13 (#x9B) 
+COLA=#x14 (#xCF) COKE=#x15 (#xC5) WOTSITS=#x16 (#x56) CHEETOS=#x16 (#x91) DICE=#x17 (#xF5) 
+FIGURES=#x18 (#x63) OPENER=#x19 (#xF9) REMOTE=#x19 (#xB3) CONTROL=#x19 (#xA0) KEYS=#x1A (#xC3) 
+KEY=#x1A (#xE5) WINDOW=#x1B (#x87) WHEEL=#x1C (#x69) TIRE=#x1C (#x97) TYRE=#x1C (#x57) 
+STEED=#x1D (#x31) HORSE=#x1D (#xD6) STALLION=#x1D (#xC8) SWORD=#x1E (#xD2) WEAPON=#x1E (#xED) 
+SHIELD=#x1F (#x11) LIGHT=#x20 (#xC4) BULB=#x20 (#xE0) N=#x21 (#xFF) NORTH=#x21 (#xE6) 
+S=#x22 (#x4) SOUTH=#x22 (#x38) E=#x23 (#xF6) EAST=#x23 (#x9C) W=#x24 (#x8) 
+WEST=#x24 (#x7C) CHAD=#x25 (#xF4) CHADRIC=#x25 (#x9A) CHADRIX=#x25 (#x9A) IMPERATOR=#x25 (#x1D) 
+LORD=#x25 (#x7E) I=#x26 (#xFA) INVENTORY=#x26 (#x29) -- Stack ----------------------------------------------------
+01FE  0000 0000 0000 0000 0000 0000 0000 0000 ................
+-- PC -------------------------------------------------------
+0611  0013 170F 1204 001E A200 8E73 068E 7406 ...........s..t.
+0621  8E75 068E 7606 A977 8500 A906 8501 A0FF .u..v..w........
+-------------------------------------------------------------
+                          SV BDIZC
+       PC:0611 SP:1FD  SR:01100101 A:1E X:00 Y:D2
+-------------------------------------------------------------
+             0611 00      BRK
+        WORD 0612 13      DIS "SWORD"
+      OUTPUT 0618 1E      DB $00
+             ;+ PARSER
+       PARSE 0619 A200    LDX #$00           ;X is our word pointer
+30
+
+~~~~
+
+For those of you that like looking at code here is the hash function in LISP, followed by the same function in 6502.
+
+~~~~
+(defun hash (word a b c d)
+  (flet ((g (i) (to-alphabet-pos (elt word i))))
+    (let ((len (length word))		 
+	  (h (+ (g 0) a)))		 
+      (when (> len 1) (setf h (logxor (ash h 1) (+ (g 1) b))))
+      (when (> len 2) (setf h (logxor (ash h 1) (+ (g 2) c))))
+      (when (> len 3) (setf h (logxor (ash h 1) (+ (g 3) d))))
+      (when (> len 4) (setf h (logxor h (- 128 (g 4)))))
+      (logand #xff h))))
+
+             ;+ PARSER
+       PARSE 0619 A200    LDX #$00           ;X is our word pointer
+             ;Clear the parsed words buffer
+             061B 8E7306  STX $0673          ;WORDS
+             061E 8E7406  STX $0674
+             0621 8E7506  STX $0675
+             0624 8E7606  STX $0676
+             0627 A977    LDA #$77           ;LO : INPUT
+             0629 8500    STA $00            ;INP
+             062B A906    LDA #$06           ;HI : INPUT
+             062D 8501    STA $01            ;INP + 1
+PARSE-DIRECT 062F A0FF    LDY #$FF
+        NEXT 0631 C8      INY
+             ;Character 0
+             0632 B100    LDA ($00),Y
+             0634 F038    BEQ $066E          ;END
+             0636 18      CLC
+             0637 69F1    ADC #$F1           ;Fudge 0
+             0639 0A      ASL
+             063A 8509    STA $09
+             ;Character 1
+             063C C8      INY
+             063D B100    LDA ($00),Y
+             063F F02D    BEQ $066E          ;END
+             0641 18      CLC
+             0642 690A    ADC #$0A           ;Fudge 1
+             0644 4509    EOR $09
+             0646 0A      ASL
+             0647 8509    STA $09
+             ;Character 2
+             0649 C8      INY
+             064A B100    LDA ($00),Y
+             064C F020    BEQ $066E          ;END
+             064E 18      CLC
+             064F 69F2    ADC #$F2           ;Fudge 2
+             0651 4509    EOR $09
+             0653 0A      ASL
+             0654 8509    STA $09
+             ;Character 3
+             0656 C8      INY
+             0657 B100    LDA ($00),Y
+             0659 F013    BEQ $066E          ;END
+             065B 18      CLC
+             065C 69F6    ADC #$F6           ;Fudge 3
+             065E 4509    EOR $09
+             0660 8509    STA $09
+             0662 C8      INY
+             0663 B100    LDA ($00),Y
+             0665 F007    BEQ $066E          ;END
+             ;128 - 4 character is xored into the hash
+             0667 A980    LDA #$80
+             0669 38      SEC
+             066A F100    SBC ($00),Y
+             066C 4509    EOR $09
+         END 066E A8      TAY
+             ;Look up the word meaning
+             066F B9A006  LDA $06A0,Y        ;WORD-MEANINGS
+             0672 60      RTS
+             ;The parsed word meanings get put here
+       WORDS 0673 00      DBS (4)
+             ;The user input buffer
+             ;Zero terminated for convenience
+       INPUT 0677 00      DBS (41)
+             ;Table mapping hash values to word meanings
+
+~~~~
+
+Since SBCL (and Common LISP in general) has a disassembler, it is also possible to look at the x86 code produced and do a comparison. Unfortunately for a proper comparison, you would need to declare the types and specify that you wish to have the function optimised by the compiler, then you would see the EOR, ASL etc. Disassembling the unoptimised LISP is just a bunch of very boring loading the stack with parameters then calling generic functions, plus a load of error handling stuff.
+
+
+
+
+
+

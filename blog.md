@@ -1,3 +1,44 @@
+## 10/7/2017 Hybrids are the future
+
+The hybrid hash/binary tree scheme now works. We can now parse sentences into words and the parser for 78 words fits into 512 bytes. With the previous scheme, it would have been over 700, but it would have grown linearly. As I add new words to the dictionary, the hybrid will grow by either 0 bytes if the word hashes to a free slot in the table or 9 bytes if it has to be added to the binary tree. I should mention I have absolutely no idea how existing 8 bit adventure games work and I haven't looked into it either.
+
+## Fast vs Slow
+
+The hash uses four 'fudge-factors' which range between 0 and 255. For a longer build we can brute force the factors to minimise the number of collisions. In the case of the 78 test words, this number can be brought down to zero, in which case the size of the parser is a mere
+
+Because it is boring to wait for this each time I want to test it, there is a quick mode which only scans the full range for one of the fudge factors; we end up with about 12 collisions.
+
+For a final build I will run it overnight on a 24 core machine to find the best factors. I expect this will make a difference as the hash table fills up.
+
+## Resolving collisions
+
+Each word is hashed, and looked up in a table. For words with no collisions, we are all good. If there is a collision between words we know, for example if WOTSITS and STAIRS give the same value we jump into a bit of code like this.
+
+~~~~
+	     ;STAIRS or WOTSITS?
+          11 080F C914    CMP #$14           ;[0] >= T
+             0811 B003    BCS $0816          ;12
+             0813 A90D    LDA #$0D           ;STAIRS
+             0815 60      RTS
+~~~~
+
+The following test cases pass.
+
+~~~~
+
+(test-parse-input "OPEN DOOR" '(:OPEN :DOOR))
+(test-parse-input "PUSH CYLINDER" '(:PUSH :CYLINDER))
+(test-parse-input "PRESS CYLINDER" '(:PUSH :CYLINDER))
+(test-parse-input "OPEN FRABJOUS DOOR" '(:OPEN ? :DOOR))
+(test-parse-input "OPEN DOOR CLOSE" '(:OPEN :DOOR :CLOSE))
+(test-parse-input " OPEN DOOR" '(:OPEN :DOOR))
+(test-parse-input "PUSH  CYLINDER" '(:PUSH :CYLINDER))
+(test-parse-input "PRESS   CYLINDER" '(:PUSH :CYLINDER))
+(test-parse-input "    OPEN  FRABJOUS  DOOR  " '(:OPEN ? :DOOR))
+(test-parse-input "OPEN     DOOR      CLOSE    " '(:OPEN :DOOR :CLOSE))
+
+~~~~
+
 ## 9/7/2017  Some output!
 
 Look at the value of the accumulator, and the value of the word meaning for SWORD. Next will be to make it test every word, then add something that definitely makes a collision and try to disambiguate it with the binary tree code.

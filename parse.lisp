@@ -7,6 +7,7 @@
 (defparameter *id-meanings* nil)
 (defparameter *word-hash-table* (make-array 256))
 (defparameter *hash-fudge-factors* nil)
+(defparameter *word-collisions* nil)
 
 (defparameter *max-input-length* 40)
 (defparameter *max-words* 4)
@@ -49,18 +50,15 @@
        (push-byte (to-alphabet-pos c)))
   (push-byte 0))
 
-;;Binary parser, expects :A0 to contain word buffer
-;;and Y to contain offset.
+;;Binary tree parser to disambiguate words which collide
+;;when hashed. Expects A0 to contain the input buffer and
+;;Y to contain the offset.
 (defun binary-parser ()
   (label :binary-parser)
   (with-namespace :binary-parser
     (alias :word :A0)
-    (let ((words (make-array 0 :fill-pointer 0 :adjustable t))
+    (let ((words (coerce *word-collisions* 'vector))
 	  (label-number 1))
-      (maphash #'(lambda (k v)
-		   (declare (ignorable v))
-		   (vector-push-extend k words))
-	       *word-ids*)
       (setf words (sort words #'string<))
       (dc (format nil "~a" words))
       (labels ((range-or-word (i j)
@@ -104,9 +102,6 @@
 				 (INY))
 			       (LDA.IZY :word)
 			       (setf y k))
-
-			     
-			     
 			     (CMP (1+ (to-alphabet-pos (letter split k)))
 				  (format nil "[~a] >= ~a" k
 					  (code-char 
@@ -161,7 +156,6 @@
 (defword :I :INVENTORY)
 
 (defun hash (word a b c d)
-  ;(declare (optimize (speed 3) (safety 0) (debug 0)))
   (flet ((g (i) (to-alphabet-pos (elt word i))))
     (let ((len (length word))
 	  (h (+ (g 0) a)))
@@ -202,15 +196,17 @@
     (declare (ignorable hashes collisions))
     collision-count))
 
-(defun build-hash-table ()
+(defun build-hash-table (&optional (quick t))
   ;(declare (optimize (speed 3) (safety 0) (debug 0)))
   (let ((max 0)
 	(min 9999)
-	(r nil))
-    (loop for a from -16 to 16 do
-	 (loop for b from -16 to 16 do
-	      (loop for c from -16 to 16 do
-		   (loop for d from -16 to 16 do
+	(r nil)
+	(low (if quick 0 -16))
+	(hi (if quick 0 16)))
+    (loop for a from low to hi do
+	 (loop for b from low to hi do
+	      (loop for c from low to hi do
+		   (loop for d from low to 255 do
 			(let ((l (count-collisions a b c d)))
 			  (when (> l max)
 			    (setf max l))
@@ -222,6 +218,7 @@
 	(apply 'build-table r)
       (declare (ignorable collision-count))
       (format t "Collisions:~a" collisions)
+      (setf *word-collisions* collisions)
       ;;fill the word meaning table with values
       (maphash #'(lambda (k v)
 		   (setf (aref *word-hash-table* k)
@@ -244,17 +241,19 @@
   (with-namespace :parser
     (alias :pos :D0)
     (alias :tmp :D1)
+    (alias :word-start :D2)
     (alias :inp :A0)
+    ;;store our input address so we can use zp indexing
+    (sta16.zp :input :inp)
+    (label :parse-direct)
     (LDX 0 "X is our word pointer")
     (dc "Clear the parsed words buffer")
     (dotimes (i *max-words*)
       (STX.AB (+ (resolve :words) i)))
-    ;;store our input address so we can use zp indexing
-    (sta16.zp :input :inp)
-    (label :parse-direct)
     (LDY #xff)
     (label :next)
     (INY)
+    (STY.ZP :word-start "Store position in-case of collision")
     ;;Now try to build up a hash for the word. Stop when
     ;;we get to a space or end of line etc.
     ;;Buffer is zero terminated so we can't overrun
@@ -263,7 +262,6 @@
     (BEQ :end)
     (CLC)
     (ADC (to-ubyte (aref *hash-fudge-factors* 0)) "Fudge 0")
-    (ASL)
     (STA.ZP :tmp)
     (dc "Character 1")
     (INY)
@@ -271,8 +269,8 @@
     (BEQ :end)
     (CLC)
     (ADC (to-ubyte (aref *hash-fudge-factors* 1)) "Fudge 1")
+    (ASL.ZP :tmp)
     (EOR.ZP :tmp)
-    (ASL)
     (STA.ZP :tmp)
     (dc "Character 2")
     (INY)
@@ -280,8 +278,8 @@
     (BEQ :end)
     (CLC)
     (ADC (to-ubyte (aref *hash-fudge-factors* 2)) "Fudge 2")
+    (ASL.ZP :tmp)
     (EOR.ZP :tmp)
-    (ASL)
     (STA.ZP :tmp)
     (dc "Character 3")
     (INY)
@@ -289,6 +287,7 @@
     (BEQ :end)
     (CLC)
     (ADC (to-ubyte (aref *hash-fudge-factors* 3)) "Fudge 3")
+    (ASL.ZP :tmp)
     (EOR.ZP :tmp)
     (STA.ZP :tmp)
     (INY)
@@ -299,28 +298,55 @@
     (SEC)
     (SBC.IZY :inp)
     (EOR.ZP :tmp)
+    (STA.ZP :tmp)
     (label :end)
-    (TAY)
+    (LDY.ZP :tmp)
     (dc "Look up the word meaning")
     (LDA.ABY :word-meanings)
+    (BNE :store-result)
+    (dc "Colliding word, lets have a go with")
+    (dc "the binary parser to resolve it")
+    (LDY.ZP :word-start)
+    (JSR :binary-parser)
+    ;;the binary parser isn't too fussy about where it
+    ;;stops. This could probably be improved.
+    (STA.ZP :tmp)
+    (LDY.ZP :word-start)
+    (dc "Advance to the next space")
+    (label :seek-space)
+    (INY)
+    (LDA.IZY :inp)
+    (BNE :seek-space)
+    (LDA.ZP :tmp)    
+    (dc "Store the word and look for another")
+    (label :store-result)
+    (STA.ABX :words)
+    (INX)
+    (TXA)
+    (CMP *max-words*)
+    (BNE :next)
     (RTS)
     
     (dc "The parsed word meanings get put here")
     (dbs :words *max-words*)
     (dc "The user input buffer")
-    (dc "Zero terminated for convenience")
-    (dbs :input (1+ *max-input-length*))
+    (dc "Terminated with many zeroes for convenience.")
+    (dbs :input (+ *max-words* *max-input-length*))
     (dc "Table mapping hash values to word meanings")
     (apply 'db :word-meanings (coerce *word-hash-table* 'list))))
 
 (defun dump-words ()
   (let ((i 0))
     (maphash #'(lambda (k v)
-		 (format t "~a=#x~x (#x~x) " k v (apply 'hash k
-						     (coerce *hash-fudge-factors* 'list)))
+		 (format t "~a=#x~x (#x~x) " k v
+			 (apply 'hash k
+				(coerce *hash-fudge-factors* 'list)))
 		 (when (zerop (mod (incf i) 5))
 		   (terpri)))
-	     *word-ids*)))
+	     *word-ids*))
+  (print "Collisions:")
+  (print *word-collisions*)
+  (values))
 
 (defun build-hash-test (pass)
   (funcall pass)
@@ -339,18 +365,16 @@
 	   (CLD)
 
 	   (sta16.zp :word '(:parser . :inp))
-
-	   (LDY 0)
 	   
 	   (JSR '(:parser . :parse-direct))
-	   (STA.AB :output)
+
 	   (BRK)
 	   
 	   (dis :word word)
-
-	   (db :output 0)
+	   (db nil 0 0 0 0 0)
 	   
 	   (parser)
+	   (binary-parser)
 	   
 	   (label :end)))
     
@@ -361,9 +385,18 @@
   (monitor-reset #x600)
   (monitor-run)
   
-  (aref (monitor-buffer) (resolve :output)))
+  (aref (monitor-buffer) (resolve '(:parser . :words))))
 
+(defun test-hash-word (word id &optional (hash-only nil))
+  (assert (= (hash-test word)
+	     (if (and hash-only (find word *word-collisions*))
+		 0 id))
+	  nil
+	  (format nil "The word ~a hashed to the wrong value" word)))
+  
+;; Test all words in the list
 
+(maphash #'(lambda (k v) (test-hash-word k v)) *word-ids*)
     
 #|
 (defun parse-words ()

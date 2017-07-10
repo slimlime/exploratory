@@ -4,7 +4,7 @@ The hybrid hash/binary tree scheme now works. We can now parse sentences into wo
 
 ## Fast vs Slow
 
-The hash uses four 'fudge-factors' which range between 0 and 255. For a longer build we can brute force the factors to minimise the number of collisions. In the case of the 78 test words, this number can be brought down to zero, in which case the size of the parser is a mere
+The hash uses four 'fudge-factors' which range between 0 and 255. For a longer build we can brute force the factors to minimise the number of collisions. In the case of the 78 test words, this number can be brought down to zero, in which case the size of the parser is smaller.
 
 Because it is boring to wait for this each time I want to test it, there is a quick mode which only scans the full range for one of the fudge factors; we end up with about 12 collisions.
 

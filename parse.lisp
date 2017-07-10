@@ -303,6 +303,7 @@
     (LDY.ZP :tmp)
     (dc "Look up the word meaning")
     (LDA.ABY :word-meanings)
+    (STA.ZP :tmp)
     (BNE :store-result)
     (dc "Colliding word, lets have a go with")
     (dc "the binary parser to resolve it")
@@ -311,15 +312,15 @@
     ;;the binary parser isn't too fussy about where it
     ;;stops. This could probably be improved.
     (STA.ZP :tmp)
+    (label :store-result)
     (LDY.ZP :word-start)
     (dc "Advance to the next space")
     (label :seek-space)
     (INY)
     (LDA.IZY :inp)
     (BNE :seek-space)
-    (LDA.ZP :tmp)    
+    (LDA.ZP :tmp) 
     (dc "Store the word and look for another")
-    (label :store-result)
     (STA.ABX :words)
     (INX)
     (TXA)
@@ -396,57 +397,9 @@
   
 ;; Test all words in the list
 
+(build-hash-table t)
+
 (maphash #'(lambda (k v) (test-hash-word k v)) *word-ids*)
-    
-#|
-(defun parse-words ()
-  (label :parse-input)
-  (with-namespace :parse-input
-    (alias :pos :D0)
-    (LDX 0 "X is our word pointer")
-    (dc "Clear the parsed words buffer")
-    (dotimes (i *max-words*)
-      (STX.AB (+ (resolve :words) i)))
-    ;;the input address, but we could make this absolute
-    ;;as we are only ever going to read input from one place
-    (sta16.zp :input '(:parser . :word))
-    (dc "Start at the beginning of the input")
-    (LDY #xff)
-    (label :next)
-    (INY)
-    (TYA)
-    (CMP *max-input-length* "Input buffer end?")
-    (BEQ :done)
-    (dc "Skip spaces to the next word")
-    (LDA.IZY '(:parser . :word))
-    (BEQ :next)
-    (dc "We have found a word?")
-    (STY.ZP :pos "Save the position")
-    (JSR :parse-word)
-    (STA.ABX :words)
-    (INX)
-    (TXA)
-    (CMP *max-words* "Reached our word limit?")
-    (BEQ :done)
-    (LDY.ZP :pos "Restore pointer")
-    (dc "Find the end of the word")
-    (label :next1)
-    (INY)
-    (TYA)
-    (CMP *max-input-length* "Input buffer end?")
-    (BEQ :done)
-    (LDA.IZY '(:parser . :word))
-    (BNE :next1)
-    (BEQ :next)
-    (label :done)
-    (RTS)))
-
-
-|#
-
-
-    
-#|
 
 (defun parse-words-tester (input)
   (reset-compiler)
@@ -457,68 +410,28 @@
 	   (org #x600)
 	   (CLD)
 	   (label :start)
-	   (JSR :parse-input)
+	   (JSR :parse)
 	   (BRK)
 	   (parser)
-	   (parse-words)
+	   (binary-parser)
 	   (label :end)))
     
-    (build #'pass))
+    (build-hash-test #'pass))
 
   ;; install the string into the input buffer
 
   (loop for c across input
         for i from 0 to *max-input-length* do       
-       (setf (aref *compiler-buffer* (+ i (resolve '(:parse-input . :input))))
+       (setf (aref *compiler-buffer* (+ i (resolve '(:parser . :input))))
 	     (to-alphabet-pos c)))
   
   (monitor-reset #x600)
   (monitor-run)
   
   (coerce (subseq (monitor-buffer)
-		  (resolve '(:parse-input . :words))
-		  (+ -1 (resolve '(:parse-input . :words)) *max-words*))
+		  (resolve '(:parser . :words))
+		  (+ -1 (resolve '(:parser . :words)) *max-words*))
 	  'list))
-
-
-(defun build-parse-test (pass)
-  (funcall pass)
-  (build-symbol-table)
-  (funcall pass)
-  (setf *compiler-final-pass* t)
-  (funcall pass))
-
-(defun parse-test (word)
-  (reset-compiler)
-  (reset-symbol-table)
-  
-  (flet ((pass ()
-	   (zeropage)	     
-	   (org #x600)
-	   (CLD)
-
-	   (sta16.zp :word '(:binary-parser . :word))
-
-	   (LDY 0)
-	   
-	   (JSR :parse-word)
-	   (STA.AB :output)
-	   (BRK)
-	   
-	   (dis :word word)
-
-	   (db :output 0)
-	   
-	   (binary-parser)
-	   
-	   (label :end)))
-    
-    (build #'pass))
-  
-  (monitor-reset #x600)
-  (monitor-run)
-  
-  (aref (monitor-buffer) (resolve :output)))
 
 
 (defun test-parse-input (input expected)
@@ -529,25 +442,8 @@
        (unless (eq '? e)
 	 (assert (equal r (gethash (symbol-name e) *word-ids*))))))
 
-;(test-parse-input "OPEN DOOR" '(:OPEN :DOOR))
-;(test-parse-input "PUSH CYLINDER" '(:PUSH :CYLINDER))
-;(test-parse-input "PRESS CYLINDER" '(:PUSH :CYLINDER))
-;(test-parse-input "OPEN FRABJOUS DOOR" '(:OPEN ? :DOOR))
-;(test-parse-input "OPEN DOOR CLOSE" '(:OPEN :DOOR :CLOSE))
-
-(defun test-parse-word (word id)
-  (assert (= (parse-test word) id)))
-
-;TODO ensure we don't match DOOR to DESCEND
-
-;(assert (= (parse-test "DOOR") 0))
-
-;; Test all words in the list
-
-;(maphash #'(lambda (k v) (test-parse-word k v)) *word-ids*)
-;(maphash #'(lambda (k v) (print (list k v))) *word-ids*)
-
-;; This function will take an input buffer and parse
-;; the words out of it.
-
-|#
+(test-parse-input "OPEN DOOR" '(:OPEN :DOOR))
+(test-parse-input "PUSH CYLINDER" '(:PUSH :CYLINDER))
+(test-parse-input "PRESS CYLINDER" '(:PUSH :CYLINDER))
+(test-parse-input "OPEN FRABJOUS DOOR" '(:OPEN ? :DOOR))
+(test-parse-input "OPEN DOOR CLOSE" '(:OPEN :DOOR :CLOSE))

@@ -206,7 +206,7 @@
     (loop for a from low to hi do
 	 (loop for b from low to hi do
 	      (loop for c from low to hi do
-		   (loop for d from low to 255 do
+		   (loop for d from low to hi do
 			(let ((l (count-collisions a b c d)))
 			  (when (> l max)
 			    (setf max l))
@@ -307,15 +307,16 @@
     (LDX.ZP :tmp)
     (dc "Look up the word meaning")
     (LDA.ABX :word-meanings)
-    (BNE :store-result)
-    (dc "Colliding word, lets have a go with")
-    (dc "the binary parser to resolve it")
-    (LDY.ZP :word-start)
-    (JSR :binary-parser)
-    (dc "Since the binary parser isn't too fussy about")
-    (dc "where it stops, rewind back to the beginning")
-    (dc "of the word before we look for the next space")
-    (LDY.ZP :word-start)
+    (when *word-collisions*
+      (BNE :store-result)
+      (dc "Colliding word, lets have a go with")
+      (dc "the binary parser to resolve it")
+      (LDY.ZP :word-start)
+      (JSR :binary-parser)
+      (dc "Since the binary parser isn't too fussy about")
+      (dc "where it stops, rewind back to the beginning")
+      (dc "of the word before we look for the next space")
+      (LDY.ZP :word-start))
     (label :store-result)
     (LDX.ZP :word-index)
     (STA.ABX :words)
@@ -384,7 +385,8 @@
 	   (db nil 0 0 0 0 0)
 	   
 	   (parser)
-	   (binary-parser)
+	   (when *word-collisions*
+	     (binary-parser))
 	   
 	   (label :end)))
     
@@ -422,7 +424,8 @@
 	   (JSR :parse)
 	   (BRK)
 	   (parser)
-	   (binary-parser)
+	   (when *word-collisions*
+	     (binary-parser))
 	   (label :end)))
     
     (build-hash-test #'pass))

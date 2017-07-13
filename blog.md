@@ -1,3 +1,112 @@
+## 13/7/2017 Dispatches
+
+So we have seen earlier how we can parse a string into words and collapse down synonyms. Once we have done this we need to do something with the result. This is dispatching. When the user types OPEN DOOR, we want something to happen. Probably a message plus setting a bit which represents the door state.
+
+We can define a handler for a sentence like this
+
+~~~~
+(defsentence '(OPEN DOOR) :open-door :room)
+~~~~
+
+The dispatcher will now now to call the machine code at the label :open-door. I suspect I shall have to concatenate the label with the room to avoid clashing. After all there may be many doors.
+
+The dispatcher uses tables, each location can define a set of handlers which will be called when the player is in that location. If no match is found in the location table, then a generic table is used. The tables are zero-terminated lists of 5-byte entries. The first three bytes are the word ids, with 0 used as a wild-card. The following two bytes contain the address of the handler, offset by one and in the highly irregular hi-lo order. This is so we can use the RTS trick to jump to the handler,
+
+Here is the disassembly for the dispatcher. It's so simple, yet I think it will serve well enough for most of the gameplay.
+
+~~~~
+
+       START 0601 A95F    LDA #$5F           ;LO : DISPATCHER:ROOM
+             0603 850F    STA $0F            ;LOCATION-DISPATCH-TABLE
+             0605 A906    LDA #$06           ;HI : DISPATCHER:ROOM
+             0607 8510    STA $10            ;LOCATION-DISPATCH-TABLE + 1
+             0609 209206  JSR $0692          ;PARSE
+             060C 201006  JSR $0610          ;DISPATCH
+             060F 00      BRK
+             ;+ DISPATCHER
+    DISPATCH 0610 A902    LDA #$02
+             0612 850A    STA $0A
+             ;Choose the location based table
+             0614 A50F    LDA $0F            ;LOCATION-DISPATCH-TABLE
+             0616 8500    STA $00            ;DISPATCH-TABLE
+             0618 A510    LDA $10            ;LOCATION-DISPATCH-TABLE + 1
+             061A 8501    STA $01            ;DISPATCH-TABLE + 1
+    DISPATCH 061C A000    LDY #$00
+             061E B100    LDA ($00),Y
+             ;Is this the last entry in the dispatch table?
+             0620 D00F    BNE $0631          ;COMPARE-WORD
+             0622 C60A    DEC $0A
+             ;We only try 2 tables, then return
+             0624 D001    BNE $0627          ;TRY-GENERIC
+             0626 60      RTS
+             ;Choose the generic table
+ TRY-GENERIC 0627 A96F    LDA #$6F           ;LO : GENERIC
+             0629 8500    STA $00            ;DISPATCH-TABLE
+             062B A906    LDA #$06           ;HI : GENERIC
+             062D 8501    STA $01            ;DISPATCH-TABLE + 1
+             062F A000    LDY #$00
+COMPARE-WORD 0631 A200    LDX #$00
+   NEXT-WORD 0633 B100    LDA ($00),Y
+             0635 F005    BEQ $063C          ;MATCHED-WORD ;0 always matches
+             0637 DD1A07  CMP $071A,X        ;WORDS
+             063A D006    BNE $0642          ;NEXT-INPUT-WORD
+             ;Great work kid, now match another one.
+MATCHED-WORD 063C C8      INY
+             063D 98      TYA
+             063E C903    CMP #$03
+             0640 F015    BEQ $0657          ;MATCHED-SENTENCE
+T-INPUT-WORD 0642 E8      INX
+             0643 8A      TXA
+             0644 C904    CMP #$04
+             0646 D0EB    BNE $0633          ;NEXT-WORD
+             ;We exhausted the input words
+             ;Skip to next entry in dispatch table
+NEXT-HANDLER 0648 18      CLC
+             0649 A500    LDA $00            ;DISPATCH-TABLE
+             064B 6905    ADC #$05
+             064D 8500    STA $00            ;DISPATCH-TABLE
+             064F A501    LDA $01            ;DISPATCH-TABLE + 1
+             0651 6900    ADC #$00
+             0653 8501    STA $01            ;DISPATCH-TABLE + 1
+             ;Assume the carry is clear after long add
+             0655 90C5    BCC $061C          ;DISPATCH
+             ;Push the dispatch address on the stack
+HED-SENTENCE 0657 B100    LDA ($00),Y
+             0659 48      PHA
+             065A C8      INY
+             065B B100    LDA ($00),Y
+             065D 48      PHA
+             ;Call the handler, which will return to the top-level caller
+             065E 60      RTS
+
+~~~~
+
+Table example showing different handlers,
+
+~~~~
+	     ;(OPEN DOOR ?) -> OPEN-DOOR
+        ROOM 065F 03      DB $03, $0A, $00, $06, $8B
+             ;(CLOSE DOOR ?) -> CLOSE-DOOR
+             0664 04      DB $04, $0A, $00, $06, $8A
+             ;(TAKE CHEEZOWS ?) -> TAKE-CHEEZOWS
+             0669 02      DB $02, $13, $00, $06, $84
+             ;Terminating byte for ROOM
+             066E 00      DB $00
+             ;GENERIC dispatch table
+             ;(INVENTORY ? ?) -> INVENTORY
+     GENERIC 066F 26      DB $26, $00, $00, $06, $8E
+             ;(TAKE ? ?) -> TAKE
+             0674 02      DB $02, $00, $00, $06, $8D
+             ;(DROP ? ?) -> DROP
+             0679 27      DB $27, $00, $00, $06, $8C
+             ;Terminating byte for GENERIC
+             067E 00      DB $00
+             ;VOID dispatch table
+             ;(? ? ?) -> NIHIL
+        VOID 067F 00      DB $00, $00, $00, $06, $8F
+             ;Terminating byte for VOID
+~~~~
+
 ## 10/7/2017 Hybrids are the future
 
 The hybrid hash/binary tree scheme now works. We can now parse sentences into words and the parser for 78 words fits into 512 bytes. With the previous scheme, it would have been over 700, but it would have grown linearly. As I add new words to the dictionary, the hybrid will grow by either 0 bytes if the word hashes to a free slot in the table or 9 bytes if it has to be added to the binary tree. I should mention I have absolutely no idea how existing 8 bit adventure games work and I haven't looked into it either.

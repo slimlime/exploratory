@@ -1,3 +1,35 @@
+## 14/7/2017 YAGNI wreaks his terrible wrath once more
+
+I have spent two hours writing some code that cunningly arranges for individual bits of game state to be stored inside real bits, which live in bytes. Very elegant, I even had a some code to generate comments to describe the state packed into each bit. Then I had a sudden realisation. The code to test a bit is 5 bytes, and to set it is 8 (not counting the branches).
+
+~~~~
+	;Test bit 2 @ 5678
+	LDA $5678
+	AND #$2
+	BEQ ...
+	
+	;Set bit 2 @ 5678
+	LDA $5678
+	ORA #$2
+	STA $5678
+	
+~~~~~
+
+But if I used a whole byte to store the bit, it's 3 and 5. Thus by not saving myself a byte, I have saved myself 2 and 3 bytes. Who on Earth thinks of callsite cost? I have to admit I shook my head and thought "this cannot be right!", but it is. If the state is in the game, then it must be gotten and set at least once.
+
+This is a much better, but it means I do have to delete all the fancy code I wrote to pack bits and do fancy shifting etc. And if you look at the best instruction to use to test this state you will see that Yagni has a sense of humour, if not a sense of aesthetics.
+
+~~~~
+	;Test 5678
+	BIT $5678
+	BVS ...
+	
+	;Set 5678
+	LDA #XFF
+	STA $5678
+	
+~~~~
+
 ## 13/7/2017 Dispatches
 
 So we have seen earlier how we can parse a string into words and collapse down synonyms. Once we have done this we need to do something with the result. This is dispatching. When the user types OPEN DOOR, we want something to happen. Probably a message plus setting a bit which represents the door state.

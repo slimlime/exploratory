@@ -14,12 +14,14 @@
 (defparameter *compiler-comments* nil)
 (defparameter *compiler-postfix-comments* nil)
 (defparameter *compiler-label-namespace* nil)
+(defparameter *compiler-namespace-depth* 0)
 
 ; todo A way of providing a 'spare byte/word' to the compile
 ; which can then be used later e.g.
 
 ; (unused-b addr) - tell the compiler this byte is spare
 ; (use-b :label)  - tell the compiler to use the next spare byte for a label
+; YAGGERS until we are out of memory!
 
 ; WIBNI
 ; Assert if final page jump bug
@@ -36,6 +38,7 @@
   (setf *compiler-comments* (make-hash-table))
   (setf *compiler-postfix-comments* (make-hash-table))
   (setf *compiler-zp-free-slot* 0)
+  (setf *compiler-namespace-depth* 0)
   (values))
 
 (defmacro defop (byte opcode &optional (mode :imp))
@@ -80,6 +83,9 @@
 (defun peek-byte (add)
   (assert-address add)
   (aref *compiler-buffer* add))
+
+(defun peek-last-byte ()
+  (peek-byte (1- *compiler-ptr*)))
 
 (defun resolve (arg &key (no-assert nil))
   (if (numberp arg)
@@ -250,19 +256,22 @@
        (push-byte (char-code c)))
   (push-byte 0))
 
-(defun dc (comment &optional (postfix nil))
+(defun dc-1 (comment ptr postfix)
   (when *compiler-final-pass*
     (when *compiler-debug*
       (print comment))
     (let ((*compiler-comments* (if postfix
 				   *compiler-postfix-comments*
 				   *compiler-comments*)))
-      (let ((comments (gethash *compiler-ptr* *compiler-comments*)))
+      (let ((comments (gethash ptr *compiler-comments*)))
 	(if comments
 	    (unless (member comment comments :test 'equal)
-	      (setf (gethash *compiler-ptr* *compiler-comments*)
+	      (setf (gethash ptr *compiler-comments*)
 		    (cons comment comments)))
-	    (setf (gethash *compiler-ptr* *compiler-comments*) (list comment)))))))
+	    (setf (gethash ptr *compiler-comments*) (list comment)))))))
+
+(defun dc (comment &optional (postfix nil))
+  (dc-1 comment *compiler-ptr* postfix))
 
 (defun fmt-label (label &optional (namespace-p nil))
   (if (consp label)
@@ -317,12 +326,29 @@
   "In the scope of the macro, define labels in the namespace
    Label resolution will be done preferentially in this namespace
    but will fall back to the global namespace if not found"
-  (let ((ns (gensym)))
-  `(let* ((,ns ,namespace)
-	  (*compiler-label-namespace* ,ns))
-     (dc (format nil "+ ~a" ,ns))
-     ,@body
-     (dc (format nil "- ~a" ,ns)))))
+  (let ((ns (gensym))
+	(ptr (gensym))
+	(str (gensym)))
+    `(let* ((,ns ,namespace)
+	    (*compiler-label-namespace* ,ns)
+	    (,ptr *compiler-ptr*)
+	    (,str (make-string *compiler-namespace-depth* :initial-element #\ )))
+       (incf *compiler-namespace-depth*)
+       ,@body
+       (decf *compiler-namespace-depth*)
+       (when (and ,ns (/= *compiler-ptr* ,ptr)) ;;only emit comments if we actually did something
+	 (dc-1 (format nil "~a  { ~a" ,str ,ns) ,ptr nil)
+	 ;;todo, place the following comment on the line below
+	 ;;will need to use the disassembler to determine how many
+	 ;;bytes should be added.
+	 (dc-1 (format nil "~a  } ~a" ,str ,ns) *compiler-ptr* nil)))))
+
+(defmacro with-local-namespace (comment-name &body body)
+  "All labels in this scope will resolve to the instantation
+   at the current location"
+  `(with-namespace (format nil "~a @ $~4,'0X" ,comment-name ;;(caar (sb-debug:list-backtrace))
+			   *compiler-ptr*)
+     ,@body))
 
 (defun dump-aliases ()
   (maphash #'(lambda (k v) (format t "~a -> ~a~%" (fmt-label k t) v)) *compiler-aliases*))
@@ -484,3 +510,39 @@
 	       (format t "~45,1T;~a" comment))
 	     (terpri))
 	   (values)))))
+
+;;e.g. CL-USER> (disassemble-6502-to-list #x600 #x610)
+;; ((LDA :IMM 1) (STA :ZP 0) (LDA :IMM 0) (STA :ZP 1) (INC :ZP 0) (BNE :REL 2)
+;; (INC :ZP 1) (BRK :IMP) (BRK :IMP) (BRK :IMP))
+
+(defun disassemble-6502-to-list (start end &key (buffer nil))
+  (when (null buffer) (setf buffer *compiler-buffer*))
+  (let ((output nil)
+	(*compiler-final-pass* t))
+    (setf start (resolve start))
+    (setf end (resolve end))
+    (loop for i from start to end do
+	 (let* ((opcode (gethash (aref buffer i) *reverse-opcodes*))
+		(mode (cdr opcode))
+		(op (car opcode))
+		(arg1 (aref buffer (+ 1 i)))
+		(arg2 (aref buffer (+ 2 i))))
+	   (let* ((hint (gethash i *compiler-disassembler-hints*)))
+	     (if (and hint (numberp (car hint)))
+		 (incf i (1- (car hint)))
+		 (labels ((format-1 () (push (list op mode arg1) output) (incf i))
+			  (format-2 () (push (list op mode arg1 arg2) output) (incf i 2)))
+		   (case mode
+		     (:imm (format-1))
+		     (:rel (format-1))
+		     (:imp (push (list op mode) output))
+		     (:ab (format-2))
+		     (:zp (format-1))
+		     (:ind (format-2))
+		     (:izx (format-1))
+		     (:izy (format-1))
+		     (:zpx (format-1))
+		     (:zpy (format-1))
+		     (:aby (format-2))
+		     (:abx (format-2))))))))
+    (nreverse output)))

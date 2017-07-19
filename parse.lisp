@@ -658,7 +658,9 @@
 (assert (not (dispatch-tester "OPEN DOOR" :void :open-door)))
 (assert (not (dispatch-tester "CLOSE DOOR" :void :close-door)))
 (assert (not (dispatch-tester "TAKE CHEEZOWS" :void :take-cheezows)))
+(assert (dispatch-tester "TAKE CHEEZOWS" :void :take))
 (assert (dispatch-tester "TAKE ELEPHANT" :void :take))
 (assert (not (dispatch-tester "GET CHEEZOWS" :void :take-cheezows)))
+(assert (dispatch-tester "GET CHEEZOWS" :void :take))
 (assert (dispatch-tester "DROP MONKEY" :void :drop))
 

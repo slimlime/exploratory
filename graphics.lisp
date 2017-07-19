@@ -18,6 +18,10 @@
   ;; Self contained functions can just use them
   ;; as they see fit.
 
+  ;; TODO move this to a more general place, and have
+  ;; it execute some code on start up to initialize
+  ;; values.
+  
   (zp-w :A0)
   (zp-w :A1)
   (zp-w :A2)

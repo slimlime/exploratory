@@ -1,15 +1,10 @@
-;todo nested namespaces?
-;todo local function instance namespaces
-;the difficulty is identifying the instance
-;of the macro next time round. If we assume
-;that all instances are seen in the first
-;pass we could keep a counter. 
-
 (defun inc16.zp (label)
   "Increment a zero-page word"
-  (INC.ZP (lo-add label))
-  (BNE 2)
-  (INC.ZP (hi-add label)))
+  (with-local-namespace "inc16.zp"
+    (INC.ZP (lo-add label))
+    (BNE :inc16-done)
+    (INC.ZP (hi-add label))
+    (label :inc16-done)))
 
 (defun sub16.zp (value zp)
   "Subtract a 16 bit value from a zero-page word"
@@ -150,7 +145,8 @@
 (defun test-mul10 ()
   (dotimes (v 26)
     (reset-compiler)
-    
+    ;;Note, can get away with one pass as there
+    ;;are no labels etc.
     (ORG #x600)
 
     (LDA v)
@@ -164,3 +160,26 @@
 	(funcall *monitor-get-state*)
       (declare (ignore buffer pc sp sr x y))
       (assert (= a (* v 10))))))
+
+(defun test-inc16 (v)
+  (reset-compiler)
+
+  (flet ((src ()
+	   (org #x600)
+
+	   (zp-w :word)
+	   (sta16.zp v :word)
+	   (inc16.zp :word)
+	   (BRK)))
+    (reset-compiler)
+    (src)
+    (setf *compiler-final-pass* t)
+    (src))
+  
+  (monitor-reset #x600)
+  (monitor-run :print nil)
+
+  (let ((buf (monitor-buffer)))
+    (assert (= (+ (aref buf (lo-add :word))
+		 (* 256 (aref buf (hi-add :word))))
+	    (1+ v)))))

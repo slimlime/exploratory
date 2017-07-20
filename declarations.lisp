@@ -12,7 +12,9 @@
     `(let ((namespace *compiler-label-namespace*))
        (let ((,bitsym ,bit))
 	 (with-local-namespace (format nil "IF ~a" ,bitsym)
-	   (BIT.AB ,bitsym)
+	   (if (resolves-to-zpg ,bitsym)
+	       (BIT.ZP ,bitsym)
+	       (BIT.AB ,bitsym))
 	   (BVC ,(if else-supplied-p :else :endif))
 	   (let ((,then-addr *compiler-ptr*))
 	     (declare (ignorable ,then-addr))
@@ -30,19 +32,6 @@
 		    (with-namespace namespace
 		      ,else)))
 	     (label :endif)))))))
-  
-(defun response (input message &key (location *current-location*))
-  (assert location)
-  (let* ((label (list location input message))
-	 (string-label (cons :string label)))
-    (dc (format nil "In ~a, ~a -> ~a" location input message))
-    (label label)
-    (sta16.zp string-label :live-message-addr)
-    (JMP :live-message)
-    (dcs string-label message)
-    (defsentence input label location)))
-
-;;conditional response
 
 (defun test-ifbit (is-set expected test-fn)
 
@@ -151,3 +140,57 @@
 			 (LDA 4)
 			 (CLC)
 			 (ADC 1)))))
+
+;;true, has return
+
+(test-ifbit t 5
+	    #'(lambda ()
+		(JSR :test)
+		(JMP :test-end)
+		(label :test)
+		(ifbit :bit
+		       (progn (LDA 5)
+			      (RTS))
+		       (progn (LDA 6)
+			      (RTS)))
+		(label :test-end)))
+
+;;false, has return
+
+(test-ifbit nil 6
+	    #'(lambda ()
+		(JSR :test)
+		(JMP :test-end)
+		(label :test)
+		(ifbit :bit
+		       (progn (LDA 5)
+			      (RTS))
+		       (progn (LDA 6)
+			      (RTS)))
+		(label :test-end)))
+
+;;test zpg true / false, note override of parameter zpgbit
+
+(test-ifbit nil 5
+	    #'(lambda ()
+		(zp-b :zpgbit)
+		(LDA #xFF)
+		(STA.ZP :zpgbit)
+		(ifbit :zpgbit
+		       (progn
+			 (LDA 4)
+			 (CLC)
+			 (ADC 1))
+		       (LDA 55))))
+
+(test-ifbit nil 55
+	    #'(lambda ()
+		(zp-b :zpgbit)
+		(LDA.ZP #x00)
+		(STA.ZP :zpgbit)
+		(ifbit :zpgbit
+		       (progn
+			 (LDA 4)
+			 (CLC)
+			 (ADC 1))
+		       (LDA 55))))

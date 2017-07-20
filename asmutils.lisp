@@ -41,6 +41,17 @@
   (LDA.ZP (hi-add from))
   (STA.ZP (hi-add to)))
 
+;;TODO Pretty sure we can work out whether this is ab or zp
+;;out since the
+;;parameters are fixed.
+
+(defun cpy16.abzp (from to)
+  "Copy a word to another using A"
+  (LDA.AB (lo-add from))
+  (STA.ZP (lo-add to))
+  (LDA.AB (hi-add from))
+  (STA.ZP (hi-add to)))
+
 (defun sta16.zp (addr zpg)
   "Load an address into a zero page word"
   (LDA (lo addr))

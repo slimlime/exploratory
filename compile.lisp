@@ -126,6 +126,11 @@
     (declare (ignorable addr))
     resolves))
 
+(defun resolves-to-zpg (label)
+  (and
+   (resolves label)
+   (< (resolve label :no-assert t) 256)))
+
 (defun hexdump (add &optional (len 32))
   (unless (numberp add)
     (setf add (resolve add)))

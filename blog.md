@@ -1,3 +1,85 @@
+## 20/7/2017 If I had a hammer
+
+# Code analysis
+
+We can now disassemble portions of the program as we are building it, and use the information to decide what instructions to emit. We define what effects a particular mnemonic has like so,
+
+~~~~
+(add-effects 'ADC '(S V Z C))
+(add-effects 'AND '(S Z))
+(add-effects 'ASL '(S Z C))
+~~~~
+
+and then we can make a call in the lisp like this to decide, e.g. if a flag has been modified. We use this knowledge in the if macro described below to decide if we can omit the CLV instruction prior to a branch-on-overflow. More complex code analysis could surely be done if required, for example, this being LISP the letters S V Z C etc don't actually mean anything, they are just symbols. It would be simple to add the registers that are affected and also track the state of flags after various operations like CLV or SEC.
+
+This code checks to see if the overflow flag has potentially changed between some earlier address and now. If not, we don't need to reset the flag, thus saving a precious byte.
+
+~~~~
+(if (code-affects-flag 'V address (1- *compiler-ptr*))
+~~~~
+
+# If statement technology
+
+A macro that tests the state of a byte in memory and inlines the handlers for the true and false case. It handles cases where there is no else clause, where the byte to test is on the zero-page and also does code analysis to reduce its footprint. In addition to checking the user code for flag modification, it also checks to see if the else clause is reachable. If there is an RTS in the final position of the then clause, no code is emitted to skip the else clause.
+
+~~~~
+
+(ifbit :bit
+	(progn
+		(LDA 4)
+        	(CLC)
+		(ADC 1))
+	(LDA 6))
+	
+~~~~
+
+generates this assembly,
+
+~~~~
+             ;    { IF BIT @ $0602
+             0602 2C1506  BIT $0615          ;BIT
+             0605 5008    BVC $060F          ;ELSE
+             0607 A904    LDA #$04
+             0609 18      CLC
+             060A 6901    ADC #$01
+             060C B8      CLV
+             060D 5002    BVC $0611          ;ENDIF
+        ELSE 060F A906    LDA #$06
+             ;    } IF BIT @ $0602
+       ENDIF 0611 
+~~~~
+
+
+# Local namespaces
+
+Local namespaces allow us to use the same label for multiple instantiations of a function. This was previously thought impossible, but new research has proven that it was staring me in the face all along. I had thought that I would have to do something fancy involving finding the filename and line where the code was called (using some non-portable feature of SBCL) but this is not necessary. It turns out we have a line number- it is simply the current position of the compiler output in memory. So when we enter a local instance of a function, we simply declare it in a namespace that contains the address of the function. Here is some example code. It contains three invocations of the inc16 function. You can see the different namespaces being entered and left with the + and - comments.
+
+~~~~
+
+0600 A905    LDA #$05
+             0602 8500    STA $00            ;WORD
+             0604 A900    LDA #$00
+             0606 8501    STA $01            ;WORD + 1
+             ;+ inc16.zp @ $0608
+             0608 E600    INC $00            ;WORD
+             060A D002    BNE $060E          ;INC16-DONE
+             060C E601    INC $01            ;WORD + 1
+             ;- inc16.zp @ $0608
+  INC16-DONE 060E 00      BRK
+             ;+ inc16.zp @ $060F
+             060F E600    INC $00            ;WORD
+             0611 D002    BNE $0615          ;INC16-DONE
+             0613 E601    INC $01            ;WORD + 1
+             ;- inc16.zp @ $060F
+             ;+ inc16.zp @ $0615
+  INC16-DONE 0615 E600    INC $00            ;WORD
+             0617 D002    BNE $061B          ;INC16-DONE
+             0619 E601    INC $01            ;WORD + 1
+             ;- inc16.zp @ $0615
+  INC16-DONE 061B 00      BRK                ;WORD ;WORD + 1
+  
+  ~~~~
+
 ## 14/7/2017 YAGNI wreaks his terrible wrath once more
 
 I have spent two hours writing some code that cunningly arranges for individual bits of game state to be stored inside real bits, which live in bytes. Very elegant, I even had a some code to generate comments to describe the state packed into each bit. Then I had a sudden realisation. The code to test a bit is 5 bytes, and to set it is 8 (not counting the branches).

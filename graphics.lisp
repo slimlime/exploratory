@@ -193,7 +193,7 @@
 
 	  (apply #'db (nreverse lo))
 	  (apply #'db (nreverse hi))))))
-
+  
   (label :typeset)
   
   (with-namespace :typeset

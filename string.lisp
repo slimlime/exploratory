@@ -7,6 +7,11 @@
 (defparameter *symbol-table* nil)
 (defparameter *processed-strings* nil)
 (defparameter *compiled-strings* nil)
+(defparameter *string-table* nil)
+
+;;this string table is basically a hash look-up of strings
+;;to addresses, which should be valid on the final pass
+(defparameter *string-table* nil)
 
 (defun add-to-word-table (str)
   (let ((count (gethash str *word-table*)))
@@ -33,6 +38,7 @@
   (setf *symbol-table* nil)
   (setf *processed-strings* nil)
   (setf *word-table* (make-hash-table :test 'equal))
+  (setf *string-table* (make-hash-table :test 'equal))
   ;; Adding newline now means it will be in a predictable
   ;; location, namely 1
   (process-string (string #\Newline)))
@@ -131,7 +137,7 @@
 ; assembler commands
 
 (defun dcs (label str)
-  "Define compressed string"
+  "Define compressed string and inline it here"
   (let ((address *compiler-ptr*))
     (if *symbol-table*
 	;;if the string table is built, emit the string and supply
@@ -148,10 +154,42 @@
 	    (add-hint len (format nil "DCS '~a'" str))
 	    (encode-string str #'(lambda (i word)
 				   (declare (ignore word))
-				   (push-byte i)))))
+				   (push-byte i)))
+	    (setf (gethash str *string-table*) address)))
 	;;in the first pass, add the string to the table
 	(process-string str))
     address))
+
+(defun dstr (str)
+  "Define a compressed string and inline it later"
+  (if *symbol-table*
+      (if *compiler-final-pass*
+	  (let ((address (gethash str *string-table*)))
+	    (if address
+		;;we know the address of the string, so
+		;;return it.
+		address
+		(progn
+		  ;;add it to the hashtable so we know
+		  ;;we need to actually put it in the
+		  ;;memory at some point.
+		  (setf (gethash str *string-table*) 0)
+		  0)))
+	  (progn
+	    (process-string str)
+	    (push str *strings-for-string-table*)
+	    0))))
+
+(defun string-table ()
+  (let ((strings nil))
+    (maphash #'(lambda (str address)
+		 (declare (ignorable address))
+		 (push str strings))
+	     *string-table*)
+    (dc "String Table ~a entries" (length strings))
+    (dolist (str strings)
+      (dcs nil str))))
+	       
 
 (defun emit-char-label (c)
   (format nil "EMIT-~a" c))

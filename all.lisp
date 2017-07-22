@@ -21,4 +21,4 @@
   (bload "parse.lisp")
   (bload "location.lisp")
   (bload "analysis.lisp")
-  (bload "declaration.lisp"))
+  (bload "declarations.lisp"))

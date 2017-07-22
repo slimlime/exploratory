@@ -33,6 +33,36 @@
 		      ,else)))
 	     (label :endif)))))))
 
+(defmacro nifbit (bit then &optional (else nil else-supplied-p))
+  (if else-supplied-p
+      `(ifbit ,bit ,else ,then)
+      (let ((bitsym (gensym)))
+	`(let ((namespace *compiler-label-namespace*))
+	   (let ((,bitsym ,bit))
+	     (with-local-namespace (format nil "NIF ~a" ,bitsym)
+	       (if (resolves-to-zpg ,bitsym)
+		   (BIT.ZP ,bitsym)
+		   (BIT.AB ,bitsym))
+	       (BVS :endif)
+	       (with-namespace namespace
+		 ,then)
+	       (label :endif)))))))
+
+(defun response-1 (msg)
+  ;;todo check for strings that don't fit.
+  (JSR :print-message)
+  (dc (format nil "-> ~a" msg) t)
+  (dw (if (stringp msg)
+	  (dstr msg)
+	  msg)))
+
+;;Display upto 4 lines of message
+(defun response (msg1 &optional msg2 msg3 msg4)
+  (response-1 msg1)
+  (when msg2 (response-1 msg2))
+  (when msg3 (response-1 msg3))
+  (when msg4 (response-1 msg4)))
+   
 (defun test-ifbit (is-set expected test-fn)
 
   (reset-compiler)
@@ -194,3 +224,25 @@
 			 (CLC)
 			 (ADC 1))
 		       (LDA 55))))
+
+;; test nifbit
+
+(test-ifbit nil 5
+	     #'(lambda ()
+		 (nifbit :bit
+			 (LDA 5))))
+(test-ifbit t 42
+	     #'(lambda ()
+		 (nifbit :bit
+			 (LDA 5))))
+
+(test-ifbit nil 5
+	     #'(lambda ()
+		 (nifbit :bit
+			 (LDA 5)
+			 (LDA 6))))
+(test-ifbit t 6
+	     #'(lambda ()
+		 (nifbit :bit
+			 (LDA 5)
+			 (LDA 6))))

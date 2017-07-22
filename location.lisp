@@ -26,11 +26,12 @@
 	       (* +screen-width-bytes+ *line-height*))
   (RTS))
 
-(defun live-message (cstr)
-  (label :live-message)
-  (JSR :scroll-text)
-  (sta16.zp cstr '(:typeset-cs . :str))
-  (sta16.zp (scradd (live-row 3) 0) '(:typeset . :raster))
+(defun call-typeset (str font line)
+  ;;this is in reality a terrible way to call it
+  ;;as it takes so many bytes, this is just for testing
+  (sta16.zp (cons :font font) :font)
+  (sta16.zp str '(:typeset-cs . :str))
+  (sta16.zp (scradd line 0) '(:typeset . :raster))
   (JSR :typeset-cs))
 				      
 (defun dloc (name title img-file img-align text
@@ -39,7 +40,7 @@
     (label :draw)
     (dc (format nil "Draw ~a (~a)" title name))
     (cls colour)
-    (sta16.zp :font font)
+    (sta16.zp (cons :font font) :font)
     (call-typeset :title font 0)
     (call-typeset :text font (+ 1 *line-height*))
     ;; todo get image width and height from file
@@ -76,7 +77,7 @@
 	   (call-typeset "User input"
 			 :past (+ 3 (* 17 *line-height*)))
 
-	   (JSR :scroll-text)
+	   ;;(JSR :scroll-text)
 
 	   (BRK)
 

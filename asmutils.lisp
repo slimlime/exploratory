@@ -1,10 +1,10 @@
 (defun inc16.zp (label)
   "Increment a zero-page word"
-  (with-local-namespace "inc16.zp"
-    (INC.ZP (lo-add label))
-    (BNE :inc16-done)
-    (INC.ZP (hi-add label))
-    (label :inc16-done)))
+  (INC.ZP (lo-add label))
+  ;;Once local namespaces are really working then
+  ;;we can use a label here
+  (BNE 2)
+  (INC.ZP (hi-add label)))
 
 (defun sub16.zp (value zp)
   "Subtract a 16 bit value from a zero-page word"
@@ -181,7 +181,12 @@
 	   (zp-w :word)
 	   (sta16.zp v :word)
 	   (inc16.zp :word)
-	   (BRK)))
+	   (BRK)
+
+	   (inc16.zp :word)
+	   (inc16.zp :word)
+
+	   ))
     (reset-compiler)
     (src)
     (setf *compiler-final-pass* t)

@@ -348,6 +348,9 @@
 	 ;;bytes should be added.
 	 (dc-1 (format nil "~a  } ~a" ,str ,ns) *compiler-ptr* nil)))))
 
+;;TODO we really need to be able to resolve in the stack of namespaces
+;;or this is pretty useless as passed in labels don't resolve to their
+;;parent scopes
 (defmacro with-local-namespace (comment-name &body body)
   "All labels in this scope will resolve to the instantation
    at the current location"

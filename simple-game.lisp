@@ -18,13 +18,86 @@
 ;; TODO make a file called 'declarations' or somesuch, with
 ;; defloc, defresponse etc
 
+;; TODO dcs should intern strings, we should ensure that when we
+;;      pass strings anywhere literally, they should be checked
+;;      against existing strings.
 
 (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/Downloads/cellardoor.bmp" :right
       "You are in the dungeon prison of Wangband underneath the fortress of the Black Wizard, Beelzepops. Home to stench-rats, were-toads, sniveling goblins and you. Of the current denizens, you are currently the most wretched. Surrounding you is a slime that reminds you of lime pudding, if lime pudding had hundreds of eyes and made a rasping, wheezing sound as it oozed out of the cracks in the wall. You must escape.")
 
-
 (with-location :dungeon-cell
-  (response '(EXAMINE WALL) "Millions of sad eyes gaze at you from the wall slime")
+  (action '(EXAMINE SLIME)
+	  (respond "Millions of sad eyes gaze at you from slime.")
+	  (nifbit :key-in-crack
+		  (respond "They seem to be staring at a crack in the floor.")))
+  
+  (action '(EXAMINE WALL)
+	  (respond "The wall oozes with unpleasant smelling slime."))
+  
+  (action '(EXAMINE FLOOR)
+	  (respond "There is a crack in the floor.")
+	  (ifbit :key-in-crack
+		 (respond "Perhaps it bears further examination?")))
+  
+  (action '(EXAMINE CRACK)
+	  (setbit :crack-examined)
+	  (ifbit :key-in-crack
+		 (respond "A glint of metal shines back at you from the crack."
+			  "A key!")
+		 (respond "A crack in the floor, just like any other crack"
+			  "One might hide a small object here, perhaps a key?")))
+  
+  (action '(TAKE KEY)
+	  (ifbit :crack-examined
+		 (ifbit :key-in-crack
+			(progn
+			  (respond "You take the shiny key.")
+			  (clrbit :key-in-crack))
+			(respond "It's in your pocket..."
+				 "Perhaps the dungeon air is getting to you?"))
+		 (respond "What key? Do you know something I don't?")))
+  
+  (action '(EXAMINE DOOR)
+	  (ifbit :door-open
+		 (respond "The door is open.")
+		 (ifbit :door-locked
+			(respond "The door is locked.")
+			(respond "The door is closed."))))
+
+  (action '(UNLOCK DOOR)
+	  (ifbit :door-locked
+		 (ifbit :key-in-crack
+			(respond "With what? Your finger?")
+			(progn
+			  (clrbit :door-locked)
+			  (respond "The lock mechanism clicks...")))
+		 (respond "The door is already locked."
+			  "Have you been licking the slime? It's hallucinogenic.")))
+
+  (action '(LICK SLIME)
+	  (ifbit :slime-licked
+		 (progn
+		   (setbit :slime-licked)
+		   (respond "Millions of colours flash in geometric patterns"
+			    "before your eyes. Space and time warp as"
+			    "Maia's cosmic tears rain down on you."
+			    "You have a strange urge to grow a beard and play guitar."))
+		 (respond "Nothing happens. Your third eye is already open.")))
+		 
+  (action '(OPEN DOOR)
+	  (ifbit :door-open
+		 (respond "The door is already open.")
+		 (ifbit :door-locked
+			(respond "The door is locked.")
+			(progn
+			  (respond "The door creaks open.")
+			  (setbit :door-locked))))))))
+
+(with-location :generic
+  (action '(TAKE KEY)
+	  (nifbit :key-in-crack
+		  (respond "You already have the key!"
+			   "Perhaps the dungeon air is getting to you."))))
   
   
 

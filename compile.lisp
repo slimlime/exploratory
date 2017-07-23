@@ -15,6 +15,7 @@
 (defparameter *compiler-postfix-comments* nil)
 (defparameter *compiler-label-namespace* nil)
 (defparameter *compiler-namespace-depth* 0)
+(defparameter *compiler-namespace-stack* nil)
 
 ; todo A way of providing a 'spare byte/word' to the compile
 ; which can then be used later e.g.
@@ -39,6 +40,7 @@
   (setf *compiler-postfix-comments* (make-hash-table))
   (setf *compiler-zp-free-slot* 0)
   (setf *compiler-namespace-depth* 0)
+  (setf *compiler-namespace-stack* nil)
   (values))
 
 (defmacro defop (byte opcode &optional (mode :imp))
@@ -90,35 +92,40 @@
 (defun resolve (arg &key (no-assert nil))
   (if (numberp arg)
       (values arg t)
-      (let ((addr nil))
-	;; if there is an alias, then resolve that to a label first
-	(let ((aliased-label (gethash 
-			      (if (consp arg)
-				  arg
-				  (cons *compiler-label-namespace* arg))
-			      *compiler-aliases*)))
-	  (if aliased-label
-	      ;; use the aliased label with the namespace
-	      ;; it was applied with, ignore the current namespace
-	      (setf addr (gethash aliased-label *compiler-labels*))
-	      ;; otherwise try the label in the current namespace
-	      ;; followed by the global namespace
+      (let ((addr nil)
+	    (alias nil))
+	;;look for an alias
+	(if (consp arg)
+	    ;;for a qualified alias we just resolve
+	    (setf alias (gethash arg *compiler-aliases*))
+	    ;;otherwise, go up the nested stack of namespaces
+	    (dolist (ns *compiler-namespace-stack*)
+	      (setf alias (gethash (cons ns arg) *compiler-aliases*))
+	      (when alias (return))))
+	;;we have found an alias, which should give a fully qualified
+	;;label we can immediately resolve
+	(setf addr (gethash alias *compiler-labels*))
+	(unless addr
+	  (if (consp arg)
+	      ;;for a qualified label we just resolve
+	      (setf addr (gethash arg *compiler-labels*))
+	      ;;otherwise go up the nested stack of namespaces
 	      (progn
-		(when *compiler-label-namespace*
-		  (setf addr (gethash (cons *compiler-label-namespace* arg)
-				      *compiler-labels*)))
-		;; if no match try again in the global namespace
+		(dolist (ns *compiler-namespace-stack*)
+		  (setf addr (gethash (cons ns arg) *compiler-labels*))
+		  (when addr (return)))
 		(unless addr
-		  (setf addr (gethash arg *compiler-labels*)))))
-	  ;; on the first pass only, allow
-	  ;; labels to be null (resolve to 0 if so)
-	  (when (and (null addr)
-		     (null no-assert)
-		     *compiler-final-pass*)
-	    (assert nil nil (format nil "The label ~a was not resolved (aliased-label [~a])" arg aliased-label)))
-	  (if addr
-	      (values addr t)
-	      (values 0 nil))))))
+		  ;;finally, check in the global namespace
+		  (setf addr (gethash arg *compiler-labels*))))))
+	;; on the first pass only, allow
+	;; labels to be null (resolve to 0 if so)
+	(when (and (null addr)
+		   (null no-assert)
+		   *compiler-final-pass*)
+	  (assert nil nil (format nil "The label ~a was not resolved (aliased to ~a)" arg alias)))
+	(if addr
+	    (values addr t)
+	    (values 0 nil)))))
 
 (defun resolves (label)
   (multiple-value-bind (addr resolves)
@@ -229,8 +236,14 @@
 
 (defun alias (alias label)
   (assert (not (numberp alias)))
-  (when *compiler-label-namespace*
-    (setf alias (cons *compiler-label-namespace* alias)))
+  (unless (consp alias)
+    (when *compiler-label-namespace*
+      (setf alias (cons *compiler-label-namespace* alias))))
+  (unless (consp label)
+    ;; now try to find which label we are actually talking about
+    (dolist (ns *compiler-namespace-stack*)
+      (when (gethash (cons ns label) *compiler-labels*)
+	(setf label (cons ns label)))))
   (setf (gethash alias *compiler-aliases*) label))
 
 (defun db (label &rest bytes)
@@ -335,11 +348,14 @@
 	(ptr (gensym))
 	(str (gensym)))
     `(let* ((,ns ,namespace)
+	    ;;could get rid of this namespace as it is just the car of the stack
 	    (*compiler-label-namespace* ,ns)
 	    (,ptr *compiler-ptr*)
 	    (,str (make-string *compiler-namespace-depth* :initial-element #\ )))
        (incf *compiler-namespace-depth*)
+       (push ,ns *compiler-namespace-stack*)
        ,@body
+       (pop *compiler-namespace-stack*)
        (decf *compiler-namespace-depth*)
        (when (and ,ns (/= *compiler-ptr* ,ptr)) ;;only emit comments if we actually did something
 	 (dc-1 (format nil "~a  { ~a" ,str ,ns) ,ptr nil)

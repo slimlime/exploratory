@@ -1,10 +1,10 @@
 (defun inc16.zp (label)
   "Increment a zero-page word"
-  (INC.ZP (lo-add label))
-  ;;Once local namespaces are really working then
-  ;;we can use a label here
-  (BNE 2)
-  (INC.ZP (hi-add label)))
+  (with-local-namespace "inc16.zp"
+    (INC.ZP (lo-add label))
+    (BNE :inc16-done)
+    (INC.ZP (hi-add label))
+    (label :inc16-done)))
 
 (defun sub16.zp (value zp)
   "Subtract a 16 bit value from a zero-page word"
@@ -199,3 +199,24 @@
     (assert (= (+ (aref buf (lo-add :word))
 		 (* 256 (aref buf (hi-add :word))))
 	    (1+ v)))))
+
+(defun test-nested-namespace ()
+  ;; this should just not generate a failed to
+  ;; resolve exception
+  (reset-compiler)
+  
+  (flet ((src ()
+	   (org #x600)
+	   (zp-w :word)
+	   (with-namespace :fred
+	     (alias :localname :word)
+	     ;; without nested namespace resolution
+	     ;; localname wouldn't resolve.
+	     (inc16.zp :localname))))
+    (reset-compiler)
+    (src)
+    (setf *compiler-final-pass* t)
+    (src)))
+
+(test-nested-namespace)
+

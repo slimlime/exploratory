@@ -1,3 +1,19 @@
+## 22/7/2017 Layout test
+
+The layout I enivsage for the game will be slightly different than some traditional adventure games. There will be some text for a location (which may change wholesale, depending on state) followed by four lines of 'live' text, which contain
+
+- echoed user input
+- events, e.g. Time passes
+- responses The door swings open.
+
+Image can be any size, but it will stay in the top right for now. Moving it to the top left occasionally proved tricky since the text rendering algorithm would have to do more work at run-time than for the ragged-right case. Here is the layout. I feel like putting some sort of decoration between the location text and the image.
+
+![Alt text](/blog/layout-test.png)
+
+## Problems
+
+Local namespaces don't work particularly well. They were needed specifically to implement the ifbit, however the inc16.zp instruction which uses it fails when it is passed a label in an enclosing namespace which isn't the global namespace. This was never going to work as the resolve function only ever checks the current namespace followed by the global namespace if it cannot resolve the label first time round. For this to work in a properly general way we would need to try nested label resolution. Since we don't need it for anything else, I simply reverted the code for inc16 to use an absolute offset.
+
 ## 20/7/2017 If I had a hammer
 
 # Code analysis

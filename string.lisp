@@ -48,7 +48,8 @@
 	(len 0))
     (maphash #'(lambda (k v)
 		 (incf len)
-		 (push (cons k v) wordlist)) *word-table*)
+		 (push (cons k v) wordlist))
+	     *word-table*)
     (let ((words (make-array len)))
       (dotimes (i len)
 	(setf (aref words i) (pop wordlist)))
@@ -151,7 +152,7 @@
 				   (incf len)))
 	    (when *compiler-final-pass*
 	      (push (cons *compiler-ptr* str) *compiled-strings*))
-	    (add-hint len (format nil "DCS '~a'" str))
+	    (add-hint len (format nil "DCS '~a' (~a->~a)" str (length str) len))
 	    (encode-string str #'(lambda (i word)
 				   (declare (ignore word))
 				   (push-byte i)))
@@ -163,22 +164,22 @@
 (defun dstr (str)
   "Define a compressed string and inline it later"
   (if *symbol-table*
-      (if *compiler-final-pass*
-	  (let ((address (gethash str *string-table*)))
-	    (if address
-		;;we know the address of the string, so
-		;;return it.
-		address
-		(progn
-		  ;;add it to the hashtable so we know
-		  ;;we need to actually put it in the
-		  ;;memory at some point.
-		  (setf (gethash str *string-table*) 0)
-		  0)))
-	  (progn
-	    (process-string str)
-	    (push str *strings-for-string-table*)
-	    0))))
+      (let ((address (gethash str *string-table*)))
+	(if address
+	    ;;we know the address of the string, so
+	    ;;return it.
+	    address
+	    (progn
+	      ;;add it to the hashtable so we know
+	      ;;we need to actually put it in the
+	      ;;memory at some point.
+	      (setf (gethash str *string-table*) 0)
+	      0)))
+      (progn
+	;;just process the string so we can generate the
+	;;compression table
+	(process-string str)
+	0)))
 
 (defun string-table ()
   (let ((strings nil))
@@ -186,10 +187,9 @@
 		 (declare (ignorable address))
 		 (push str strings))
 	     *string-table*)
-    (dc "String Table ~a entries" (length strings))
+    (dc (format nil "String Table ~a entries" (length strings)))
     (dolist (str strings)
       (dcs nil str))))
-	       
 
 (defun emit-char-label (c)
   (format nil "EMIT-~a" c))

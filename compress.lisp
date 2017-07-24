@@ -201,7 +201,6 @@
   (assert (= 0 (mod w 8)))
   (assert (= 0 (mod h 8)))
   (with-namespace :decompress
-    (print img-align)
     ;;we don't really need to emit this much assembly for the call
     (let ((offset (if (eq img-align :right)
 		      (+ (/ +screen-width+ 8) (- (/ w 8)))

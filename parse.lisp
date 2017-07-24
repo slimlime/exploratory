@@ -23,15 +23,17 @@
   (setf *handlers* (make-hash-table)))
   
 (defun defword (word &rest synonyms)
-  (setf word (symbol-name word))
-  (assert (null (gethash word *word-ids*)))
-  (setf (gethash word *word-ids*) *word-id-count*)
-  (setf (gethash *word-id-count* *id-meanings*) word)
-  (dolist (synonym synonyms)
-    (setf synonym (symbol-name synonym))
-    (assert (null (gethash synonym *word-ids*)))
-    (setf (gethash synonym *word-ids*) *word-id-count*))
-  (incf *word-id-count*))
+  ;;don't do anything once the table has already been built
+  (unless *hash-fudge-factors*
+    (setf word (symbol-name word))
+    (assert (null (gethash word *word-ids*)) nil (format nil "~a already in dictionary" word))
+    (setf (gethash word *word-ids*) *word-id-count*)
+    (setf (gethash *word-id-count* *id-meanings*) word)
+    (dolist (synonym synonyms)
+      (setf synonym (symbol-name synonym))
+      (assert (null (gethash synonym *word-ids*)))
+      (setf (gethash synonym *word-ids*) *word-id-count*))
+    (incf *word-id-count*)))
 
 (defun to-alphabet-pos (char)
   (let ((code (1+ (- (char-code (char-upcase char))

@@ -1,10 +1,54 @@
 ;; Here are the functions which will be used to declare the game data
 
 (defparameter *current-location* nil)
+(defparameter *bits* nil)
+
+(defun reset-bits ()
+  (setf *bits* (make-hash-table :test 'equal)))
+
+(defun defbit (bit initially-set &optional (namespace *current-location*))
+  (setf (gethash (cons namespace bit) *bits*) initially-set))
+
+(defun bit-table ()
+  (dc "Bit table")
+  (let ((bits nil))
+  (maphash #'(lambda (bit initially-set)
+	       (push (list
+		      (format nil "~a" (if (consp (car bit)) ""))
+		      bit
+		      initially-set)
+		     bits))
+	   *bits*)
+  (let ((ns nil))
+    (dolist (bit (sort bits #'string< :key #'car))
+      (when (not (equal ns (first bit)))
+	(setf ns (first bit))
+	(dc (format nil "Bits for ~a" ns)))
+      (db (second bit) (if (third bit) #xff #x00))))))
+
+(defun defbits (initially-set &rest bits)
+  (dolist (bit bits)
+    (defbit bit initially-set)))
+
+(defun setbit (bit &optional set)
+  (if set
+      (progn
+	(LDA #xFF)
+	;;todo this is very susceptible to code analysis...
+	;;it is entirely possible it may be already set
+	;;to the value we want
+	(STA.AB bit))
+      (progn
+	(LDA #x00)
+	(STA.AB bit))))
+
+(defun clrbit (bit)
+  (setbit bit nil))
 
 (defmacro with-location (location &body body)
   `(let ((*current-location* ,location))
-     ,@body))
+     (with-namespace *current-location*
+       ,@body)))
 
 (defmacro ifbit (bit then &optional (else nil else-supplied-p))
   (let ((bitsym (gensym))
@@ -48,21 +92,30 @@
 		 ,then)
 	       (label :endif)))))))
 
-(defun response-1 (msg)
-  ;;todo check for strings that don't fit.
+(defun respond-1 (msg)
+  ;;todo check for strings that don't fit the screen width
   (JSR :print-message)
   (dc (format nil "-> ~a" msg) t)
-  (dw (if (stringp msg)
-	  (dstr msg)
-	  msg)))
+  (dw nil (if (stringp msg)
+	      (dstr msg)
+	      msg)))
 
 ;;Display upto 4 lines of message
-(defun response (msg1 &optional msg2 msg3 msg4)
-  (response-1 msg1)
-  (when msg2 (response-1 msg2))
-  (when msg3 (response-1 msg3))
-  (when msg4 (response-1 msg4)))
-   
+(defun respond (msg1 &optional msg2 msg3 msg4)
+  (respond-1 msg1)
+  (when msg2 (respond-1 msg2))
+  (when msg3 (respond-1 msg3))
+  (when msg4 (respond-1 msg4)))
+
+;;define a handler for the provided sentence
+(defmacro action (words &body body)
+  (let ((words-sym (gensym)))
+    `(progn
+       (let ((,words-sym ,words))
+	 (dc (format nil "~a -> ~a" ,words-sym ',body))
+	 (defsentence ,words-sym (format nil "~a" ,words-sym) *current-location*)
+	 ,@body))))
+
 (defun test-ifbit (is-set expected test-fn)
 
   (reset-compiler)
@@ -91,7 +144,7 @@
     (setf *compiler-final-pass* t)
     (src))
 
-  (disassemble-6502 :start :end)
+  ;;(disassemble-6502 :start :end)
   
   (monitor-reset #x600)
   (monitor-run :print nil)

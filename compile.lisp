@@ -112,6 +112,7 @@
 	      ;;otherwise go up the nested stack of namespaces
 	      (progn
 		(dolist (ns *compiler-namespace-stack*)
+		  ;;(format t "Checking ~a:~a~%" ns arg)
 		  (setf addr (gethash (cons ns arg) *compiler-labels*))
 		  (when addr (return)))
 		(unless addr
@@ -122,7 +123,7 @@
 	(when (and (null addr)
 		   (null no-assert)
 		   *compiler-final-pass*)
-	  (assert nil nil (format nil "The label ~a was not resolved (aliased to ~a)" arg alias)))
+	  (assert nil nil (format nil "The label ~a was not resolved (aliased to ~a, in namespace ~a)" arg alias *compiler-label-namespace*)))
 	(if addr
 	    (values addr t)
 	    (values 0 nil)))))

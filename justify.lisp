@@ -46,37 +46,39 @@
 		    do
 		      (vector-push-extend (aref s i) w)
 		      (incf i))
-		 ;gobble up spaces
+		 ;;gobble up spaces
 		 (loop while (and (< i len)
 				  (is-space (aref s i)))
 		    do
 		      (incf i))
 		 (if (> (length w) 0) w nil))))
-      (let ((spc (funcall width " "))
-	    (js (make-array 16 :element-type 'standard-char
+      (let ((js (make-array 16 :element-type 'standard-char
 			    :fill-pointer 0
-			    :adjustable t)))
-	(let ((hyphenated nil))
-	  (loop while t do
-	       (let ((w (next-word)))
-		 (unless w
-		   (return))
-		 (let* ((dx (funcall width w))
-			(fits (<= (+ dx x) (funcall sw y))))
-		   (if fits
-		       (progn
-			 (unless (or (= x 0) hyphenated)
-			   (vector-push-extend #\  js))
-			 (unless hyphenated
-			   (incf x dx)))
-		       (progn
-			 (vector-push-extend #\Newline js)
-			 (setf x dx)
-			 (incf y dy)))
-		   (incf x spc)
-		   (loop for c across w do
-			(vector-push-extend c js)))
-		 (setf hyphenated (eq #\- (last-char w))))))
+			    :adjustable t))
+	    (w nil)
+	    (word-without-space nil))
+	(loop while t do
+	     (let ((next-word (next-word)))
+	       (unless next-word
+		 (return))
+	       (setf word-without-space next-word)
+	       (if (or (= 0 x) (eq #\- (last-char w)))
+		   (setf w next-word)
+		   (setf w (concatenate 'string " " next-word))))
+	     (let ((dx (funcall width w)))
+	       ;;if the word fits, put it in
+	       ;;if not, go to the next line and put it in
+	       (if (<= (+ x dx) (funcall sw y))
+		   (progn
+		     (loop for c across w do
+			  (vector-push-extend c js))
+		     (incf x dx))
+		   (progn
+		     (vector-push-extend #\Newline js)
+		     (loop for c across word-without-space do
+			  (vector-push-extend c js))
+		     (setf x (funcall width word-without-space))
+		     (incf y dy)))))
 	  js))))
 
 (defun justify-with-image (s imgw imgh font)
@@ -111,6 +113,13 @@ chars")
 (justify-test "Hy-p yes" "Hy-p yes")
 (justify-test "Wrap then fil" "Wrap
 then fil")
+(justify-test "Hy-p nine" "Hy-p
+nine")
+(justify-test "a-b a-bjl" "a-b a-
+bjl")
+(justify-test "a-b a-bj" "a-b a-bj")
+;;TODO make this one pass
+;;(justify-test "Hyp- Nos" "Hyp- Nos")
 
 
 

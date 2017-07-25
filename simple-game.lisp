@@ -1,3 +1,4 @@
+
 ;; A simple game to test all the bits work
 
 ;; TODO See why the labels seem to be in the labels list twice
@@ -173,7 +174,6 @@
 	   (game-data)
 	   (bit-table)
 	   
-	   
 	   ;;inline functions we will need
 
 	   (scroller :scroll-all 4)
@@ -208,10 +208,15 @@
     (let ((end *compiler-ptr*))
       (pass)
       (assert (= end *compiler-ptr*) nil "Build was not stable"))
-
+    
     (setf *compiler-final-pass* t)
-      (pass)))
-      
+    (pass)))
+
+(defun run-game ()
+  (monitor-reset #x600)
+  (monitor-run)
+  (setmem-copy (monitor-buffer)))
+
 ;;A goblin appears at the door. He flings some inedible slop through the bars.
 
 ;;(dloc :frazbolgs-closet "FRAZBOLG'S CLOSET" "/home/dan/Downloads/goblincloset.bmp" :right

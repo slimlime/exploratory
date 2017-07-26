@@ -161,12 +161,16 @@
 	   (label :start)
 
 	   (JSR '(:dungeon-cell . :draw))
+
+	   (label :test)
+	   (lda 0)
+	   (JSR :print-message)
+	   (dw nil (dstr "Hello World"))
 	   
 	   (BRK)
 
 	   ;;test harness
 
-	   (label :print-message nil)
 	   (BRK)
 
 	   ;;game state
@@ -176,6 +180,7 @@
 	   
 	   ;;inline functions we will need
 
+	   (print-message)
 	   (scroller :scroll-all 4)
 	   (scroller :scroll-text 3)
 	   (memcpy)
@@ -212,9 +217,10 @@
     (setf *compiler-final-pass* t)
     (pass)))
 
-(defun run-game ()
+(defun run-game (&optional (break-on 'BRK))
+  (build-game)
   (monitor-reset #x600)
-  (monitor-run)
+  (monitor-run :break-on break-on)
   (setmem-copy (monitor-buffer)))
 
 ;;A goblin appears at the door. He flings some inedible slop through the bars.

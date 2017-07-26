@@ -45,6 +45,47 @@
 (defun clrbit (bit)
   (setbit bit nil))
 
+;;print message retrieves a word in the location pointed to
+;;by the return location on the stack. The return location
+;;is adjusted by two bytes so we can skip it
+(defun print-message ()
+  (label :print-message)
+  (with-namespace :print-message
+    (alias :str '(:typeset-cs . :str)) 
+    (alias :tmp :A1)
+    (ensure-aliases-different :str :tmp)
+    (dc "Get the return address, the address")
+    (dc "of the string is stored there...")
+    ;;TODO see if there is a better way of doing this
+    ;;it seems long winded, but this function will be
+    ;;called a lot and the call-site needs to be as
+    ;;small as possible. 5 bytes is pretty reasonable (jsr + dw)
+    (PLA)
+    (CLC)
+    (ADC 1 "Return address is stored offset by 1")
+    (STA.ZP (lo-add :tmp))
+    (PLA)
+    (ADC 0)
+    (STA.ZP (hi-add :tmp))
+    (dc "Store the parameter for use by the typesetter")
+    (LDY 0)
+    (LDA.IZY :tmp)
+    (STA.ZP (lo-add :str))
+    (INY)
+    (LDA.IZY :tmp)
+    (STA.ZP (hi-add :str))
+    (dc "Now fudge the return address to skip the parameter")
+    (LDA.ZP (lo-add :tmp))
+    (ADC 1)
+    (TAX)
+    (LDA.ZP (hi-add :tmp))
+    (ADC 0)
+    (PHA)
+    (TXA)
+    (PHA)
+    (sta16.zp (scradd (live-row 4) 0) '(:typeset . :raster))
+    (JMP :typeset-cs)))
+
 (defmacro with-location (location &body body)
   `(let ((*current-location* ,location))
      (with-namespace *current-location*

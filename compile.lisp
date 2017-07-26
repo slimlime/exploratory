@@ -104,7 +104,10 @@
 	      (when alias (return))))
 	;;we have found an alias, which should give a fully qualified
 	;;label we can immediately resolve
-	(setf addr (gethash alias *compiler-labels*))
+	;;TODO check for circular aliases..
+	(when alias
+	  (setf addr (resolve alias)))
+	  ;;(setf addr (gethash alias *compiler-labels*)))
 	(unless addr
 	  (if (consp arg)
 	      ;;for a qualified label we just resolve
@@ -246,6 +249,11 @@
       (when (gethash (cons ns label) *compiler-labels*)
 	(setf label (cons ns label)))))
   (setf (gethash alias *compiler-aliases*) label))
+
+(defun ensure-aliases-different (alias1 alias2)
+  (when *compiler-final-pass*
+    (assert (/= (resolve alias1)
+		(resolve alias2)))))
 
 (defun db (label &rest bytes)
   (add-hint (length bytes)
@@ -502,7 +510,9 @@
 		 (progn
 					;render hint
 		   (incf i (1- (car hint)))
-		   (format t "      ~a" (cdr hint)))
+		   ;;todo for smaller hints, whynot just dump the bytes rather
+		   ;;than just the first one
+		   (format t "..    ~a" (cdr hint)))
 					;else render opcodes
 		 (labels ((format-label (addr)
 			    (let ((label (gethash addr lab)))

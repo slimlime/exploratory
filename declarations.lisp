@@ -34,9 +34,6 @@
   (if set
       (progn
 	(LDA #xFF)
-	;;todo this is very susceptible to code analysis...
-	;;it is entirely possible it may be already set
-	;;to the value we want
 	(STA.AB bit))
       (progn
 	(LDA #x00)
@@ -45,47 +42,10 @@
 (defun clrbit (bit)
   (setbit bit nil))
 
-;;print message retrieves a word in the location pointed to
-;;by the return location on the stack. The return location
-;;is adjusted by two bytes so we can skip it
-(defun print-message ()
-  (label :print-message)
-  (with-namespace :print-message
-    (alias :str '(:typeset-cs . :str)) 
-    (alias :tmp :A1)
-    (ensure-aliases-different :str :tmp)
-    (dc "Get the return address, the address")
-    (dc "of the string is stored there...")
-    ;;TODO see if there is a better way of doing this
-    ;;it seems long winded, but this function will be
-    ;;called a lot and the call-site needs to be as
-    ;;small as possible. 5 bytes is pretty reasonable (jsr + dw)
-    (PLA)
-    (CLC)
-    (ADC 1 "Return address is stored offset by 1")
-    (STA.ZP (lo-add :tmp))
-    (PLA)
-    (ADC 0)
-    (STA.ZP (hi-add :tmp))
-    (dc "Store the parameter for use by the typesetter")
-    (LDY 0)
-    (LDA.IZY :tmp)
-    (STA.ZP (lo-add :str))
-    (INY)
-    (LDA.IZY :tmp)
-    (STA.ZP (hi-add :str))
-    (dc "Now fudge the return address to skip the parameter")
-    (LDA.ZP (lo-add :tmp))
-    (ADC 1)
-    (TAX)
-    (LDA.ZP (hi-add :tmp))
-    (ADC 0)
-    (PHA)
-    (TXA)
-    (PHA)
-    (sta16.zp (scradd (live-row 4) 0) '(:typeset . :raster))
-    (JMP :typeset-cs)))
-
+(defun set-act (font colour)
+  (setf *act-font* font)
+  (setf *act-colour* colour))
+  
 (defmacro with-location (location &body body)
   `(let ((*current-location* ,location))
      (with-namespace *current-location*
@@ -133,29 +93,34 @@
 		 ,then)
 	       (label :endif)))))))
 
-(defun respond-1 (msg)
-  ;;todo check for strings that don't fit the screen width
-  (JSR :print-message)
-  (dc (format nil "-> ~a" msg) t)
-  (dw nil (if (stringp msg)
-	      (dstr msg)
-	      msg)))
-
-;;Display upto 4 lines of message
-(defun respond (msg1 &optional msg2 msg3 msg4)
-  (respond-1 msg1)
-  (when msg2 (respond-1 msg2))
-  (when msg3 (respond-1 msg3))
-  (when msg4 (respond-1 msg4)))
+;;todo make justification work with the - at the beginning without actually
+;;puting it into the string table
+(defun respond (message &rest messages)
+  (let ((lines 0))
+    (dolist (msg (cons message messages))
+      (when msg
+	(setf msg (concatenate 'string "- " msg))
+	(let ((justified-text (justify-with-image msg 0 0 *act-font*)))
+	  (incf lines (1+ (count #\Newline justified-text)))
+	  (JSR :print-message)
+	  (dc (format nil "-> ~a" justified-text) t)
+	  (dw nil (dstr justified-text))
+	  (assert (<= lines 4) nil (format nil "Response would have more than 4 lines~%~a~%~a"
+					     message messages)))))))
 
 ;;define a handler for the provided sentence
+
 (defmacro action (words &body body)
   (let ((words-sym (gensym)))
     `(progn
        (let ((,words-sym ,words))
-	 (dc (format nil "~a -> ~a" ,words-sym ',body))
-	 (defsentence ,words-sym (format nil "~a" ,words-sym) *current-location*)
-	 ,@body))))
+	 (dc (format nil "~a" ,words-sym))
+	 (defsentence ,words-sym
+	     (cons  *current-location* (format nil "~a" ,words-sym))
+	   *current-location*)
+	 (label (format nil "~a" ,words-sym) *current-location*)
+	 ,@body
+	 (RTS)))))
 
 (defun test-ifbit (is-set expected test-fn)
 

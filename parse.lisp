@@ -13,6 +13,9 @@
 (defparameter *max-input-length* 40)
 (defparameter *max-words* 4)
 
+(defun reset-parser-between-passes ()
+  (setf *handlers* (make-hash-table)))
+
 (defun reset-parser ()
   (setf *word-ids* (make-hash-table :test 'equal))
   (setf *id-meanings* (make-hash-table))
@@ -20,7 +23,7 @@
   (setf *word-hash-table* (make-array 256))
   (setf *hash-fudge-factors* nil)
   (setf *word-collisions* nil)
-  (setf *handlers* (make-hash-table)))
+  (reset-parser-between-passes))
   
 (defun defword (word &rest synonyms)
   ;;don't do anything once the table has already been built
@@ -212,6 +215,7 @@
     (sta16.zp :input :inp)
     (label :parse-direct)
     (LDX 0 "X is our word pointer")
+    (STX.ZP :word-index)
     (dc "Clear the parsed words buffer")
     (dotimes (i *max-words*)
       (STX.AB (+ (resolve :words) i)))
@@ -471,8 +475,12 @@
 (test-parse-input "OPEN     DOOR      CLOSE    " '(OPEN DOOR CLOSE))
 
 ;;Push a sentence handler into the list of handlers for a location
-
+;;Note that the location is NOT automatically applied to the handler address
 (defun defsentence (words handler-address &optional (location :generic))
+  (assert (null (find words (gethash location *handlers* )
+		      :key #'car :test #'equal))
+	  nil (format nil "The words ~a already appear with a handler." words))
+  ;;if this throws and shouldn't has the handlers table been reset?
   (push (cons words handler-address)
 	(gethash location *handlers*)))
 	   

@@ -42,6 +42,9 @@
   (setf *monitor-watches* 
 	(remove (resolve addr) *monitor-watches* :key #'car)))
 
+(defun monitor-unwatch-all ()
+  (setf *monitor-watches* nil))
+
 (defun monitor-watch (addr &optional (len 16))
   (monitor-unwatch addr)
   (push (cons (resolve addr) len) *monitor-watches*))
@@ -105,3 +108,6 @@
 (defun monitor-reset (org &key (buffer *compiler-buffer*))
   (funcall *monitor-reset* buffer (resolve org))
   (values))
+
+(defun monitor-setpc (addr)
+  (setf (6502:cpu-pc cl-6502:*cpu*) (resolve addr)))

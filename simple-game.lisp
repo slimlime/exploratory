@@ -33,7 +33,7 @@
   (defword :UNLOCK)
 
   (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/Downloads/cellardoor.bmp" :right
-	"You are in the dungeon prison of Wangband underneath the fortress of the Black Wizard, Beelzepops. Home to stench-rats, were-toads, sniveling goblins and you. Of the current denizens, you are currently the most wretched. Surrounding you is a slime that reminds you of lime pudding, if lime pudding had hundreds of eyes and made a rasping, wheezing sound as it oozed out of the cracks in the wall. You must escape.")
+	"You are in the dungeon prison of Wangband under the fortress of the Black Wizard, Beelzepops. Home to stench-rats, were-toads, sniveling goblins and you. Of the current denizens, you are currently the most wretched. A lime-green slime oozes out of the wall, making a rasping, wheezing sound. You must escape.")
 
   (with-location :dungeon-cell 
 
@@ -59,7 +59,7 @@
 	    (nifbit :slime-examined
 		    (progn
 		      (setbit :slime-examined)
-		      (respond "Eugh! The slime appears to be looking at you!"))))
+		      (respond "Eugh! The slime is looking at you!"))))
 
     (action '(EXAMINE FLOOR)
 	    (respond "There is a crack in the floor.")
@@ -71,13 +71,13 @@
 		   (progn
 		     (ifbit :key-in-crack
 			    (progn
-			      (respond "A glint of metal shines back at you from the crack."
+			      (respond "A glint of metal shines back at you..."
 				       "A key!")
 			      (setbit :crack-examined))
-			    (respond "A crack in the floor, just like any other crack"
-				     "One might hide a small object here, perhaps a key?")))
-		   (respond "The veil of Maia, or perhaps your shocking hangover"
-			    "prevents you from seeing anything interesting.")))
+			    (respond "A crack in the floor, just like any other."
+				     "One might hide a small key-like object here."
+				     "Like, for example, a key.")))
+		   (respond "The Veil of Maia, or your shocking hangover prevents you from seeing anything interesting.")))
 	  
     (action '(TAKE KEY)
 	    (ifbit :crack-examined
@@ -114,11 +114,9 @@
 	    (ifbit :slime-licked
 		   (progn
 		     (setbit :slime-licked)
-		     (respond "Millions of colours flash in geometric patterns"
-			      "before your eyes. Space and time warp as Maia's"
-			      "cosmic tears  rain down on you in a shower of gold."
-			      "You feel a strange urge to grow a beard and play the guitar."))
-		   (respond "Nothing happens. Your third eye is already open.")))
+		     (respond "Millions of colours flash in geometric patterns before your eyes. Space and time warp as Maia's cosmic tears rain down on you in a shower of gold."))
+		   (respond "Nothing happens. Your third eye is already open."
+			    "You feel a strange urge to grow a beard and play the guitar.")))
 		 
     (action '(OPEN DOOR)
 	    (ifbit :door-open
@@ -154,6 +152,9 @@
   (reset-compiler)
 
   (flet ((pass ()
+
+	   (reset-parser-between-passes)
+	   
 	   (zeropage)	     
 	   (org #x600)
 	   (CLD)
@@ -163,13 +164,14 @@
 	   (JSR '(:dungeon-cell . :draw))
 
 	   (label :test)
-	   (lda 0)
-	   (JSR :print-message)
-	   (dw nil (dstr "Hello World"))
-	   
+	   (sta16.zp (cons :dispatcher :dungeon-cell)
+		     :location-dispatch-table)
+
 	   (BRK)
 
-	   ;;test harness
+	   (label :test-input)
+	   (JSR :parse)
+	   (JSR :dispatch)
 
 	   (BRK)
 
@@ -197,6 +199,7 @@
 	   (when *word-collisions*
 	     (binary-parser))
 
+	   (dispatcher)
 	   (string-table)
 	   (font-data)
 	   (image-decompressor)
@@ -216,6 +219,26 @@
     
     (setf *compiler-final-pass* t)
     (pass)))
+
+(defun enter-input (str)
+  ;;really need to make better 6502 emulator to avoid need
+  ;;for copying the buffer
+  (let ((buffer (cl-6502:get-range 0)))
+    (loop for c across str
+       for i from 0 to *max-input-length* do       
+	 (setf (aref buffer (+ i (resolve '(:parser . :input))))
+	       (to-alphabet-pos c)))
+    (setf (cl-6502:get-range 0) buffer))
+  (monitor-setpc :test-input)
+  (monitor-run)
+  (setmem-copy (monitor-buffer))
+  (values))
+
+;;TODO need a test case for the input EXAMINE SLIME as it fails to terminate
+;;ends up with two random words at the end
+;;TODO the hyphen shouldn't be tacked on in the string table
+;;TODO parser seems to take ages, shouldn't take that long
+;;TODO fails to parse now, something todo with enter-input
 
 (defun run-game (&optional (break-on 'BRK))
   (build-game)

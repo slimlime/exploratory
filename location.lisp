@@ -14,6 +14,8 @@
 ;;TODO fleuron          | use same drawing thingy
 ;;TODO get image size in dloc
 
+(defparameter *max-lines* 12)
+
 (defun live-row (i)
   (+ 3 (* (+ i 13) *line-height*)))
 
@@ -50,11 +52,16 @@
       (dc (format nil "Image data for ~a (~a)" title name))
       (dimg :image img-file sx sy)
       (dcs :title title)
-      (dcs :text
-	   (if img-file
-	       (justify-with-image text sx (- sy (+ 1 *line-height*)) font)
-	       (justify-with-image text 0 0 font))))))
-
+      (let ((text
+	     (if img-file
+		 (justify-with-image text sx (- sy (+ 1 *line-height*)) font)
+		 (justify-with-image text 0 0 font))))
+	(assert (< (count #\Newline text) *max-lines*) nil
+		(format nil "The location description exceeds ~a lines ~%~a"
+			*max-lines*
+			text))
+	(dcs :text text)))))
+	   
 (defun location-test ()
   (reset-compiler)
   (reset-symbol-table)

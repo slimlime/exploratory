@@ -284,21 +284,55 @@
     (STA.ZP :prev-width)
     (RTS)))
 
-;;print message retrieves a word in the location pointed to
-;;by the return location on the stack. The return location
-;;is adjusted by two bytes so we can skip it
+(defun live-row (i)
+  (+ 3 (* (+ i 13) *line-height*)))
+
 (defun print-message ()
-  (label :print-message)
+  (scroller :scroll-text 3)
+
+  ;;these entry points are a bit expensive 160 bytes!
+  ;;TODO Some fancy scheme
+  
+  (label '(:print-message . 3))
+
+  (call-memset 0 (scradd (live-row 0) 0)
+	       (* 3 +screen-width-bytes+ *line-height*))
+
+  (sta16.zp (scradd (live-row 0) 0) '(:typeset . :raster))
+  
+  (JMP '(:print-message . :print))
+  
+  (label '(:print-message . 2))
+
+  (call-memcpy (scradd (live-row 2) 0)
+	       (scradd (live-row 0) 0)
+	       (* 1 +screen-width-bytes+ *line-height*))
+
+  (call-memset 0 (scradd (live-row 1) 0)
+	       (* 2 +screen-width-bytes+ *line-height*))
+
+  (sta16.zp (scradd (live-row 1) 0) '(:typeset . :raster))
+  
+  (JMP '(:print-message . :print))
+  
+  (label '(:print-message . 1))
+
+  (call-memcpy (scradd (live-row 1) 0)
+	       (scradd (live-row 0) 0)
+	       (* 2 +screen-width-bytes+ *line-height*))
+
+  (call-memset 0 (scradd (live-row 2) 0)
+	       (* 1 +screen-width-bytes+ *line-height*))
+
+  (sta16.zp (scradd (live-row 2) 0) '(:typeset . :raster))
+  
   (with-namespace :print-message
+    (label :print)
     (alias :str '(:typeset-cs . :str)) 
-    (alias :tmp :A1)
-    (ensure-aliases-different :str :tmp)
+    (alias :tmp :A0)
+    (ensure-aliases-different :str :tmp '(:typeset . :raster))
     (dc "Get the return address, the address")
     (dc "of the string is stored there...")
-    ;;TODO see if there is a better way of doing this
-    ;;it seems long winded, but this function will be
-    ;;called a lot and the call-site needs to be as
-    ;;small as possible. 5 bytes is pretty reasonable (jsr + dw)
     (PLA)
     (CLC)
     (ADC 1 "Return address is stored offset by 1")
@@ -322,7 +356,6 @@
     (PHA)
     (TXA)
     (PHA)
-    (sta16.zp (scradd (live-row 4) 0) '(:typeset . :raster))
     (JMP :typeset-cs)))
 
 ;;TODO make this build specific to this file, and make specific versions

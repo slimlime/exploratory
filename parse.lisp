@@ -11,7 +11,10 @@
 (defparameter *handlers* nil)
 
 (defparameter *max-input-length* 40)
-(defparameter *max-words* 4)
+(defparameter *max-words* 4) ;;bit misleading as this is the max words in the input buffer
+;;but we only parse 3 of them.
+
+;;TODO I am wondering if I should have made the input buffer 0 terminated
 
 (defun reset-parser-between-passes ()
   (setf *handlers* (make-hash-table)))
@@ -231,14 +234,14 @@
     ;;Buffer is zero terminated so we can't overrun
     (dc "Character 0")
     (LDA.IZY :inp)
-    (BEQ :end)
+    (BEQ :word-end)
     (CLC)
     (ADC (to-ubyte (aref *hash-fudge-factors* 0)) "Fudge 0")
     (STA.ZP :tmp)
     (dc "Character 1")
     (INY)
     (LDA.IZY :inp)
-    (BEQ :end)
+    (BEQ :word-end)
     (CLC)
     (ADC (to-ubyte (aref *hash-fudge-factors* 1)) "Fudge 1")
     (ASL.ZP :tmp)
@@ -247,7 +250,7 @@
     (dc "Character 2")
     (INY)
     (LDA.IZY :inp)
-    (BEQ :end)
+    (BEQ :word-end)
     (CLC)
     (ADC (to-ubyte (aref *hash-fudge-factors* 2)) "Fudge 2")
     (ASL.ZP :tmp)
@@ -256,7 +259,7 @@
     (dc "Character 3")
     (INY)
     (LDA.IZY :inp)
-    (BEQ :end)
+    (BEQ :word-end)
     (CLC)
     (ADC (to-ubyte (aref *hash-fudge-factors* 3)) "Fudge 3")
     (ASL.ZP :tmp)
@@ -264,14 +267,18 @@
     (STA.ZP :tmp)
     (INY)
     (LDA.IZY :inp)
-    (BEQ :end)
+    (BEQ :word-end)
     (dc "128 - 4 character is xored into the hash")
     (LDA 128)
     (SEC)
     (SBC.IZY :inp)
     (EOR.ZP :tmp)
     (STA.ZP :tmp)
-    (label :end)
+    (label :word-end)
+    (dc "Did we go off the end of the buffer?")
+    (TYA)
+    (CMP *max-input-length*)
+    (BPL :done)
     (LDX.ZP :tmp)
     (dc "Look up the word meaning")
     (LDA.ABX :word-meanings)
@@ -304,6 +311,7 @@
     (STA.ZP :word-index)
     (CMP *max-words*)
     (BNE :next)
+    (label :done)
     (RTS)
     
     (dc "The parsed word meanings get put here")
@@ -360,10 +368,10 @@
     
     (build-hash-test #'pass))
 
-  (dump-words)
+  ;;(dump-words)
   
   (monitor-reset #x600)
-  (monitor-run)
+  (monitor-run :print nil)
   
   (aref (monitor-buffer) (resolve '(:parser . :words))))
 
@@ -422,7 +430,7 @@
 
 (maphash #'(lambda (k v) (test-hash-word k v)) *word-ids*)
 
-(defun parse-words-tester (input)
+(defun parse-words-tester (input &key (break-on 'brk))
   (reset-compiler)
   (reset-symbol-table)
   
@@ -448,7 +456,7 @@
 	     (to-alphabet-pos c)))
   
   (monitor-reset #x600)
-  (monitor-run)
+  (monitor-run :print nil :break-on break-on)
   
   (coerce (subseq (monitor-buffer)
 		  (resolve '(:parser . :words))
@@ -456,13 +464,23 @@
 	  'list))
 
 (defun test-parse-input (input expected)
-  (format t "Testing ~a~%" input)
-  (loop
-     for e in expected
-     for r in (parse-words-tester input) do
-       (unless (eq '? e)
-	 (assert (equal r (gethash (symbol-name e) *word-ids*))))))
+  ;;(format t "Testing ~a~%" input)
 
+  (let ((words (parse-words-tester input)))
+    (print words)
+    (loop
+       for e in expected
+       for r in words do
+	 (unless (eq '? e)
+	   (assert (equal r (gethash (symbol-name e) *word-ids*)))))
+    ;;we must insist the parser stops parsing at the end of the string
+    (loop for i from (length expected) to 2 do
+	 (assert (equal 0 (elt words i)) nil
+		 (format nil "Sentence [~a] parsed to [~a] which has phantom extra words at pos ~a"
+			 input words i)))))
+
+(test-parse-input "" '())
+(test-parse-input "CHAIR" '(CHAIR))
 (test-parse-input "OPEN DOOR" '(OPEN DOOR))
 (test-parse-input "PUSH CYLINDER" '(PUSH CYLINDER))
 (test-parse-input "PRESS CYLINDER" '(PUSH CYLINDER))
@@ -563,7 +581,7 @@
 				  0 3)
 			  'list))
 		 (handler (cdr entry)))
-	     (dc (format nil "~a -> ~a" words handler))
+	     (dc (format nil "~{~a ~} -> ~a" words (fmt-label handler t)))
 	     (apply 'db nil (append
 			     (mapcar #'(lambda (word)
 					 (let* ((symb (symbol-name word))
@@ -639,7 +657,7 @@
 	     (to-alphabet-pos c)))
   
   (monitor-reset #x600)
-  (monitor-run)
+  (monitor-run :print nil)
 
   ;; return the output byte which will have been set
   ;; if the correct handler is called.

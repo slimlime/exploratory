@@ -250,11 +250,15 @@
 	(setf label (cons ns label)))))
   (setf (gethash alias *compiler-aliases*) label))
 
-(defun ensure-aliases-different (alias1 alias2)
+(defun ensure-aliases-different (&rest aliases)
   (when *compiler-final-pass*
-    (assert (/= (resolve alias1)
-		(resolve alias2)))))
-
+    (let ((addresses (make-hash-table)))
+      (dolist (alias aliases)
+	(let ((existing (gethash (resolve alias) addresses)))
+	  (assert (null existing)
+		  nil (format nil "Alias ~a conflicts with ~a" alias existing)))
+	(setf (gethash (resolve alias) addresses) alias)))))
+	
 (defun db (label &rest bytes)
   (add-hint (length bytes)
 	    (format nil "DB ~{$~2,'0X~^, ~}" bytes))
@@ -353,41 +357,35 @@
   "In the scope of the macro, define labels in the namespace
    Label resolution will be done preferentially in this namespace
    but will fall back to the global namespace if not found"
-  (let ((ns (gensym))
-	(ptr (gensym))
-	(str (gensym)))
+  (let ((ns (gensym)))
     `(let* ((,ns ,namespace)
 	    ;;could get rid of this namespace as it is just the car of the stack
-	    (*compiler-label-namespace* ,ns)
-	    (,ptr *compiler-ptr*)
-	    (,str (make-string *compiler-namespace-depth* :initial-element #\ )))
-       (incf *compiler-namespace-depth*)
+	    (*compiler-label-namespace* ,ns))
        (push ,ns *compiler-namespace-stack*)
        ,@body
-       (pop *compiler-namespace-stack*)
-       (decf *compiler-namespace-depth*)
-       (when (and ,ns (/= *compiler-ptr* ,ptr)) ;;only emit comments if we actually did something
-	 (dc-1 (format nil "~a  { ~a" ,str ,ns) ,ptr nil)
-	 ;;todo, place the following comment on the line below
-	 ;;will need to use the disassembler to determine how many
-	 ;;bytes should be added.
-	 (dc-1 (format nil "~a  } ~a" ,str ,ns) *compiler-ptr* nil)))))
+       (pop *compiler-namespace-stack*))))
 
-;;TODO we really need to be able to resolve in the stack of namespaces
-;;or this is pretty useless as passed in labels don't resolve to their
-;;parent scopes
-(defmacro with-local-namespace (comment-name &body body)
+(defmacro with-local-namespace (&body body)
   "All labels in this scope will resolve to the instantation
    at the current location"
-  `(with-namespace (format nil "~a @ $~4,'0X" ,comment-name ;;(caar (sb-debug:list-backtrace))
-			   *compiler-ptr*)
+  `(with-namespace (format nil "$~4,'0X" *compiler-ptr*)
      ,@body))
 
 (defun dump-aliases ()
   (maphash #'(lambda (k v) (format t "~a -> ~a~%" (fmt-label k t) v)) *compiler-aliases*))
 
-(defun dump-labels ()
-  (maphash #'(lambda (k v) (format t "~a -> ~4,'0X~%" (fmt-label k t) v)) *compiler-labels*))
+(defun label-namespace (label)
+  (if (consp label)
+      (car label)
+      nil))
+
+(defun dump-labels (&key (namespace nil namespace-p))  
+  (maphash #'(lambda (k v)
+	       (when (or (not namespace-p)
+			 (equal (label-namespace k)
+				namespace))
+		 (format t "~a -> ~4,'0X~%" (fmt-label k t) v)))
+	       *compiler-labels*))
 
 
 ;; 6502 instructions by mode
@@ -476,7 +474,7 @@
 ;;;; Disassembler
 
 (defun right-justify (s)
-  (subseq (format nil "            ~a" s)
+  (subseq (format nil "                    ~a" s)
 	  (length s)))
 
 (defun disassemble-6502 (start end &key (buffer nil))
@@ -487,7 +485,7 @@
   (let ((lab (make-hash-table)))		
     ;;invert the label table i.e. lookup label by address
     ;;todo, additional labels at the same address are currently hidden
-    (maphash #'(lambda (k v) (setf (gethash v lab) k))
+    (maphash #'(lambda (label addr) (push label (gethash addr lab)))
 	     *compiler-labels*)
     (loop for i from start to end do
 	 (let* ((opcode (gethash (aref buffer i) *reverse-opcodes*))
@@ -496,16 +494,20 @@
 		(arg1 (aref buffer (+ 1 i)))
 		(arg2 (aref buffer (+ 2 i))))
 	   (let* ((label (gethash i lab))
-		  (str (if label
-			   (right-justify (fmt-label label))
-			   "            "))
 		  (hint (gethash i *compiler-disassembler-hints*))
 		  (comments (gethash i *compiler-comments*))
 		  (postfix-comments (gethash i *compiler-postfix-comments*)))
 	     (when comments
 	       (dolist (comment (reverse comments))
-		 (format t "             ;~a~%" comment)))
-	     (format t "~a ~4,'0X ~2,'0X" str i (aref buffer i))
+		 (format t "                     ;~a~%" comment)))
+	     (when label
+	       (dolist (l (cdr label))
+		 (format t "~a~%" (right-justify (fmt-label l t)))))
+	     (format t "~a ~4,'0X ~2,'0X"
+		     (if label
+			 (right-justify (fmt-label (car label) t))
+			 "                    ")
+		     i (aref buffer i))
 	     (if (and hint (numberp (car hint)))
 		 (progn
 					;render hint
@@ -517,7 +519,8 @@
 		 (labels ((format-label (addr)
 			    (let ((label (gethash addr lab)))
 			      (when label
-				(format t "~45,1T;~a" (fmt-label label)))))
+				(format t "~45,1T;~{~a ~}"
+					(mapcar #'(lambda (l) (fmt-label l t)) label)))))
 			  (format-cur-label ()
 			    (format-label (logior arg1 (ash arg2 8))))
 			  (format-1 (fmt) (format t fmt arg1 op arg1)

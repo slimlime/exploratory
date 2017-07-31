@@ -45,95 +45,97 @@
     (defword :DOOR)
     (defword :EXIT :OUT :GO)
   
-    (defbits t :key-in-crack)
-    (defbits nil :slime-examined :slime-licked :crack-examined :door-locked
+    (defbits t :key-in-crack :door-locked)
+    (defbits nil :slime-examined :slime-licked :crack-examined
 	     :door-open)
   
     (action '(EXAMINE SLIME)
-	    (respond "Millions of sad eyes gaze at you from the slime.")
-	    (ifbit :key-in-crack
-		   (respond "They seem to be staring at the floor.")))
+      (respond "Millions of sad eyes peer out from the slime.")
+      (ifbit :key-in-crack
+	     (respond "They seem to be staring at the floor.")))
   
     (action '(EXAMINE WALL)
-	    (respond "The wall oozes with a repellant green slime.")
-	    (nifbit :slime-examined
-		    (progn
-		      (setbit :slime-examined)
-		      (respond "Eugh! The slime is looking at you!"))))
+      (respond "The wall oozes with a repellant green slime.")
+      (nifbit :slime-examined
+	      (progn
+		(setbit :slime-examined)
+		(respond "Eugh! The slime is looking at you!"))))
 
     (action '(EXAMINE FLOOR)
-	    (respond "There is a crack in the floor.")
-	    (ifbit :key-in-crack
-		   (respond "Perhaps it bears further examination?")))
+      (respond "There is a crack in the floor.")
+      (ifbit :key-in-crack
+	     (respond "Perhaps it bears further examination?")))
   
     (action '(EXAMINE CRACK)
-	    (ifbit :slime-licked
-		   (progn
-		     (ifbit :key-in-crack
-			    (progn
-			      (respond "A glint of metal shines back at you..."
-				       "A key!")
-			      (setbit :crack-examined))
-			    (respond "A crack in the floor, just like any other."
-				     "One might hide a small key-like object here."
-				     "Like, for example, a key.")))
-		   (respond "The Veil of Maia, or your shocking hangover prevents you from seeing anything interesting.")))
+      (ifbit :slime-licked
+	     (progn
+	       (ifbit :key-in-crack
+		      (progn
+			(respond "A glint of metal shines back at you..."
+				 "A key!")
+			(setbit :crack-examined))
+		      (respond "A crack in the floor, just like any other."
+			       "One might hide a small key-like object here."
+			       "Like, for example, a key.")))
+	     (respond "The Veil of Maia, or your shocking hangover prevents you from seeing anything interesting.")))
 	  
     (action '(TAKE KEY)
-	    (ifbit :crack-examined
-		   (ifbit :key-in-crack
-			  (progn
-			    (respond "You take the shiny key.")
-			    (clrbit :key-in-crack))
-			  (respond "It's in your pocket..."
-				   "Perhaps the dungeon air is getting to you?"))
-		   (respond "What key? Do you know something I don't?")))
+      (ifbit :crack-examined
+	     (ifbit :key-in-crack
+		    (progn
+		      (respond "You take the shiny key.")
+		      (clrbit :key-in-crack))
+		    (respond "It's in your pocket..."
+			     "Perhaps the dungeon air is getting to you?"))
+	     (respond "What key? Do you know something I don't?")))
   
     (action '(EXAMINE DOOR)
-	    (ifbit :door-open
-		   (respond "The door is open.")
-		   (ifbit :door-locked
-			  (respond "The door is locked.")
-			  (respond "The door is closed."))))
+      (ifbit :door-open
+	     (respond "The door is open.")
+	     (ifbit :door-locked
+		    (respond "The door is locked.")
+		    (respond "The door is closed."))))
 
     (action '(UNLOCK DOOR)
-	    (ifbit :door-locked
-		   (ifbit :key-in-crack
-			  (respond "With what? Your finger?")
-			  (progn
-			    (clrbit :door-locked)
-			    (respond "The lock mechanism clicks...")))
-		   (respond "The door is already unlocked.")))
+      (ifbit :door-locked
+	     (ifbit :key-in-crack
+		    (respond "With what? Your finger?")
+		    (progn
+		      (clrbit :door-locked)
+		      (respond "The lock mechanism clicks...")))
+	     (respond "The door is already unlocked.")))
 
-    (action '(EXIT DOOR)
-	    (ifbit :door-open
-		   (respond "You go through the door...")
-		   (respond "You walk into the closed door. Ouch.")))
+    (action '(EXIT)
+      (ifbit :door-open
+	     (respond "You go through the door...")
+	     (respond "You walk into the closed door. Ouch.")))
 
     (action '(LICK SLIME)
-	    (ifbit :slime-licked
-		   (progn
-		     (setbit :slime-licked)
-		     (respond "Millions of colours flash in geometric patterns before your eyes. Space and time warp as Maia's cosmic tears rain down on you in a shower of gold."))
-		   (respond "Nothing happens. Your third eye is already open."
-			    "You feel a strange urge to grow a beard and play the guitar.")))
+      (nifbit :slime-licked
+	      (progn
+		(setbit :slime-licked)
+		(respond "Colours break in waves upon your ears. Maia's cosmic tears rain down on you in a shower of gold. "))
+	      (respond "Nothing happens. Your third eye is already open."
+		       "But... you do feel a strange urge to grow a beard and play the guitar.")))
 		 
     (action '(OPEN DOOR)
-	    (ifbit :door-open
-		   (respond "The door is already open.")
-		   (ifbit :door-locked
-			  (respond
-			   "Have you been licking the slime? It's hallucinogenic."
-			   "The door, typically for a dungeon, is locked.")
-			  (progn
-			    (respond "The door creaks open.")
-			    (setbit :door-open))))))
+      (ifbit :door-open
+	     (respond "The door is already open.")
+	     (ifbit :door-locked
+		    (respond
+		     "Have you been licking the slime? It's hallucinogenic."
+		     "The door, typically for a dungeon, is locked.")
+		    (progn
+		      (respond "The door creaks open.")
+		      (setbit :door-open))))))
 
   (with-location :generic
     (action '(TAKE KEY)
-	    (nifbit '(:dungeon-cell . :key-in-crack)
-		    (respond "You already have the key!"
-			     "Perhaps the dungeon air is getting to you.")))))
+      (nifbit '(:dungeon-cell . :key-in-crack)
+	      (respond "You already have the key!"
+		       "Perhaps the dungeon air is getting to you.")))))
+
+(defparameter origin #x600)
 
 (defun build-game (&key (full-reset nil) (quick-parser t))
 
@@ -145,18 +147,17 @@
   (reset-bits)
   (reset-parser)
 
-  
   ;;this (atm) must be called so the widths are initialised
   ;;todo, make a font-init function which just does the widths.
   (font-data)
   (reset-compiler)
-
+  
   (flet ((pass ()
 
 	   (reset-parser-between-passes)
 	   
 	   (zeropage)	     
-	   (org #x600)
+	   (org origin)
 	   (CLD)
 
 	   (label :start)
@@ -164,6 +165,7 @@
 	   (JSR '(:dungeon-cell . :draw))
 
 	   (label :test)
+	   (label :test2)
 	   (sta16.zp (cons :dispatcher :dungeon-cell)
 		     :location-dispatch-table)
 
@@ -183,8 +185,6 @@
 	   ;;inline functions we will need
 
 	   (print-message)
-	   (scroller :scroll-all 4)
-	   (scroller :scroll-text 3)
 	   (memcpy)
 	   (memset)
 	   (typeset)
@@ -201,10 +201,12 @@
 
 	   (dispatcher)
 	   (string-table)
-	   (font-data)
-	   (image-decompressor)
 	   
-	   (label :end)))
+	   (image-decompressor)
+	   (label :end)
+	   ;font data is pretty boring so stick it here
+	   (font-data)
+	   ))
     
     (pass)
     (build-symbol-table)
@@ -217,21 +219,28 @@
       (pass)
       (assert (= end *compiler-ptr*) nil "Build was not stable"))
     
-    (setf *compiler-final-pass* t)
-    (pass)))
+      (setf *compiler-final-pass* t)
+      (pass)
 
-(defun enter-input (str)
+      (format t "Build size ~a~%" (- *compiler-ptr* origin))))
+
+(defun enter-input (str &key (break-on 'brk))
   ;;really need to make better 6502 emulator to avoid need
   ;;for copying the buffer
   (let ((buffer (cl-6502:get-range 0)))
+    ;;we must clear the buffer for new input
+    (loop for i from 0 to *max-input-length* do
+	 (setf (aref buffer (+ i (resolve '(:parser . :input)))) 0))
+    
     (loop for c across str
        for i from 0 to *max-input-length* do       
 	 (setf (aref buffer (+ i (resolve '(:parser . :input))))
 	       (to-alphabet-pos c)))
     (setf (cl-6502:get-range 0) buffer))
   (monitor-setpc :test-input)
-  (monitor-run)
+  (monitor-run :break-on break-on)
   (setmem-copy (monitor-buffer))
+  ;;(vicky)
   (values))
 
 ;;TODO need a test case for the input EXAMINE SLIME as it fails to terminate

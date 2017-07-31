@@ -30,7 +30,8 @@
   (dolist (bit bits)
     (defbit bit initially-set)))
 
-(defun setbit (bit &optional set)
+(defun setbit (bit &optional (set t))
+  ;;TODO we might move these to the zpg, so check for that
   (if set
       (progn
 	(LDA #xFF)
@@ -45,7 +46,7 @@
 (defun set-act (font colour)
   (setf *act-font* font)
   (setf *act-colour* colour))
-  
+
 (defmacro with-location (location &body body)
   `(let ((*current-location* ,location))
      (with-namespace *current-location*
@@ -56,7 +57,8 @@
 	(then-addr (gensym)))
     `(let ((namespace *compiler-label-namespace*))
        (let ((,bitsym ,bit))
-	 (with-local-namespace (format nil "IF ~a" ,bitsym)
+	 (with-local-namespace
+	   (dc "IF" t)
 	   (if (resolves-to-zpg ,bitsym)
 	       (BIT.ZP ,bitsym)
 	       (BIT.AB ,bitsym))
@@ -96,29 +98,30 @@
 ;;todo make justification work with the - at the beginning without actually
 ;;puting it into the string table
 (defun respond (message &rest messages)
-  (let ((lines 0))
-    (dolist (msg (cons message messages))
-      (when msg
-	(setf msg (concatenate 'string "- " msg))
-	(let ((justified-text (justify-with-image msg 0 0 *act-font*)))
-	  (incf lines (1+ (count #\Newline justified-text)))
-	  (JSR :print-message)
-	  (dc (format nil "-> ~a" justified-text) t)
-	  (dw nil (dstr justified-text))
-	  (assert (<= lines 4) nil (format nil "Response would have more than 4 lines~%~a~%~a"
-					     message messages)))))))
+  (let* ((text
+	  (justify-with-image (format nil "~a~{~%~a~}" message messages)
+			      4 200 *act-font*))
+	 (lines (1+ (count #\Newline text))))
+    (assert (<= lines 3) nil
+	    (format nil "Response would have more than 3 lines~%~a"
+		    text))
+    (JSR (cons :print-message lines))
+    (dc (format nil "~a" text) t)
+    (dw nil (dstr text))))
 
-;;define a handler for the provided sentence
+;;define a action handler for a sentence
+(defun words2label (words)
+  (string-right-trim "-" (format nil "~{~a-~}" words)))
 
 (defmacro action (words &body body)
   (let ((words-sym (gensym)))
     `(progn
        (let ((,words-sym ,words))
-	 (dc (format nil "~a" ,words-sym))
+	 (dc (format nil "ON ~{~a ~}" ,words-sym))
 	 (defsentence ,words-sym
-	     (cons  *current-location* (format nil "~a" ,words-sym))
+	     (cons  *current-location* (words2label ,words-sym))
 	   *current-location*)
-	 (label (format nil "~a" ,words-sym) *current-location*)
+	 (label (words2label ,words-sym) *current-location*)
 	 ,@body
 	 (RTS)))))
 

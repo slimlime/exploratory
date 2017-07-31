@@ -16,18 +16,6 @@
 
 (defparameter *max-lines* 12)
 
-(defun live-row (i)
-  (+ 3 (* (+ i 13) *line-height*)))
-
-(defun scroller (label lines)
-  (label label)
-  (call-memcpy (scradd (live-row 1) 0)
-	       (scradd (live-row 0) 0)
-	       (* lines +screen-width-bytes+ *line-height*))
-  (call-memset 0 (scradd (live-row lines) 0)
-	       (* +screen-width-bytes+ *line-height*))
-  (RTS))
-
 (defun call-typeset (str font line)
   ;;this is in reality a terrible way to call it
   ;;as it takes so many bytes, this is just for testing
@@ -35,7 +23,9 @@
   (sta16.zp str '(:typeset-cs . :str))
   (sta16.zp (scradd line 0) '(:typeset . :raster))
   (JSR :typeset-cs))
-				      
+
+;;TODO this takes far too many bytes to push all the parameters
+;;need to pass them by reference
 (defun dloc (name title img-file img-align text
 	     &key (font *act-font*) (colour *act-colour*))
   (with-namespace name
@@ -61,7 +51,17 @@
 			*max-lines*
 			text))
 	(dcs :text text)))))
-	   
+
+
+(defun scroller (label lines)
+  (label label)
+  (call-memcpy (scradd (live-row 1) 0)
+	       (scradd (live-row 0) 0)
+	       (* lines +screen-width-bytes+ *line-height*))
+  (call-memset 0 (scradd (live-row lines) 0)
+	       (* +screen-width-bytes+ *line-height*))
+  (RTS))
+
 (defun location-test ()
   (reset-compiler)
   (reset-symbol-table)

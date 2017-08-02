@@ -49,8 +49,9 @@
 
 (defmacro with-location (location &body body)
   `(let ((*current-location* ,location))
-     (with-namespace *current-location*
-       ,@body)))
+     (measure-size *current-location*
+       (with-namespace *current-location*
+	 ,@body))))
 
 (defmacro ifbit (bit then &optional (else nil else-supplied-p))
   (let ((bitsym (gensym))
@@ -119,7 +120,7 @@
        (let ((,words-sym ,words))
 	 (dc (format nil "ON ~{~a ~}" ,words-sym))
 	 (defsentence ,words-sym
-	     (cons  *current-location* (words2label ,words-sym))
+	     (cons *current-location* (words2label ,words-sym))
 	   *current-location*)
 	 (label (words2label ,words-sym) *current-location*)
 	 ,@body

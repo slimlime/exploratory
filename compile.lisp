@@ -25,7 +25,7 @@
 ; YAGGERS until we are out of memory!
 
 ; WIBNI
-; Assert if final page jump bug
+					; Assert if final page jump bug
 
 (defun reset-compiler (&optional (buffer-size 65536))
   (setf *compiler-ptr* 0)
@@ -371,6 +371,15 @@
   `(with-namespace (format nil "$~4,'0X" *compiler-ptr*)
      ,@body))
 
+(defmacro measure-size (name &body body)
+  (let ((ptrsym (gensym)))
+    `(let ((,ptrsym *compiler-ptr*))
+       ,@body
+       (when *compiler-final-pass*
+	 (format t "~a size ~a~%"
+		 ,name
+		 (- *compiler-ptr* ,ptrsym))))))
+
 (defun dump-aliases ()
   (maphash #'(lambda (k v) (format t "~a -> ~a~%" (fmt-label k t) v)) *compiler-aliases*))
 
@@ -468,6 +477,25 @@
 
 (defun JMP (addr) (JMP.AB addr))
 (defun JSR (addr) (JSR.AB addr))
+
+;; page agnostic addressing, provide an instruction of the form OP.* which
+;; resolves to either zero page or absoulte depending on how the address resolves
+
+(defun concat-symbol (symbol str)
+  (intern (concatenate 'string (symbol-name symbol) str)))
+
+(defmacro page-agnostic (op)
+  `(defun ,(concat-symbol op ".*") (addr &optional comment)
+     (if (resolves-to-zpg addr)
+	 (,(concat-symbol op ".ZP") addr comment)
+	 (,(concat-symbol op ".AB") addr comment))))
+
+(page-agnostic ORA) (page-agnostic ASL) (page-agnostic AND) (page-agnostic BIT)
+(page-agnostic ROL) (page-agnostic EOR) (page-agnostic LSR) (page-agnostic ADC)
+(page-agnostic ROR) (page-agnostic STA) (page-agnostic STY) (page-agnostic STX)
+(page-agnostic LDA) (page-agnostic LDX) (page-agnostic LDY) (page-agnostic CPY)
+(page-agnostic CMP) (page-agnostic SBC) (page-agnostic CPX) (page-agnostic INC)
+(page-agnostic DEC)
 
 (reset-compiler)
 

@@ -27,7 +27,7 @@
   (setf *hash-fudge-factors* nil)
   (setf *word-collisions* nil)
   (reset-parser-between-passes))
-  
+
 (defun defword (word &rest synonyms)
   ;;don't do anything once the table has already been built
   (unless *hash-fudge-factors*
@@ -465,9 +465,8 @@
 
 (defun test-parse-input (input expected)
   ;;(format t "Testing ~a~%" input)
-
   (let ((words (parse-words-tester input)))
-    (print words)
+    ;;(print words)
     (loop
        for e in expected
        for r in words do
@@ -495,6 +494,13 @@
 ;;Push a sentence handler into the list of handlers for a location
 ;;Note that the location is NOT automatically applied to the handler address
 (defun defsentence (words handler-address &optional (location :generic))
+  ;;put all words in the table that aren't already in there
+  ;;as it stands we won't be able to declare any synonyms
+  ;;once they have been declared here, but perhaps that is yagni
+  (dolist (word words)
+    (unless (gethash (symbol-name word) *word-ids*)
+      (defword word)))
+
   (assert (null (find words (gethash location *handlers* )
 		      :key #'car :test #'equal))
 	  nil (format nil "The words ~a already appear with a handler." words))
@@ -610,7 +616,7 @@
 (defun dispatch-tester (input location expected-handler)
   (reset-compiler)
   (reset-symbol-table)
-  
+  (format t "Testing ~a in ~a -> ~a~%" input location expected-handler)
   (flet ((pass ()
 	   (zeropage)	     
 	   (org #x600)

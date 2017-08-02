@@ -22,32 +22,32 @@
 ;; OPEN DOOR
 ;; EXIT
 
+
+(defparameter *snickering* "You hear the faint sound of snickering...")
+(defparameter *thegodslookaway* "The gods look away in shame.")
+(defparameter *farout* "Far out!")
+
+;;todo what happens e.g. EXAMINE DOOR WINDOW
+
 (defun game-data ()
 
+  ;;Define synonyms
+  
   (defword :EXAMINE :LOOK)
   (defword :TAKE :GET :PICK :GRAB)
   (defword :LICK :EAT :TASTE)
-  (defword :OPEN)
-  (defword :LOCK)
-  (defword :CLOSE)
-  (defword :UNLOCK)
-
+  (defword :SLIME :PUDDING)
+  (defword :EXIT :OUT :GO)
+  (defword :ATTACK :KILL :HIT :CLEAVE :PUNCH)
+  
   (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/Downloads/cellardoor.bmp" :right
-	"You are in the dungeon prison of Wangband under the fortress of the Black Wizard, Beelzepops. Home to stench-rats, were-toads, sniveling goblins and you. Of the current denizens, you are currently the most wretched. A lime-green slime oozes out of the wall, making a rasping, wheezing sound. You must escape.")
+	"You are in the dungeon prison of Wangband under the fortress of the Black Wizard, Beelzepops. Home to stench-rats, were-toads, sniveling goblins and you. Of the current denizens, you are currently the most wretched. A lime-green slime oozes out of the wall, making a rasping, wheezing sound. You must escape, but your cell has a door...")
 
   (with-location :dungeon-cell 
-
-    (defword :SLIME :PUDDING)
-    (defword :WALL)
-    (defword :FLOOR)
-    (defword :CRACK)
-    (defword :KEY)
-    (defword :DOOR)
-    (defword :EXIT :OUT :GO)
-  
+    
     (defbits t :key-in-crack :door-locked)
     (defbits nil :slime-examined :slime-licked :crack-examined
-	     :door-open)
+	     :door-open :slop-flung)
   
     (action '(EXAMINE SLIME)
       (respond "Millions of sad eyes peer out from the slime.")
@@ -90,12 +90,43 @@
 	     (respond "What key? Do you know something I don't?")))
   
     (action '(EXAMINE DOOR)
+      (respond "The door is a grim iron affair with a tiny barred window and a keyhole.") 
       (ifbit :door-open
 	     (respond "The door is open.")
-	     (ifbit :door-locked
-		    (respond "The door is locked.")
-		    (respond "The door is closed."))))
+	     (respond "The door is closed.")))
 
+    (action '(EXAMINE WINDOW)
+      (setbit :slop-flung)
+      (respond "A goblin appears at the window. He flings some inedible slop through the bars.")
+      (respond *snickering*))
+
+    (action '(EXAMINE SLOP)
+      (ifbit :slop-flung
+	     (respond "A balanced soup of entrails, small amphibians and mandibles. Ooh! Garlic croutons!")))
+
+    (action '(EAT SLOP)
+      (ifbit :slop-flung
+	     (respond *thegodslookaway*)))
+    
+    (action '(EXAMINE KEY)
+      (ifbit :crack-examined
+	     ;;it is clear we are at the limits here of what we can do
+	     ;;without an object model. Where IS the key?
+	     (respond "It's a key, man.")
+	     (respond "What key?")))
+    
+    (action '(EXAMINE KEYHOLE) (respond "It's a keyhole, man."))
+    (action '(TAKE CRACK) (respond "Inadvisable."))
+    (action '(LICK CRACK) (respond *thegodslookaway*))
+    (action '(ATTACK SLIME) (respond "Your hand is stayed by the slime's gaze of infinite sadness."))
+
+    (action '(UNLOCK DOOR FINGER)
+      (ifbit :door-locked
+	     (progn
+	       (respond "Wise guy, eh? The lock doesn't budge. Your finger is now sore.")
+	       (respond *snickering*))
+	     (respond "You do realise you just put your finger in the keyhole of an unlocked door?")))
+    
     (action '(UNLOCK DOOR)
       (ifbit :door-locked
 	     (ifbit :key-in-crack
@@ -105,16 +136,34 @@
 		      (respond "The lock mechanism clicks...")))
 	     (respond "The door is already unlocked.")))
 
+    (action '(CLOSE DOOR)
+      (ifbit :door-open
+	     (progn
+	       (clrbit :door-open)
+	       (respond "The door closes.")
+	       (respond *thegodslookaway*))))
+
+    (action '(LOCK DOOR)
+      (ifbit :door-locked
+	     (respond "The door is already locked.")
+	     (progn
+	       (setbit :door-locked)
+	       (clrbit :door-open)
+	       (respond "The lock mechanism clicks shut. You really have got it in for yourself haven't you?"))))
+
     (action '(EXIT)
       (ifbit :door-open
 	     (respond "You go through the door...")
-	     (respond "You walk into the closed door. Ouch.")))
+	     (progn
+	       (respond "You walk into the closed door. Ouch.")
+	       (respond *snickering*))))
 
     (action '(LICK SLIME)
       (nifbit :slime-licked
 	      (progn
 		(setbit :slime-licked)
-		(respond "Colours break in waves upon your ears. Maia's cosmic tears rain down on you in a shower of gold. "))
+		(respond *farout*)
+		(respond "Myriad colours break in waves upon your ears. Maia's cosmic tears rain down on you in a shower of gold. The slime smiles."))
 	      (respond "Nothing happens. Your third eye is already open."
 		       "But... you do feel a strange urge to grow a beard and play the guitar.")))
 		 
@@ -124,8 +173,9 @@
 	     (ifbit :door-locked
 		    (respond
 		     "Have you been licking the slime? It's hallucinogenic."
-		     "The door, typically for a dungeon, is locked.")
+		     "The door, not unusually for a dungeon, is locked.")
 		    (progn
+		      (respond *farout*)
 		      (respond "The door creaks open.")
 		      (setbit :door-open))))))
 
@@ -134,6 +184,10 @@
       (nifbit '(:dungeon-cell . :key-in-crack)
 	      (respond "You already have the key!"
 		       "Perhaps the dungeon air is getting to you.")))))
+
+;;TODO Add door to description
+;;TODO edge case for Millions of eyes...
+;;TODO DONT SHOW THAT THE DOOR IS LOCKED FIRST TIME
 
 (defparameter origin #x600)
 
@@ -248,6 +302,9 @@
 ;;TODO the hyphen shouldn't be tacked on in the string table
 ;;TODO parser seems to take ages, shouldn't take that long
 ;;TODO fails to parse now, something todo with enter-input
+;;todo CLEAVE WIZARD == EXIT DOOR
+;;TODO TOUCH SLIME
+;;TODO ADD MATTOCK
 
 (defun run-game (&optional (break-on 'BRK))
   (build-game)

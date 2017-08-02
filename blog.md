@@ -14,7 +14,7 @@ Here is a screen-shot- bottom right, the user input entered at the repl, on the 
 - Something is needed to break up the user text and the responses, it all blends into one at the moment. Maybe a prompt >
 - A nice pattern is needed next to the title
 - Backstop to unknown words, at the moment you can type anything
-- Decide what to do about the 'sensible gibberish' problem. A colleague typed 'CLEAVE WIZARD' which the parser decided was equivalen to 'OPEN DOOR' this is clearly not acceptable. Or is it?
+- Decide what to do about the 'sensible gibberish' problem. A colleague typed 'CLEAVE WIZARD' which the parser decided was equivalent to 'OPEN DOOR' this is clearly not acceptable. Or is it?
 
 ## Interesting results
 

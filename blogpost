@@ -1,0 +1,151 @@
+#2/8/17 CLEAVE WIZARD, OPEN DOOR
+
+Progress report
+
+I have created a single location game where the idea is to escape from a dungeon cell, to test out the logic. It can be played at the LISP repl, using an instance of the VICKY screen driver running as a separate process to monitor it.
+
+Here is a screen-shot- bottom right, the user input entered at the repl, on the left just under VICKY you can see the game code that handles the action.
+
+TODO
+
+- I need to create a key input 'driver' so that the 6502 code can take user input
+- Something is needed to break up the user text and the responses, it all blends into one at the moment. Maybe a prompt >
+- A nice pattern is needed next to the title
+- Backstop to unknown words, at the moment you can type anything
+- Decide what to do about the 'sensible gibberish' problem. A colleague typed 'CLEAVE WIZARD' which the parser decided was equivalen to 'OPEN DOOR' this is clearly not acceptable. Or is it?
+
+## Interesting results
+
+It is nice to see the string compression working well, often better than 50% compression ratios for strings with common words.
+
+~~~~
+
+ 1613 A1..    DCS 'The door is already locked.' (27->11)
+ 161E A1..    DCS 'The door closes.' (16->7)
+ 1625 A1..    DCS 'The door is already unlocked.' (29->12)
+ 1631 A1..    DCS 'The lock mechanism clicks...' (28->13)
+
+~~~~
+
+Here is some game code, which is nice and declarative* and straightforward,
+
+~~~~
+
+(action '(TAKE KEY)
+      (ifbit :crack-examined
+	     (ifbit :key-in-crack
+		    (progn
+		      (respond "You take the shiny key.")
+		      (clrbit :key-in-crack))
+		    (respond "It's in your pocket..."
+			     "Perhaps the dungeon air is getting to you?"))
+	     (respond "What key? Do you know something I don't?")))
+
+~~~~
+
+*declarative basically has so many meanings it can mean anything one wants. I choose it to mean, abstracted and concerned only with describing the task at hand. It would be relatively easy to define action, ifbit, setbit to emit, say, javascript.
+
+and here is the resulting assembler code,
+
+~~~~
+
+;ON TAKE KEY 
+UNGEON-CELL:TAKE-KEY 0C5E 2CC70D  BIT $0DC7  ;DUNGEON-CELL:CRACK-EXAMINED  ;IF
+                     0C61 501A    BVC $0C7D  ;$0C5E:ELSE 
+                     0C63 2CCB0D  BIT $0DCB  ;DUNGEON-CELL:KEY-IN-CRACK  ;IF
+                     0C66 500D    BVC $0C75  ;$0C63:ELSE $0C61:ENDIF 
+                     0C68 204A0E  JSR $0E4A  ;PRINT-MESSAGE:1 
+                     0C6B C1..    DW $17C1   ;You take the shiny key.
+                     0C6D A900    LDA #$00
+                     0C6F 8DCB0D  STA $0DCB  ;DUNGEON-CELL:KEY-IN-CRACK 
+                     0C72 B8      CLV
+                     0C73 5005    BVC $0C7A  ;$0C63:ENDIF 
+         $0C61:ENDIF
+          $0C63:ELSE 0C75 20150E  JSR $0E15  ;PRINT-MESSAGE:2 
+                     0C78 9F..    DW $179F   ;It's in your pocket... Perhaps the dungeon
+air is getting to you?
+         $0C63:ENDIF 0C7A B8      CLV
+                     0C7B 5005    BVC $0C82  ;$0C5E:ENDIF 
+          $0C5E:ELSE 0C7D 204A0E  JSR $0E4A  ;PRINT-MESSAGE:1 
+                     0C80 88..    DW $1788   ;What key? Do you know something I don't?
+         $0C5E:ENDIF 0C82 60      RTS
+
+~~~~
+
+CLV is very boring after a JSR where we could insist that the overflow is cleared. It strikes me that we could annotate a function so that the code analysis can look inside and decide what has happened to the overflow flag. Either that or just make it do it and omit the CLV, with a comment in the print message code.
+
+It is tempting to put the state bits in the zero-page- this would free up a byte for every test and set. I have so far used very little zero-page and I have come to the conclusion that my fears of using it up were greatly exaggerated. I think this is because I know that I don't have any deeply recursive functions, or objects which really need to keep their state for a long time but also need fast access to it.
+
+Both these optimisations can wait, but it is worth noting that the logic for this room takes about 400 bytes. This is too much- and it does not include the actual strings or the image.
+
+Total game size is about 7K. This is encouraging as this includes three font tables, all the general routines and all the data and logic for a simple room.
+
+#2/8/17
+
+##CPX and CPY
+
+As in, it turns out 6502 has them. I completely forgot and as a result have coded the entire thing so far using CMP- first transferring X and Y to the accumulator where necessary.
+
+Clearly, 6502 is a bloated processor with far too many registers and instructions. What a waste of the three-thousand or so transistors it used.
+
+Hmm, 3000 transistors. Perhaps we could fit a million of them in an FPGA.
+
+#2/8/17
+
+##Page agnostic addressing
+
+Most 6502 assemblers would have provided an instruction which decides whether to use zero page addressing or absolute addressing. We can do this by resolving the address at compile time and then choosing the mode.
+
+e.g.
+
+~~~~
+
+LDA $1234  ;; assembler automatically chooses absolute addressing
+LDA $12    ;; assembler automatically chooses zero-page addressing
+LDA #$12   ;; automatically choose immediate mode
+
+~~~~
+
+This is useful as it can save a byte in the case where the target of the operation is in the zero-page. Up till now I have hand-coded this where I felt it was necessary, e.g.
+
+~~~~
+
+(if (resolves-to-zpg addr))
+  (BIT.ZP addr)
+  (BIT.AB addr))	
+
+~~~~
+
+With a bit of macro technology this can be expanded to cover all the instructions which have a zero-page and absolute mode,
+
+~~~~
+
+(defmacro page-agnostic (op)
+  `(defun ,(concat-symbol op ".*") (addr &optional comment)
+     (if (resolves-to-zpg addr)
+	 (,(concat-symbol op ".ZP") addr comment)
+	 (,(concat-symbol op ".AB") addr comment))))
+
+(page-agnostic ORA) (page-agnostic ASL) (page-agnostic AND) (page-agnostic BIT)
+(page-agnostic ROL) (page-agnostic EOR) (page-agnostic LSR) (page-agnostic ADC)
+(page-agnostic ROR) (page-agnostic STA) (page-agnostic STY) (page-agnostic STX)
+(page-agnostic LDA) (page-agnostic LDX) (page-agnostic LDY) (page-agnostic CPY)
+(page-agnostic CMP) (page-agnostic SBC) (page-agnostic CPX) (page-agnostic INC)
+(page-agnostic DEC)
+
+~~~~
+
+This code generates functions of the form
+
+~~~~
+
+(LDA.* my-label)
+(STX.* my-label)
+...
+
+~~~~
+
+
+Other assemblers I have seen use macros for the instructions themselves. This allows sneakier syntactical arrangements where the addressing mode can be inferred from the argument itself. This does allow the assembly to look a lot more like the original 6502 sources.
+
+I am not a fan of jumping to macros to gain some advantage in syntax- I don't think it is a big deal that we have to type LDA.* instead of LDA $, or LDA #xaa instead of LDA #$aa. In my opinion much effort has been wasted over the decades caring about syntax rather than more important things like composability and transparency. (LISP afficionados are not immune to this, the loop macro being the canonical example)

@@ -35,6 +35,15 @@ Unsurprisingly, the game data for the dungeon cell takes up the most memory. Thi
 
 - Put the state in the zero-page
 
+~~~~
+
+DUNGEON-CELL (2228)
+
+~~~~
+
+- Location pre-amble to parameters
+
+The location pre-amble does a lot of loading of data into locations. This could be parameterised.
 
 
 

@@ -24,7 +24,9 @@
       (when (not (equal ns (first bit)))
 	(setf ns (first bit))
 	(dc (format nil "Bits for ~a" ns)))
-      (db (second bit) (if (third bit) #xff #x00))))))
+      (zp-b (second bit) (if (third bit) #xff #x00))))))
+      
+      ;;(db (second bit) (if (third bit) #xff #x00))))))
 
 (defun defbits (initially-set &rest bits)
   (dolist (bit bits)
@@ -35,10 +37,10 @@
   (if set
       (progn
 	(LDA #xFF)
-	(STA.AB bit))
+	(STA.* bit))
       (progn
 	(LDA #x00)
-	(STA.AB bit))))
+	(STA.* bit))))
 
 (defun clrbit (bit)
   (setbit bit nil))
@@ -60,9 +62,7 @@
        (let ((,bitsym ,bit))
 	 (with-local-namespace
 	   (dc "IF" t)
-	   (if (resolves-to-zpg ,bitsym)
-	       (BIT.ZP ,bitsym)
-	       (BIT.AB ,bitsym))
+	   (BIT.* ,bitsym)
 	   (BVC ,(if else-supplied-p :else :endif))
 	   (let ((,then-addr *compiler-ptr*))
 	     (declare (ignorable ,then-addr))
@@ -87,10 +87,9 @@
       (let ((bitsym (gensym)))
 	`(let ((namespace *compiler-label-namespace*))
 	   (let ((,bitsym ,bit))
-	     (with-local-namespace (format nil "NIF ~a" ,bitsym)
-	       (if (resolves-to-zpg ,bitsym)
-		   (BIT.ZP ,bitsym)
-		   (BIT.AB ,bitsym))
+	     (with-local-namespace
+	       (format nil "NIF ~a" ,bitsym)
+	       (BIT.* ,bitsym)
 	       (BVS :endif)
 	       (with-namespace namespace
 		 ,then)

@@ -1,27 +1,7 @@
 
-;; A simple game to test all the bits work
+; A simple game to test all the bits work
 
-;; TODO See why the labels seem to be in the labels list twice
-;; oh yes, this is an artefact of them not being in the same
-;; place in the second pass. Once the structure is sorted out
-;; it should be fine, though it might be better to use a
-;; counter which will give the same effect.
-
-;; TODO ensure justify will split on a -
-;; TODO ensure that the location string fits and leaves 4 lines at the bottom
-
-;; EXAMINE WALL
-;; EXAMINE SLIME
-;; EXAMINE FLOOR
-;; EXAMINE CRACK
-;; OPEN DOOR
-;; LICK SLIME
-;; EXAMINE CRACK
-;; TAKE KEY
-;; UNLOCK DOOR
-;; OPEN DOOR
-;; EXIT
-
+;; catchphrases
 
 (defparameter *snickering* "You hear the faint sound of snickering...")
 (defparameter *thegodslookaway* "The gods look away in shame.")
@@ -36,7 +16,7 @@
   (defword :EXAMINE :LOOK)
   (defword :TAKE :GET :PICK :GRAB)
   (defword :LICK :EAT :TASTE)
-  (defword :SLIME :PUDDING)
+  (defword :SLIME :OOZE :PUDDING)
   (defword :EXIT :OUT :GO)
   (defword :ATTACK :KILL :HIT :CLEAVE :PUNCH)
   
@@ -185,10 +165,6 @@
 	      (respond "You already have the key!"
 		       "Perhaps the dungeon air is getting to you.")))))
 
-;;TODO Add door to description
-;;TODO edge case for Millions of eyes...
-;;TODO DONT SHOW THAT THE DOOR IS LOCKED FIRST TIME
-
 (defparameter origin #x600)
 
 (defun build-game (&key (full-reset nil) (quick-parser t))
@@ -315,7 +291,7 @@
 ;;A goblin appears at the door. He flings some inedible slop through the bars.
 
 ;;(dloc :frazbolgs-closet "FRAZBOLG'S CLOSET" "/home/dan/Downloads/goblincloset.bmp" :right
-;;      "You are in the well-appointed closet of the goblin guard Frazbolg. Over centuries of guarding his prisoners he has amassed an impressive collection of posessions, a single chair (broken), a spare loin-cloth (tattered) and a hundred-year-old copy of Modern Necromancer magazine.")
+;;      "You are in the well-appointed closet of the goblin guard Frazbolg. Over centuries of guarding his prisoners he has amassed an impressive collection of posessions, a single chair (broken), a spare loin-cloth (tattered), a toaster and a hundred-year-old copy of Modern Necromancer magazine.")
 
 ;;You see a spanner
 
@@ -326,3 +302,5 @@
 ;;Frazbolg is engrossed in an article 'Lady necromancers. Here to stay?'
 ;;Frazbolg is engrossed in an article 'One weird trick for a bloated corpse.'
 ;;Frazbolg says 'I am stuck here until I can afford Necromancer school.'
+
+;;You gaze into the toaster. The toaster gazes into you.

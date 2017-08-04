@@ -1,151 +1,125 @@
-#2/8/17 CLEAVE WIZARD, OPEN DOOR
+## 4/7/2017 Optimization
 
-Progress report
+Rather than fix the current set of bugs or work on new features I have decided to work on memory optimization. To this end I will build a function which tabulates the memory usage by namespace in an effort to find the best bits to concentrate on.
 
-I have created a single location game where the idea is to escape from a dungeon cell, to test out the logic. It can be played at the LISP repl, using an instance of the VICKY screen driver running as a separate process to monitor it.
-
-Here is a screen-shot- bottom right, the user input entered at the repl, on the left just under VICKY you can see the game code that handles the action.
-
-TODO
-
-- I need to create a key input 'driver' so that the 6502 code can take user input
-- Something is needed to break up the user text and the responses, it all blends into one at the moment. Maybe a prompt >
-- A nice pattern is needed next to the title
-- Backstop to unknown words, at the moment you can type anything
-- Decide what to do about the 'sensible gibberish' problem. A colleague typed 'CLEAVE WIZARD' which the parser decided was equivalen to 'OPEN DOOR' this is clearly not acceptable. Or is it?
-
-## Interesting results
-
-It is nice to see the string compression working well, often better than 50% compression ratios for strings with common words.
+Here are the results of the new dump-namespaces function
 
 ~~~~
 
- 1613 A1..    DCS 'The door is already locked.' (27->11)
- 161E A1..    DCS 'The door closes.' (16->7)
- 1625 A1..    DCS 'The door is already unlocked.' (29->12)
- 1631 A1..    DCS 'The lock mechanism clicks...' (28->13)
+DUNGEON-CELL (2275)
+TYPESET-CS (743)
+PARSER (445)
+DECOMPRESS (206)
+DISPATCHER (189)
+TYPESET (123)
+MEMSET (116)
+MEMCPY (100)
+BINARY-PARSER (43)
+$0D90 (41)
+PRINT-MESSAGE (37)
+$0D04 (36)
+$0C5E (36)
+$0C39 (36)
+$0D9D (28)
+$0D73 (28)
+$0D3E (28)
+$0D5B (23)
+$0D09 (23)
+$0CEC (23)
+$0C63 (23)
+$0C3E (23)
 
 ~~~~
 
-Here is some game code, which is nice and declarative* and straightforward,
+Unsurprisingly, the game data for the dungeon cell takes up the most memory. This does not include the compressed string data, but since this is already compressed as best as I can, it doesn't matter. So here are the things to do.
+
+- Put the state in the zero-page
+
+
+
+
+## 4/7/2017 Local variable assignment
+
+Yesterday I discovered an interesting online paper by David A Wheeler (https://www.dwheeler.com/6502/a-lang.txt) which described some strategies for a higher level language for programming the 6502. Although my project is about *ad-hoc* program construction and specifically *not* language development or compilation, there are a lot of points of cross-over. He even uses the term super-assembler or something similar, which is a term I have been using to describe the LISP code here.
+
+One thing that stood out was his observation that careful use of the zero-page could enable efficient sharing of data between function calls. He describes a topological sort which ensures that 'local' variables occupy the same slot in the zero-page as the a function which takes them as input, this avoiding a copy.
+
+This is something I have to do manually, with the aid of aliasing and assertions,
 
 ~~~~
 
-(action '(TAKE KEY)
-      (ifbit :crack-examined
-	     (ifbit :key-in-crack
-		    (progn
-		      (respond "You take the shiny key.")
-		      (clrbit :key-in-crack))
-		    (respond "It's in your pocket..."
-			     "Perhaps the dungeon air is getting to you?"))
-	     (respond "What key? Do you know something I don't?")))
-
+(with-namespace :print-message
+    (label :print)
+    (alias :str '(:typeset-cs . :str)) 
+    (alias :tmp :A0)
+    (ensure-aliases-different :str :tmp '(:typeset . :raster))
+  
 ~~~~
 
-*declarative basically has so many meanings it can mean anything one wants. I choose it to mean, abstracted and concerned only with describing the task at hand. It would be relatively easy to define action, ifbit, setbit to emit, say, javascript.
+Here we can see this in action- the typeset-cs str variable is used in the print message routine, and also provides the input to the typeset routine. An assertion follows to ensure that non of the zero-page aliases clash, both in the print message function and the function it calls.
 
-and here is the resulting assembler code,
+Because we are rarely calling functions more than one level deep, it is relatively straightforward to ensure we do not have memory location clash manually. Should the call graph become more complex then the scheme described by Wheeler would be advantageous. At this point however, we would need to have a more concrete notion of what constitutes a function. Yagni, for now, and my guess is that the adventure game project will never have a call graph of functions which rises to this level of complexity.
 
-~~~~
+## 3/7/2017 Esoteric Considerations
 
-;ON TAKE KEY 
-UNGEON-CELL:TAKE-KEY 0C5E 2CC70D  BIT $0DC7  ;DUNGEON-CELL:CRACK-EXAMINED  ;IF
-                     0C61 501A    BVC $0C7D  ;$0C5E:ELSE 
-                     0C63 2CCB0D  BIT $0DCB  ;DUNGEON-CELL:KEY-IN-CRACK  ;IF
-                     0C66 500D    BVC $0C75  ;$0C63:ELSE $0C61:ENDIF 
-                     0C68 204A0E  JSR $0E4A  ;PRINT-MESSAGE:1 
-                     0C6B C1..    DW $17C1   ;You take the shiny key.
-                     0C6D A900    LDA #$00
-                     0C6F 8DCB0D  STA $0DCB  ;DUNGEON-CELL:KEY-IN-CRACK 
-                     0C72 B8      CLV
-                     0C73 5005    BVC $0C7A  ;$0C63:ENDIF 
-         $0C61:ENDIF
-          $0C63:ELSE 0C75 20150E  JSR $0E15  ;PRINT-MESSAGE:2 
-                     0C78 9F..    DW $179F   ;It's in your pocket... Perhaps the dungeon
-air is getting to you?
-         $0C63:ENDIF 0C7A B8      CLV
-                     0C7B 5005    BVC $0C82  ;$0C5E:ENDIF 
-          $0C5E:ELSE 0C7D 204A0E  JSR $0E4A  ;PRINT-MESSAGE:1 
-                     0C80 88..    DW $1788   ;What key? Do you know something I don't?
-         $0C5E:ENDIF 0C82 60      RTS
+What is programming?
 
-~~~~
+If one imagines a cross-section of the different programs in existence one will find that they all share some things in common. Namely, state and changes to state. Put alternatively, state and behaviour. Fundamentally I think this is what computation is all about. Database app, web-sites, games all take, manipulate and deliver state.
 
-CLV is very boring after a JSR where we could insist that the overflow is cleared. It strikes me that we could annotate a function so that the code analysis can look inside and decide what has happened to the overflow flag. Either that or just make it do it and omit the CLV, with a comment in the print message code.
+But what about pure functional languages? Surely they aren't about manipulating state? Absolutely they are. They do not exist in a vacuum- their state is the input provided to them and the output they give. Conceptually the sausage factory in the middle can be described as functions which have no side-effects but IMO this is a distinction without a difference. Functional concepts are absolutely essential in arranging ones thoughts about computation, but they are not fundamental to its implementation. Definite advantages can be had by thinking about a computational process in terms of pure function composition, but it is a category error to insist this be the basis for a *real* programming language.
 
-It is tempting to put the state bits in the zero-page- this would free up a byte for every test and set. I have so far used very little zero-page and I have come to the conclusion that my fears of using it up were greatly exaggerated. I think this is because I know that I don't have any deeply recursive functions, or objects which really need to keep their state for a long time but also need fast access to it.
+Early programs (some of mine from the 80s for example) are a mess of state and gotos; they are basically impossible to fully understand. Programs such as this have a combinatorial explosion of state such that it is easy to get into the soup and have no idea how it happened. The only solution is to turn it off and on again. Absolutely no-one who has experienced this wants to go back to it.
 
-Both these optimisations can wait, but it is worth noting that the logic for this room takes about 400 bytes. This is too much- and it does not include the actual strings or the image.
+I have learned programming this 6502 adventure game so far is this,
 
-Total game size is about 7K. This is encouraging as this includes three font tables, all the general routines and all the data and logic for a simple room.
+- Most bugs were in behaviour code- i.e. either incorrect design or just flat out incorrectly implemented logic.
+- TWO 'state' bugs that went undetected. One was an uninitialised loop counter, the other was the parse input buffer not being cleared down. This is not indicative of a combinatorial explosion of dodgy state.
+- Unit testing is good to ensure behaviour works
+- Unit testing still can't deal with unknown state transitions
 
-#2/8/17
+So,
 
-##CPX and CPY
+- Functional thinking is useful *in the conceptual or design realm*. Make a serious effort to reduce the amount of state, and therefore the number of state transitions.
+- Functional straitjackets *in the implementation realm* are not useful. Loop, modify state, do what needs to be done, get over it.
 
-As in, it turns out 6502 has them. I completely forgot and as a result have coded the entire thing so far using CMP- first transferring X and Y to the accumulator where necessary.
+### Fetishization of recursion.
 
-Clearly, 6502 is a bloated processor with far too many registers and instructions. What a waste of the three-thousand or so transistors it used.
+Recursion is over-rated. There are *very* few problems which require recursion, for example, there is no recursion in the code-base for this adventure game. None. Scheme, Haskell (and most modern LISP) tutorials would have us believe that if we aren't doing recursion to add a list of numbers together then we are like the apes at the beginning of the 2001 movie.
 
-Hmm, 3000 transistors. Perhaps we could fit a million of them in an FPGA.
+Do we need recursion?
 
-#2/8/17
+Can you type a recursive solution faster than you can type a loop based solution? If so, do it. Did we *need* to do it recursively? No. Is it faster? Probably not, most languages don't have tail-call optimisation.
 
-##Page agnostic addressing
+Ok, my language has tail-call optimisation. Great! You might even get it as a benefit of any JITting that occurs. Now, did you remember to put the recursive call in the tail position? Not sure? Is it even possible? If it's not possible, you may be able to do it as a loop- if not congratulations, you may need recursion!
+ 
+Ok, we need recursion, we can't use TCO as this is a problem that requires some state to be saved until after the recursive call. Now, there is but one question. Do you have enough stack to solve the problem? No, make it two questions. Can you arrange the code so that it doesn't melt your brain? This is not an idle consideration. In my programming career I have written enough recursive code that really did need to store up the state, and the primary worry was whether it would scale. The secondary worry was arranging the functions just so, so that the shape of the call stack fit the shape of the problem.
 
-Most 6502 assemblers would have provided an instruction which decides whether to use zero page addressing or absolute addressing. We can do this by resolving the address at compile time and then choosing the mode.
+If the problem doesn't fit the shape of the call stack well, or if the call stack would not be large enough you may need to 'emulate' recursion by using some sort of queue, or explicit stack and... a loop. At this point I guarantee your code will not have the idiomatic shape of recursive code in your chosen language.
 
-e.g.
+Now my code isn't functional! How can I compose it and take advantage of all the gifts and boons this bestows? Just concentrate on make your function pure, if composing it and keeping it nice and modular is your concern. Don't worry about the seething mass of state inside, no-one else will ever see it.
 
-~~~~
+Now my code isn't functional! How can I compose it with other behaviour INSIDE the recursive code. Have you ever tried to do this as a solution to anything outside a toy problem? I think there are probably five people in the world who can do this with ease and they are either working on the Haskell compiler or their PhD thesis is literally called "Mutually Recursive Functions for Fun and Recreation". Of course, for this thesis, they have written their own Scheme implementation in Python, and the recursive bits are transpiled to imperative code, just for now, until they can make it more performant.
 
-LDA $1234  ;; assembler automatically chooses absolute addressing
-LDA $12    ;; assembler automatically chooses zero-page addressing
-LDA #$12   ;; automatically choose immediate mode
+Let us examine three Fibonaccis in SBCL LISP.
 
-~~~~
+- Loop based
+- Recursive
 
-This is useful as it can save a byte in the case where the target of the operation is in the zero-page. Up till now I have hand-coded this where I felt it was necessary, e.g.
+Conclusion
 
-~~~~
+Recursion is (mostly) only useful for toy problems of the sort found in modern programming tutorials, but may find occasional use where the problem is well suited to being expressed recursively and has no scaling problems. Mutual recursion in anything more complex than working out Fibonacci is basically far too complex to arrange in practice. Sadly I think that LISP tutorials feature too much emphasis on mapcar and pals- a construct which is not very efficient. It makes more sense to instruct functional programming in C# using LINQ, but even there we see the limits of composability very quickly. Going beyond a few chained Selects and Wheres is a painful nightmare in practice. Grouping? Forget about it.
 
-(if (resolves-to-zpg addr))
-  (BIT.ZP addr)
-  (BIT.AB addr))	
+Now let us look at a recursive solution with memoization, which will lead us to the other thing that programming is.
 
-~~~~
+- Recursion with memoization
 
-With a bit of macro technology this can be expanded to cover all the instructions which have a zero-page and absolute mode,
+## Programming is transformation of state
 
-~~~~
+## Transformation of state is Data de-compression
 
-(defmacro page-agnostic (op)
-  `(defun ,(concat-symbol op ".*") (addr &optional comment)
-     (if (resolves-to-zpg addr)
-	 (,(concat-symbol op ".ZP") addr comment)
-	 (,(concat-symbol op ".AB") addr comment))))
+## Data de-compression is prediction
 
-(page-agnostic ORA) (page-agnostic ASL) (page-agnostic AND) (page-agnostic BIT)
-(page-agnostic ROL) (page-agnostic EOR) (page-agnostic LSR) (page-agnostic ADC)
-(page-agnostic ROR) (page-agnostic STA) (page-agnostic STY) (page-agnostic STX)
-(page-agnostic LDA) (page-agnostic LDX) (page-agnostic LDY) (page-agnostic CPY)
-(page-agnostic CMP) (page-agnostic SBC) (page-agnostic CPX) (page-agnostic INC)
-(page-agnostic DEC)
+## Prediction is action
 
-~~~~
+And now we have arrived at either a profoundly strange loop, or a humdrum tautology.
 
-This code generates functions of the form
-
-~~~~
-
-(LDA.* my-label)
-(STX.* my-label)
-...
-
-~~~~
-
-
-Other assemblers I have seen use macros for the instructions themselves. This allows sneakier syntactical arrangements where the addressing mode can be inferred from the argument itself. This does allow the assembly to look a lot more like the original 6502 sources.
-
-I am not a fan of jumping to macros to gain some advantage in syntax- I don't think it is a big deal that we have to type LDA.* instead of LDA $, or LDA #xaa instead of LDA #$aa. In my opinion much effort has been wasted over the decades caring about syntax rather than more important things like composability and transparency. (LISP afficionados are not immune to this, the loop macro being the canonical example)

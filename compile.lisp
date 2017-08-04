@@ -16,6 +16,7 @@
 (defparameter *compiler-label-namespace* nil)
 (defparameter *compiler-namespace-depth* 0)
 (defparameter *compiler-namespace-stack* nil)
+(defparameter *compiler-namespace-sizes* nil)
 
 ; todo A way of providing a 'spare byte/word' to the compile
 ; which can then be used later e.g.
@@ -41,6 +42,8 @@
   (setf *compiler-zp-free-slot* 0)
   (setf *compiler-namespace-depth* 0)
   (setf *compiler-namespace-stack* nil)
+  (setf *compiler-namespace-sizes* (make-hash-table :test 'equal))
+
   (values))
 
 (defmacro defop (byte opcode &optional (mode :imp))
@@ -353,17 +356,40 @@
       (dw label word))
     (incf *compiler-zp-free-slot* 2)))
 
+(defun inc-namespace-bytes (namespace bytes)
+  (unless namespace
+    (setf namespace 'global))
+  (let ((size (gethash namespace *compiler-namespace-sizes*)))
+    (setf (gethash namespace *compiler-namespace-sizes*)
+	  (if size (+ size bytes) bytes))))
+
+(defun dump-namespaces ()
+  (let ((entries nil))
+  (maphash #'(lambda (namespace bytes)
+	       (push (cons namespace bytes) entries))
+	   *compiler-namespace-sizes*)
+  (dolist (entry (sort entries #'> :key #'cdr))
+    (format t "~a (~a)~%" (car entry) (cdr entry)))))
+
+;;todo this way of defining a macro is a bit troublesome, I think
+;;this can be gleaned from the fact that the parameters are immediately
+;;evaluated and that the body could just be funcalled. The immediate advantage
+;;would be recompilation.
 (defmacro with-namespace (namespace &body body)
   "In the scope of the macro, define labels in the namespace
    Label resolution will be done preferentially in this namespace
    but will fall back to the global namespace if not found"
-  (let ((ns (gensym)))
+  (let ((ns (gensym))
+	(ptrsym (gensym)))
     `(let* ((,ns ,namespace)
+	    (,ptrsym *compiler-ptr*)
 	    ;;could get rid of this namespace as it is just the car of the stack
 	    (*compiler-label-namespace* ,ns))
        (push ,ns *compiler-namespace-stack*)
        ,@body
-       (pop *compiler-namespace-stack*))))
+       (pop *compiler-namespace-stack*)
+       (when *compiler-final-pass*
+	 (inc-namespace-bytes ,ns (- *compiler-ptr* ,ptrsym))))))
 
 (defmacro with-local-namespace (&body body)
   "All labels in this scope will resolve to the instantation

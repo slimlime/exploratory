@@ -316,7 +316,7 @@
   (JMP '(:print-message . :print))
   
   (label '(:print-message . 1))
-
+  
   (call-memcpy (scradd (live-row 1) 0)
 	       (scradd (live-row 0) 0)
 	       (* 2 +screen-width-bytes+ *line-height*))

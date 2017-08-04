@@ -11,29 +11,13 @@ TYPESET-CS (743)
 PARSER (445)
 DECOMPRESS (206)
 DISPATCHER (189)
-TYPESET (123)
-MEMSET (116)
-MEMCPY (100)
-BINARY-PARSER (43)
-$0D90 (41)
-PRINT-MESSAGE (37)
-$0D04 (36)
-$0C5E (36)
-$0C39 (36)
-$0D9D (28)
-$0D73 (28)
-$0D3E (28)
-$0D5B (23)
-$0D09 (23)
-$0CEC (23)
-$0C63 (23)
-$0C3E (23)
+...
 
 ~~~~
 
 Unsurprisingly, the game data for the dungeon cell takes up the most memory. This does not include the compressed string data, but since this is already compressed as best as I can, it doesn't matter. So here are the things to do.
 
-- Put the state in the zero-page
+- Put the state in the zero-page (DONE)
 
 ~~~~
 
@@ -41,11 +25,83 @@ DUNGEON-CELL (2228)
 
 ~~~~
 
-- Location pre-amble to parameters
+- Alternate mechanism for state
 
-The location pre-amble does a lot of loading of data into locations. This could be parameterised.
+Current method for setting state sets the entire byte to either 0 or FF.
 
+~~~~
 
+4 bytes to set, 4 bytes to clear.
+
+LDA #xFF
+STA $byte
+
+LDA #x00
+STA $byte
+
+~~~~
+
+This requires loading the accumulator with the right value. Alternatively, we can use the property that BIT also tests the sign bit of the byte, so the following trick becomes available.
+
+~~~~
+
+3 bytes set, 2 bytes clear! Rotate in the carry to set the sign bit, shift the byte to clear it.
+
+SEC
+ROR $byte
+
+LSR $byte
+
+~~~~
+
+Disadvantage of this method is that it only ensures that the sign bit is set or clear. This means that there are many more instructions that will affect it. This means we will probably have to do a three byte jump to skip the else clause where required.
+
+And now we are down to...
+
+~~~~
+
+DUNGEON-CELL (2195)
+
+~~~~
+
+- Branch directly to RTS (TODO)
+
+The if macro puts a branch in to skip past the else clause; sometimes this goes directly to some more code, which is fine, but other times it branches directly to an RTS. Sometimes this is more than one level deep, a waste of 2 bytes each time this occurs.
+
+e.g. the JMPs at 0C44 and 0C4C are very dull, and could be replaced with an RTS.
+
+~~~~
+
+N-CELL:EXAMINE-CRACK 0C34 2412    BIT $12    ;IF SLIME-LICKED
+         $0C1F:ENDIF 0C36 1017    BPL $0C4F  ;$0C34:ELSE 
+                     0C38 2415    BIT $15    ;IF KEY-IN-CRACK
+                     0C3A 100B    BPL $0C47  ;$0C38:ELSE 
+                     0C3C 20160E  JSR $0E16  ;PRINT-MESSAGE:1 
+                     0C3F 0B..    DW $180B   ;A glint of metal shines back at you... A key!
+                     0C41 38      SEC
+                     0C42 6611    ROR $11
+                     0C44 4C4C0C  JMP $0C4C  ;$0C38:ENDIF 
+          $0C38:ELSE 0C47 20C30D  JSR $0DC3  ;PRINT-MESSAGE:3 
+                     0C4A C7..    DW $17C7   ;A crack in the floor, just like any other.
+One might hide a small key-like object here.
+Like, for example, a key.
+         $0C38:ENDIF 0C4C 4C540C  JMP $0C54  ;$0C34:ENDIF $0C37:ELSE 
+          $0C34:ELSE 0C4F 20C30D  JSR $0DC3  ;PRINT-MESSAGE:3 
+                     0C52 97..    DW $1797   ;The Veil of Maia, or your shocking
+hangover prevents you from seeing
+anything interesting.
+          $0C37:ELSE
+         $0C34:ENDIF 0C54 60      RTS
+
+~~~~
+
+If we were doing compilation there would be an intermediate step which would analyse the branches and collapse redundant ones. Since we are only doing assembly, there may be a trick we can do, but I am going to put it on the back burner.
+
+- Parameterize location initialization (TODO)
+
+The pre-amble to setting up a location is long and tedious (approx 150 bytes). Considering the location has only an image, a title and a dispatch table, it really should just be 6 bytes plus a JSR.
+
+We can make it into a function, but in the normal way I will wait until there is at least another instance.
 
 ## 4/7/2017 Local variable assignment
 
@@ -128,7 +184,7 @@ Now let us look at a recursive solution with memoization, which will lead us to 
 
 ## Data de-compression is prediction
 
-## Prediction is action
+## Prediction is closely related to action, which is transformation of state
 
 And now we have arrived at either a profoundly strange loop, or a humdrum tautology.
 

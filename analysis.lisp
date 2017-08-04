@@ -5,6 +5,8 @@
 (defun add-effects (op flag-effects)
   (setf (gethash op *opcode-effects*) flag-effects))
 
+(defparameter *valid-flags* '(S V Z C I D))
+
 (add-effects 'ADC '(S V Z C))
 (add-effects 'AND '(S Z))
 (add-effects 'ASL '(S Z C))
@@ -61,6 +63,7 @@
   nil)
 
 (defun code-affects-flag (flag start end)
+  (assert (find flag *valid-flags*) nil (format nil "Unknown ~a flag" flag))
   (when *compiler-debug*
     (format t "Code affects flag ~a~%" flag)
     (disassemble-6502 start end))

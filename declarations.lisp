@@ -33,14 +33,11 @@
     (defbit bit initially-set)))
 
 (defun setbit (bit &optional (set t))
-  ;;TODO we might move these to the zpg, so check for that
   (if set
       (progn
-	(LDA #xFF)
-	(STA.* bit))
-      (progn
-	(LDA #x00)
-	(STA.* bit))))
+	(SEC)
+	(ROR.* bit))
+      (LSR.* bit)))
 
 (defun clrbit (bit)
   (setbit bit nil))
@@ -61,9 +58,9 @@
     `(let ((namespace *compiler-label-namespace*))
        (let ((,bitsym ,bit))
 	 (with-local-namespace
-	   (dc "IF" t)
+	   (dc (format nil "IF ~a" ,bitsym) t)
 	   (BIT.* ,bitsym)
-	   (BVC ,(if else-supplied-p :else :endif))
+	   (BPL ,(if else-supplied-p :else :endif))
 	   (let ((,then-addr *compiler-ptr*))
 	     (declare (ignorable ,then-addr))
 	     (with-namespace namespace
@@ -71,11 +68,9 @@
 	     ,(when else-supplied-p
 		 `(progn
 		    (unless (= (peek-last-byte) #x60) ;;RTS
-		      (if (code-affects-flag 'V ,then-addr (1- *compiler-ptr*))
-			  (progn
-			    (CLV)
-			    (BVC :endif))
-			  (BVS :endif)))
+		      (if (code-affects-flag 'S ,then-addr (1- *compiler-ptr*))
+			  (JMP :endif)
+			  (BMI :endif)))
 		    (label :else)
 		    (with-namespace namespace
 		      ,else)))
@@ -90,7 +85,7 @@
 	     (with-local-namespace
 	       (format nil "NIF ~a" ,bitsym)
 	       (BIT.* ,bitsym)
-	       (BVS :endif)
+	       (BMI :endif)
 	       (with-namespace namespace
 		 ,then)
 	       (label :endif)))))))

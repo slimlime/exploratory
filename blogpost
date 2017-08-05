@@ -1,129 +1,4 @@
-## 4/7/2017 Optimization
 
-Rather than fix the current set of bugs or work on new features I have decided to work on memory optimization. To this end I will build a function which tabulates the memory usage by namespace in an effort to find the best bits to concentrate on.
-
-Here are the results of the new dump-namespaces function
-
-~~~~
-
-DUNGEON-CELL (2275)
-TYPESET-CS (743)
-PARSER (445)
-DECOMPRESS (206)
-DISPATCHER (189)
-...
-
-~~~~
-
-Unsurprisingly, the game data for the dungeon cell takes up the most memory. This does not include the compressed string data, but since this is already compressed as best as I can, it doesn't matter. So here are the things to do.
-
-- Put the state in the zero-page (DONE)
-
-~~~~
-
-DUNGEON-CELL (2228)
-
-~~~~
-
-- Alternate mechanism for state
-
-Current method for setting state sets the entire byte to either 0 or FF.
-
-~~~~
-
-4 bytes to set, 4 bytes to clear.
-
-LDA #xFF
-STA $byte
-
-LDA #x00
-STA $byte
-
-~~~~
-
-This requires loading the accumulator with the right value. Alternatively, we can use the property that BIT also tests the sign bit of the byte, so the following trick becomes available.
-
-~~~~
-
-3 bytes set, 2 bytes clear! Rotate in the carry to set the sign bit, shift the byte to clear it.
-
-SEC
-ROR $byte
-
-LSR $byte
-
-~~~~
-
-Disadvantage of this method is that it only ensures that the sign bit is set or clear. This means that there are many more instructions that will affect it. This means we will probably have to do a three byte jump to skip the else clause where required.
-
-And now we are down to...
-
-~~~~
-
-DUNGEON-CELL (2195)
-
-~~~~
-
-- Branch directly to RTS (TODO)
-
-The if macro puts a branch in to skip past the else clause; sometimes this goes directly to some more code, which is fine, but other times it branches directly to an RTS. Sometimes this is more than one level deep, a waste of 2 bytes each time this occurs.
-
-e.g. the JMPs at 0C44 and 0C4C are very dull, and could be replaced with an RTS.
-
-~~~~
-
-N-CELL:EXAMINE-CRACK 0C34 2412    BIT $12    ;IF SLIME-LICKED
-         $0C1F:ENDIF 0C36 1017    BPL $0C4F  ;$0C34:ELSE 
-                     0C38 2415    BIT $15    ;IF KEY-IN-CRACK
-                     0C3A 100B    BPL $0C47  ;$0C38:ELSE 
-                     0C3C 20160E  JSR $0E16  ;PRINT-MESSAGE:1 
-                     0C3F 0B..    DW $180B   ;A glint of metal shines back at you... A key!
-                     0C41 38      SEC
-                     0C42 6611    ROR $11
-                     0C44 4C4C0C  JMP $0C4C  ;$0C38:ENDIF 
-          $0C38:ELSE 0C47 20C30D  JSR $0DC3  ;PRINT-MESSAGE:3 
-                     0C4A C7..    DW $17C7   ;A crack in the floor, just like any other.
-One might hide a small key-like object here.
-Like, for example, a key.
-         $0C38:ENDIF 0C4C 4C540C  JMP $0C54  ;$0C34:ENDIF $0C37:ELSE 
-          $0C34:ELSE 0C4F 20C30D  JSR $0DC3  ;PRINT-MESSAGE:3 
-                     0C52 97..    DW $1797   ;The Veil of Maia, or your shocking
-hangover prevents you from seeing
-anything interesting.
-          $0C37:ELSE
-         $0C34:ENDIF 0C54 60      RTS
-
-~~~~
-
-If we were doing compilation there would be an intermediate step which would analyse the branches and collapse redundant ones. Since we are only doing assembly, there may be a trick we can do, but I am going to put it on the back burner.
-
-- Parameterize location initialization (TODO)
-
-The pre-amble to setting up a location is long and tedious (approx 150 bytes). Considering the location has only an image, a title and a dispatch table, it really should just be 6 bytes plus a JSR.
-
-We can make it into a function, but in the normal way I will wait until there is at least another instance.
-
-## 4/7/2017 Local variable assignment
-
-Yesterday I discovered an interesting online paper by David A Wheeler (https://www.dwheeler.com/6502/a-lang.txt) which described some strategies for a higher level language for programming the 6502. Although my project is about *ad-hoc* program construction and specifically *not* language development or compilation, there are a lot of points of cross-over. He even uses the term super-assembler or something similar, which is a term I have been using to describe the LISP code here.
-
-One thing that stood out was his observation that careful use of the zero-page could enable efficient sharing of data between function calls. He describes a topological sort which ensures that 'local' variables occupy the same slot in the zero-page as the a function which takes them as input, this avoiding a copy.
-
-This is something I have to do manually, with the aid of aliasing and assertions,
-
-~~~~
-
-(with-namespace :print-message
-    (label :print)
-    (alias :str '(:typeset-cs . :str)) 
-    (alias :tmp :A0)
-    (ensure-aliases-different :str :tmp '(:typeset . :raster))
-  
-~~~~
-
-Here we can see this in action- the typeset-cs str variable is used in the print message routine, and also provides the input to the typeset routine. An assertion follows to ensure that non of the zero-page aliases clash, both in the print message function and the function it calls.
-
-Because we are rarely calling functions more than one level deep, it is relatively straightforward to ensure we do not have memory location clash manually. Should the call graph become more complex then the scheme described by Wheeler would be advantageous. At this point however, we would need to have a more concrete notion of what constitutes a function. Yagni, for now, and my guess is that the adventure game project will never have a call graph of functions which rises to this level of complexity.
 
 ## 3/7/2017 Esoteric Considerations
 
@@ -169,6 +44,31 @@ Let us examine three Fibonaccis in SBCL LISP.
 
 - Loop based
 - Recursive
+- Recursive, memoized
+
+~~~~
+
+CL-USER> (time (fibonacci-1 40))
+Evaluation took:
+  9.362 seconds of real time
+  9.084000 seconds of total run time (9.068000 user, 0.016000 system)
+  97.03% CPU
+  12,148,887,044 processor cycles
+  0 bytes consed
+  
+102334155
+CL-USER> (time (fibonacci-2 40))
+Evaluation took:
+  0.000 seconds of real time
+  0.000000 seconds of total run time (0.000000 user, 0.000000 system)
+  100.00% CPU
+  5,385 processor cycles
+  0 bytes consed
+  
+102334155
+
+~~~~
+
 
 Conclusion
 

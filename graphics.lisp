@@ -36,10 +36,7 @@
   (zp-b :D6))
 
 (defun typeset ()
-  
-  ; some non-scratch zpg
-  ;; todo, this can actually be scratch
-  
+    
   (zp-w :font)
 
   (when *symbol-table*
@@ -202,7 +199,7 @@
 
     (alias :shift :D0)
     (alias :prev-width :D1)
-
+    
     (LDX 0 "Ensure we can use X indexed addressing later")
     (LDA.ZP :prev-width)
     (BEQ :start)
@@ -251,8 +248,11 @@
     (dc "If the shift is zero then we can write the byte")
     (dc "and then clear the next one with no extra work")
     (STA.IZX :raster "We hope X is 0 here")
-    (LDA 0)
-    (BEQ :second-half)
+    
+    ;;(LDA 0)
+    (inc16.zp :raster)
+    (BNE :skip-clear)
+    ;;(BEQ :second-half)
     (dc "Shift the bit pattern across by the offset")
     (dc "and OR it with the screen")
     (label :shift-right)
@@ -274,7 +274,11 @@
     (BNE :shift-left)
     (label :second-half)
     (inc16.zp :raster)
+    (dc "don't clear the next character")
+    (CMP 0)
+    (BEQ :skip-clear)
     (STA.IZX :raster "X better be 0 here")
+    (label :skip-clear)
     (DEY)
     (BNE :next)
     (dc "Now, the first byte of the character data holds the")
@@ -390,6 +394,38 @@
 
 	     (dcs :str (justify *odyssey* :width (font-width font)))))
       (build #'pass))) 
+  
+  (monitor-reset #x600)
+  (monitor-run)
+  (update-vicky))
+
+(defun render-test3 ()
+
+  ;;Test an OBOE error where the M is being overwritten, presumably by the
+  ;;thing that clears the next position.
+  (reset-compiler)
+  (reset-symbol-table)
+
+  (flet ((pass ()
+	   (zeropage)
+	   (org #x600)
+	   (CLD)
+	   (label :render-test3)
+   
+	   (sta16.zp :str1 '(:typeset-cs . :str))
+	   (sta16.zp '(:font . :present) :font)
+	   (sta16.zp #x80F0 '(:typeset . :raster))
+
+	   (JSR :typeset-cs)
+
+	   (BRK)
+
+	   (typeset)
+	   (font-data)
+
+	   (dcs :str1 "Millions of sad eyes peer out from the slime.")))
+    
+    (build #'pass))
   
   (monitor-reset #x600)
   (monitor-run)

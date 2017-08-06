@@ -9,14 +9,17 @@
   (declare (ignorable y))
   +screen-width+)
 
-(defun font-width (font)
-  ;todo handle kerning
-  #'(lambda (word)
-      (let ((w 0))
+(defun measure-word (word font)
+  ;;TODO handle kerning
+  ;;essentially this will never be shorter than the actual string
+  (let ((w 0))
 	(loop for c across word do
 	     (incf w (gethash (cons font c) *font-widths*))
 	     (incf w))
-	w)))
+	w))
+
+(defun font-width (font)
+  #'(lambda (word) (measure-word word font)))
 
 (defun last-char (str)
   (let ((len (1- (length str))))

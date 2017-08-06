@@ -24,6 +24,29 @@
   (sta16.zp (scradd line 0) '(:typeset . :raster))
   (JSR :typeset-cs))
 
+(defun fleuron ()
+   (label :fleuron)
+   (with-namespace :fleuron
+     (alias :raster :A0)
+     (alias :left-col :D0)
+     (sta16.zp (scradd 10 0) :raster)
+     (LDX 9)
+     (label :next-row)
+     (SEC)
+     (sbc16.zp +screen-width-bytes+ :raster)
+     (LDA.ABX :rope)
+     (LDY (1- +screen-width-bytes+))
+     (label :next-column)
+     (STA.IZY :raster)
+     (DEY)
+     (CPY.ZP :D0)
+     (BPL :next-column)
+     (DEX)
+     (BPL :next-row)
+     (RTS)
+     
+     (db :rope 0 #xc3 #x24 #x99 #x42 #x42 #x99 #x24 #xc3 0)))
+
 ;;TODO this takes far too many bytes to push all the parameters
 ;;need to pass them by reference
 (defun dloc (name title img-file img-align text
@@ -34,6 +57,9 @@
     (cls colour)
     (sta16.zp (cons :font font) :font)
     (call-typeset :title font 0)
+    (LDA (1+ (ash (measure-word title font) -3)))
+    (STA.ZP :D0)
+    (JSR :fleuron)
     (call-typeset :text font (+ 1 *line-height*))
     ;; todo get image width and height from file
     (let ((sx 104) (sy 104))      
@@ -70,7 +96,7 @@
 	   (org #x600)
 	   (CLD)
 	   (label :loc-test)
-
+	   
 	   (JSR '(:rickety-stair . :draw))
 
 	   (call-typeset "Live 1"
@@ -101,6 +127,7 @@
 	   (memset)
 	   (typeset)
 	   (image-decompressor)
+	   (fleuron)
 
 	   (font-data)
 	   	   

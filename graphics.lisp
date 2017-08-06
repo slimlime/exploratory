@@ -58,17 +58,18 @@
 	(alias :tmp-raster :A3)
 
 	(label :typeset-cs nil)
-	(cpy16.zp '(:typeset . :raster) :tmp-raster)
 	(LDA 0)
-	(STA.ZP '(:typeset . :prev-width))
 	(STA.ZP '(:typeset . :shift))
-	(BEQ :first)
+	(STA.ZP '(:typeset . :prev-width))
+	(label :typeset-cs-continue nil)
+	(cpy16.zp '(:typeset . :raster) :tmp-raster)
+	(JMP :first)
 	(label :next)
 	(INC.ZP (lo-add :str))
 	(BNE :first)
 	(INC.ZP (hi-add :str))
 	(BEQ :done "Gone off the edge of the map")
-	(label :typeset-cs-cont nil) ;don't reset shift position
+	(label :typeset-cs-cont-test nil) ;don't reset shift position
 	(label :first)
 	(LDY 0)
 	(LDA.IZY :str)
@@ -198,7 +199,7 @@
     (alias :raster :A1)
 
     (alias :shift :D0)
-    (alias :prev-width :D1)
+    (alias :prev-width :D1) ;;note that the 'width' includes the kerning bit
     
     (LDX 0 "Ensure we can use X indexed addressing later")
     (LDA.ZP :prev-width)
@@ -248,11 +249,8 @@
     (dc "If the shift is zero then we can write the byte")
     (dc "and then clear the next one with no extra work")
     (STA.IZX :raster "We hope X is 0 here")
-    
-    ;;(LDA 0)
     (inc16.zp :raster)
     (BNE :skip-clear)
-    ;;(BEQ :second-half)
     (dc "Shift the bit pattern across by the offset")
     (dc "and OR it with the screen")
     (label :shift-right)
@@ -335,6 +333,7 @@
     (alias :str '(:typeset-cs . :str)) 
     (alias :tmp :A0)
     (ensure-aliases-different :str :tmp '(:typeset . :raster))
+
     (dc "Get the return address, the address")
     (dc "of the string is stored there...")
     (PLA)
@@ -360,7 +359,26 @@
     (PHA)
     (TXA)
     (PHA)
-    (JMP :typeset-cs)))
+
+    ;;Drawing the prompt takes far too many instructions.
+    ;;TODO improve this so we can use the right entry points
+    ;;Also would be nice to not have to copy the raster pos
+    (sta16.zp :prompt '(:typeset . :char))
+    (cpy16.zp '(:typeset . :raster) '(:typeset-cs . :tmp-raster))
+    (LDA 0)
+    (STA.ZP '(:typeset . :prev-width))
+    (STA.ZP '(:typeset . :shift))
+    (JSR :typeset)
+    
+    ;;put the raster back where it started. This is a bit boring.
+    (cpy16.zp '(:typeset-cs . :tmp-raster) '(:typeset . :raster))
+
+    (LDA 0)
+    (STA.ZP '(:typeset . :prev-width))
+    (LDA 5)
+    (STA.ZP '(:typeset . :shift))
+
+    (JMP :typeset-cs-continue)))
 
 ;;TODO make this build specific to this file, and make specific versions
 ;;for elsewhere
@@ -418,12 +436,56 @@
 
 	   (JSR :typeset-cs)
 
+	   (LDA 5)
+	   (STA.ZP '(:typeset . :shift))
+	   (sta16.zp :str1 '(:typeset-cs . :str))
+           (sta16.zp (+ #x80F0 *line-spacing*) '(:typeset . :raster))
+
+	   (JSR :typeset-cs-preserve-shift)
+
 	   (BRK)
 
 	   (typeset)
 	   (font-data)
 
 	   (dcs :str1 "Millions of sad eyes peer out from the slime.")))
+    
+    (build #'pass))
+  
+  (monitor-reset #x600)
+  (monitor-run)
+  (update-vicky))
+
+(defun render-test4 ()
+
+  (reset-compiler)
+  (reset-symbol-table)
+
+  (flet ((pass ()
+	   (zeropage)
+	   (org #x600)
+	   (CLD)
+	   (label :render-test4)
+
+	   (sta16.zp :str1 '(:typeset-cs . :str))
+	   (sta16.zp '(:font . :present) :font)
+	   (sta16.zp #x80F0 '(:typeset . :raster))
+
+	   (JSR :typeset-cs)
+
+	   (JSR '(:print-message . 2))
+	   (dw nil (resolve :str1))
+
+	   (BRK)
+
+	   (typeset)
+	   (font-data)
+	   (print-message)
+	   (memcpy)
+	   (memset)
+	   
+	   (dcs :str1 "Millions of sad eyes peer out from the
+slime.")))
     
     (build #'pass))
   
@@ -534,7 +596,7 @@
 	   ;; call into the entry point that does not
 	   ;; reset the shift position so we can check
 	   ;; the rendering at every bit offset
-	   (JSR :typeset-cs-cont)
+	   (JSR :typeset-cs-cont-test)
 
 	   (DEC.ZP :count)
 	   (BNE :doit)

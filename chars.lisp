@@ -72,9 +72,20 @@
 	     (label label :font)
 	     (dc (format nil "~a font table" font-name))))
 
-      ; Now the actual font data
-      ; spaces are special cases, and, wasteful.
-      ; could be handled in the code
+      ;; Now the actual font data
+      ;; spaces are special cases, and, wasteful.
+      ;; could be handled in the code
+
+      ;;redefine deffont to use with-namespace
+
+
+      ;;X
+      ;; X
+      ;;  X
+      ;; X
+      ;;X
+      
+      (db :prompt 3 0 0 128 64 32 64 128 0 0 0)
 
       (deffont :present)
 

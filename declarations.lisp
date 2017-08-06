@@ -94,8 +94,10 @@
 ;;puting it into the string table
 (defun respond (message &rest messages)
   (let* ((text
+	  ;;TODO this is an abuse of the justify function, which
+	  ;;     is to account for the prompt
 	  (justify-with-image (format nil "~a~{~%~a~}" message messages)
-			      4 200 *act-font*))
+			      5 4 *act-font*))
 	 (lines (1+ (count #\Newline text))))
     (assert (<= lines 3) nil
 	    (format nil "Response would have more than 3 lines~%~a"

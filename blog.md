@@ -1,10 +1,40 @@
-## 6/7/2017 Latest screen-shot
+## 6/8/2017 CLEAVE WIZARD re-visited
+
+As you know I have entered this project completely blind to how adventures of this type were actually implemented. One thing I do remember about the early games (particularly on the ZX Spectrum, e.g. The Hobbit, Golden Apple etc) is that while they did have moderately buggy parsers, they didn't really mistake CLEAVE WIZARD for OPEN DOOR.
+
+What has happened here is that we have a collision (in the hash table) between a word, OPEN, which is in the dictionary and CLEAVE, which is not. Adding CLEAVE to the list of synonyms fixes this particular problem there are probably quite a few words which have this hashing property that the game does not know about. It would be particularly galling if you tried to KISS PRINCESS and ended up CHOPPING PRINCESS. Fundamentally, my scheme doesn't really know if it has matched an actual word!
+
+I will probably not fix this for this game, but I did come up with another idea. It should have been immediately obvious. Many years in the code mines working for the man must have left me blind to the benefits of the more old-school data structures. You may remember reading the posts on the binary parser... binary trees are a go-to structure, but what about...
+
+- Binary search
+
+All words (stripped to 4 characters) sorted alphabetically
+Four 256 byte tables, each containing successive characters
+Binary search index is a single byte
+Easy access using indexing addressing modes- no need to multiply
+Fifth table containing synonyms
+
+- Pros
+
+Definite words match (to 4 characters) can be achieved
+
+- Cons
+
+4 character limit can't distinguish between CHEETOS and CHEEZOWS, which is going to be an important plot point.
+
+Takes 1K (I am not convinced my current scheme is going to be less than this for a full dictionary)
+
+I have to actually code it
+
+Max 256 words including synonyms (hash and binary tree is limited to 256 excluding synonyms, and by memory)
+
+## 6/8/2017 Latest screen-shot
 
 A couple of lines of response, with a prompt and a funky 'rope' effect next to the title.
 
 ![Alt text](/blog/fleuron.png)
 
-## 4/7/2017 Optimization
+## 4/8/2017 Optimization
 
 Rather than fix the current set of bugs or work on new features I have decided to work on memory optimization. To this end I will build a function which tabulates the memory usage by namespace in an effort to find the best bits to concentrate on.
 
@@ -109,7 +139,7 @@ The pre-amble to setting up a location is long and tedious (approx 150 bytes). C
 
 We can make it into a function, but in the normal way I will wait until there is at least another instance.
 
-## 4/7/2017 Local variable assignment
+## 4/8/2017 Local variable assignment
 
 Yesterday I discovered an interesting online paper by David A Wheeler (https://www.dwheeler.com/6502/a-lang.txt) which described some strategies for a higher level language for programming the 6502. Although my project is about *ad-hoc* program construction and specifically *not* language development or compilation, there are a lot of points of cross-over. He even uses the term super-assembler or something similar, which is a term I have been using to describe the LISP code here.
 

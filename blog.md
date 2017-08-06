@@ -1,3 +1,9 @@
+## 6/7/2017 Latest screen-shot
+
+A couple of lines of response, with a prompt and a funky 'rope' effect next to the title.
+
+![Alt text](/blog/fleuron.png)
+
 ## 4/7/2017 Optimization
 
 Rather than fix the current set of bugs or work on new features I have decided to work on memory optimization. To this end I will build a function which tabulates the memory usage by namespace in an effort to find the best bits to concentrate on.

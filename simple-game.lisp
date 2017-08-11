@@ -268,6 +268,7 @@
 	   
 	   ;;inline functions we will need
 
+	   (deref-w)
 	   (print-message)
 	   (memcpy)
 	   (memset)

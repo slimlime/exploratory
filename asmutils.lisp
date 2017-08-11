@@ -143,20 +143,21 @@
     (label :done)
     (RTS)))
 
-;;This function gets a parameter inlined after the caller
-;;of the caller, and stores it in A0
+;;Retrieve the parameter at the grandparent call-site
+;;Store first byte in X, second in A
 (defun deref-w ()
   (label :deref-w)
-  (with-namespace :deref-w
+  (with-namespace :deref
+    (zp-w :tmp)
     (TSX)
     (INX "Points to return address of this function")
     (INX "Now skip to return address of grandparent")
     (INX)
     (dc "Store the grandparent return address")
     (LDA.ABX #x100)
-    (STA.ZP (lo-add :A0))
+    (STA.ZP (lo-add :tmp))
     (LDA.ABX #x101)
-    (STA.ZP (hi-add :A0))
+    (STA.ZP (hi-add :tmp))
     (dc "Now we have the address of the parameter (-1)")
     (dc "Add two to it so we can skip it when parent returns")
     (CLC)
@@ -166,17 +167,14 @@
     (LDA 0)
     (ADC.ABX #x101)
     (STA.ABX #x101)
+    (LDY 1 "Offset against -1 for return convention")
     (dc "Dereference the word at the parameter address")
-    (LDY 1)
-    (LDA.IZY :A0))
+    (LDA.IZY :tmp)
     (TAX)
     (INY)
-    (LDA.IZY :A0)
-    (STA.ZP (hi-add :A0))
-    (TXA)
-    (STA.ZP (lo-add :A0))
+    (LDA.IZY :tmp)
     (RTS)))
-    
+
 (defun mul10 ()
   "Multiply A by ten, if 0 <= A <= 25, using D0"
   (zp-b :D0)
@@ -194,15 +192,14 @@
 	   (org #x600)
 	   
 	   (label :start)
-
-	   (zp-w :A0 0)
 	   (zp-b :dummy1 0)
 	   (zp-b :dummy2 0)
-
+	   (zp-w :test)
+	   
 	   (LDA 0)
 	   (STA.ZP :dummy1)
 
-	   (sta16.zp 0 :A0)
+	   (sta16.zp 0 :test)
 	   
 	   (JSR :routine)
 	   (DW nil #x1234)
@@ -215,9 +212,9 @@
 	   (BRK)
 	   (label :routine)
 
-	   ;;we want the parameter to be stored in target
-
 	   (JSR :deref-w)
+	   (STX.ZP (lo-add :test))
+	   (STA.ZP (hi-add :test))
 
 	   ;;test that we get here
 	   (LDA 6)
@@ -236,10 +233,10 @@
   (monitor-run :print nil)
   
   (let ((buf (monitor-buffer)))
-    (assert (= 5 (aref buf 2)))
-    (assert (= 6 (aref buf 3)))
-    (assert (= #x34 (aref buf 0)))
-    (assert (= #x12 (aref buf 1)))))
+    (assert (= 5 (aref buf 0)))
+    (assert (= 6 (aref buf 1)))
+    (assert (= #x34 (aref buf 2)))
+    (assert (= #x12 (aref buf 3)))))
 
 (defun test-mul10 ()
   (dotimes (v 26)

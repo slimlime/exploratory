@@ -54,7 +54,7 @@
      (BPL :next-row)
      (RTS)
      
-     (db :rope 0 0 #xc3 #x24 #x99 #x42 #x99 #x24 #xc3 0)))
+     (db :rope 0 #xc3 #x24 #x99 #x42 #x42 #x99 #x24 #xc3 0)))
 
 (defun middle-fleuron-column (text font)
   (if (< (count #\Newline text) (1- *max-lines*))
@@ -62,13 +62,6 @@
       (1+ (ash (measure-word (subseq text (1+ (position #\Newline text :from-end t)))
 			 font)
 	       -3))))
-
-  
-(defun location ()
-  (label :go-location)
-  (with-namespace :location
-
-
 
 ;;TODO this takes far too many bytes to push all the parameters
 ;;need to pass them by reference

@@ -330,40 +330,12 @@
   
   (with-namespace :print-message
     (label :print)
-    (alias :str '(:typeset-cs . :str)) 
-    (alias :tmp :A0)
-    (ensure-aliases-different :str :tmp '(:typeset . :raster))
+    (alias :str '(:typeset-cs . :str))
 
-    (dc "Get the return address, the address")
-    (dc "of the string is stored there...")
-    (PLA)
-    (CLC)
-    (ADC 1 "Return address is stored offset by 1")
-    (STA.ZP (lo-add :tmp))
-    (PLA)
-    (ADC 0)
-    (STA.ZP (hi-add :tmp))
-    (dc "Store the parameter for use by the typesetter")
-    (LDY 0)
-    (LDA.IZY :tmp)
+    (JSR :deref-w)
     (STA.ZP (lo-add :str))
-    (INY)
-    (LDA.IZY :tmp)
-    (STA.ZP (hi-add :str))
-    (dc "Now fudge the return address to skip the parameter")
-    (LDA.ZP (lo-add :tmp))
-    (CLC)
-    (ADC 1)
-    (TAX)
-    (LDA.ZP (hi-add :tmp))
-    (ADC 0)
-    (PHA)
-    (TXA)
-    (PHA)
+    (STX.ZP (hi-add :str))
 
-    ;;Drawing the prompt takes far too many instructions.
-    ;;TODO improve this so we can use the right entry points
-    ;;Also would be nice to not have to copy the raster pos
     (sta16.zp :prompt '(:typeset . :char))
     (cpy16.zp '(:typeset . :raster) '(:typeset-cs . :tmp-raster))
     (LDA 0)

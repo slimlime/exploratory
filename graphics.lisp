@@ -352,6 +352,7 @@
     (STA.ZP (hi-add :str))
     (dc "Now fudge the return address to skip the parameter")
     (LDA.ZP (lo-add :tmp))
+    (CLC)
     (ADC 1)
     (TAX)
     (LDA.ZP (hi-add :tmp))

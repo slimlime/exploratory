@@ -176,7 +176,7 @@
 (reset-image-cache)
 
 ;; Define an image
-(defun dimg (label file sx sy)
+(defun dimg (name file sx sy)
   (assert (= 0 (mod sx 8)))
   (assert (= 0 (mod sy 8)))
   (let ((img (gethash file *image-cache*)))
@@ -185,11 +185,11 @@
       (setf (gethash file *image-cache*) img))
     (let ((data (compress (first img) (/ sx 8)))
 	  (att  (compress (second img) (/ sx 8))))
-      (label label :image-pixels)
+      (label :pixels name)
       (add-hint (length data) (format nil "~a pixels (~a)" file (length data)))
       (loop for c across data do
 	   (push-byte c))
-      (label label :image-colours)
+      (label :colours name)
       (add-hint (length att) (format nil "~a colours (~a)" file (length att)))
       (loop for c across att do
 	   (push-byte c)))))
@@ -208,11 +208,11 @@
 
       (LDA (/ w 8))
       (STA.ZP :imgw)
-      (sta16.zp (cons :image-pixels image) :data)
+      (sta16.zp (cons image :pixels) :data)
       (sta16.zp (+ offset *screen-memory-address*) :dest)
       (LDA h)
       (JSR :decompress)
-      (sta16.zp (cons :image-colours image) :data)
+      (sta16.zp (cons image :colours) :data)
       (sta16.zp (+ offset *char-memory-address*) :dest)
       (LDA (/ h 8))
       (JSR :decompress))))
@@ -354,7 +354,7 @@
 	     
 	     (BRK)
 
-	     (cls)
+	     (cls #x0F)
 	     (typeset)
 	     (image-decompressor)
 

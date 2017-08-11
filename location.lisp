@@ -24,12 +24,21 @@
   (sta16.zp (scradd line 0) '(:typeset . :raster))
   (JSR :typeset-cs))
 
+(defparameter *text-line-offset* 1)
+
 (defun fleuron ()
-   (label :fleuron)
    (with-namespace :fleuron
      (alias :raster :A0)
      (alias :left-col :D0)
-     (sta16.zp (scradd 10 0) :raster)
+     (label :middle-fleuron nil)
+     (STA.ZP :D0)
+     (sta16.zp (scradd (+ *text-line-offset* *font-height*
+			  (* *line-height* *max-lines*)) 0) :raster)
+     (JMP :draw-fleuron)
+     (label :top-fleuron nil)
+     (STA.ZP :D0)
+     (sta16.zp (scradd *font-height* 0) :raster)
+     (label :draw-fleuron)
      (LDX 9)
      (label :next-row)
      (SEC)
@@ -45,39 +54,53 @@
      (BPL :next-row)
      (RTS)
      
-     (db :rope 0 #xc3 #x24 #x99 #x42 #x42 #x99 #x24 #xc3 0)))
+     (db :rope 0 0 #xc3 #x24 #x99 #x42 #x99 #x24 #xc3 0)))
+
+(defun middle-fleuron-column (text font)
+  (if (< (count #\Newline text) (1- *max-lines*))
+      0
+      (1+ (ash (measure-word (subseq text (1+ (position #\Newline text :from-end t)))
+			 font)
+	       -3))))
+
+  
+(defun location ()
+  (label :go-location)
+  (with-namespace :location
+
+
 
 ;;TODO this takes far too many bytes to push all the parameters
 ;;need to pass them by reference
 (defun dloc (name title img-file img-align text
 	     &key (font *act-font*) (colour *act-colour*))
-  (with-namespace name
-    (label :draw)
-    (dc (format nil "Draw ~a (~a)" title name))
-    (cls colour)
-    (sta16.zp (cons :font font) :font)
-    (call-typeset :title font 0)
-    (LDA (1+ (ash (measure-word title font) -3)))
-    (STA.ZP :D0)
-    (JSR :fleuron)
-    (call-typeset :text font (+ 1 *line-height*))
-    ;; todo get image width and height from file
-    (let ((sx 104) (sy 104))      
-      (draw-image :image sx sy img-align)
+  (let ((sx 104) (sy 104))
+    (with-namespace name
+      (setf text
+	    (if img-file
+		(justify-with-image text sx (- sy (+ 1 *line-height*)) font)
+		(justify-with-image text 0 0 font)))
+      (assert (< (count #\Newline text) *max-lines*) nil
+	      (format nil "The location description exceeds ~a lines ~%~a"
+		      *max-lines*
+		      text))    
+      (label :draw)
+      (dc (format nil "Draw ~a (~a)" title name))
+      (cls colour)
+      (sta16.zp (cons :font font) :font)
+      (call-typeset :title font 0)
+      (LDA (1+ (ash (measure-word title font) -3)))
+      (JSR :top-fleuron)
+      (call-typeset :text font (+ *text-line-offset* *line-height*))
+      (LDA (middle-fleuron-column text font))
+      (JSR :middle-fleuron)
+      ;; todo get image width and height from file
+      (draw-image name sx sy img-align)
       (RTS)
       (dc (format nil "Image data for ~a (~a)" title name))
-      (dimg :image img-file sx sy)
+      (dimg name img-file sx sy)
       (dcs :title title)
-      (let ((text
-	     (if img-file
-		 (justify-with-image text sx (- sy (+ 1 *line-height*)) font)
-		 (justify-with-image text 0 0 font))))
-	(assert (< (count #\Newline text) *max-lines*) nil
-		(format nil "The location description exceeds ~a lines ~%~a"
-			*max-lines*
-			text))
-	(dcs :text text)))))
-
+      (dcs :text text))))
 
 (defun scroller (label lines)
   (label label)

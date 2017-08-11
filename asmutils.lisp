@@ -143,6 +143,40 @@
     (label :done)
     (RTS)))
 
+;;This function gets a parameter inlined after the caller
+;;of the caller, and stores it in A0
+(defun deref-w ()
+  (label :deref-w)
+  (with-namespace :deref-w
+    (TSX)
+    (INX "Points to return address of this function")
+    (INX "Now skip to return address of grandparent")
+    (INX)
+    (dc "Store the grandparent return address")
+    (LDA.ABX #x100)
+    (STA.ZP (lo-add :A0))
+    (LDA.ABX #x101)
+    (STA.ZP (hi-add :A0))
+    (dc "Now we have the address of the parameter (-1)")
+    (dc "Add two to it so we can skip it when parent returns")
+    (CLC)
+    (LDA 2)
+    (ADC.ABX #x100)
+    (STA.ABX #x100)
+    (LDA 0)
+    (ADC.ABX #x101)
+    (STA.ABX #x101)
+    (dc "Dereference the word at the parameter address")
+    (LDY 1)
+    (LDA.IZY :A0))
+    (TAX)
+    (INY)
+    (LDA.IZY :A0)
+    (STA.ZP (hi-add :A0))
+    (TXA)
+    (STA.ZP (lo-add :A0))
+    (RTS)))
+    
 (defun mul10 ()
   "Multiply A by ten, if 0 <= A <= 25, using D0"
   (zp-b :D0)
@@ -152,6 +186,60 @@
   (ASL)
   (CLC)
   (ADC.ZP :D0))
+
+(defun test-deref-w ()
+  (reset-compiler)
+
+  (flet ((src ()
+	   (org #x600)
+	   
+	   (label :start)
+
+	   (zp-w :A0 0)
+	   (zp-b :dummy1 0)
+	   (zp-b :dummy2 0)
+
+	   (LDA 0)
+	   (STA.ZP :dummy1)
+
+	   (sta16.zp 0 :A0)
+	   
+	   (JSR :routine)
+	   (DW nil #x1234)
+
+	   ;;test that we get back here..
+
+	   (LDA 5)
+	   (STA.ZP :dummy1)
+	   	   
+	   (BRK)
+	   (label :routine)
+
+	   ;;we want the parameter to be stored in target
+
+	   (JSR :deref-w)
+
+	   ;;test that we get here
+	   (LDA 6)
+	   (STA.ZP :dummy2)
+	   (RTS)
+
+	   (deref-w)
+	   
+	   (label :end)))
+    (reset-compiler)
+    (src)
+    (setf *compiler-final-pass* t)
+    (src))
+  
+  (monitor-reset #x600)
+  (monitor-run :print nil)
+  
+  (let ((buf (monitor-buffer)))
+    (assert (= 5 (aref buf 2)))
+    (assert (= 6 (aref buf 3)))
+    (assert (= #x34 (aref buf 0)))
+    (assert (= #x12 (aref buf 1)))))
 
 (defun test-mul10 ()
   (dotimes (v 26)

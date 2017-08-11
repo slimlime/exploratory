@@ -110,17 +110,23 @@
 (defun words2label (words)
   (string-right-trim "-" (format nil "~{~a-~}" words)))
 
+(defun action-fn (words fn)
+  ;;Accept a single list of words, or lists of words
+  (unless (listp (car words))
+    (setf words (list words)))
+
+  (dolist (sentence words)
+    (dc (format nil "ON ~{~a ~}" sentence))
+    (let ((label (words2label sentence)))
+      (defsentence sentence
+	  (cons *current-location* label)
+	*current-location*)
+      (label label *current-location*)))
+  (funcall fn)
+  (RTS))
+
 (defmacro action (words &body body)
-  (let ((words-sym (gensym)))
-    `(progn
-       (let ((,words-sym ,words))
-	 (dc (format nil "ON ~{~a ~}" ,words-sym))
-	 (defsentence ,words-sym
-	     (cons *current-location* (words2label ,words-sym))
-	   *current-location*)
-	 (label (words2label ,words-sym) *current-location*)
-	 ,@body
-	 (RTS)))))
+  `(action-fn ,words #'(lambda () ,@body)))
 
 (defun test-ifbit (is-set expected test-fn)
 

@@ -26,7 +26,8 @@
   (zp-w :A1)
   (zp-w :A2)
   (zp-w :A3)
-    
+  (zp-w :A4)
+  
   (zp-b :D0)
   (zp-b :D1)
   (zp-b :D2)
@@ -333,8 +334,8 @@
     (alias :str '(:typeset-cs . :str))
 
     (JSR :deref-w)
-    (STA.ZP (lo-add :str))
-    (STX.ZP (hi-add :str))
+    (STX.ZP (lo-add :str))
+    (STA.ZP (hi-add :str))
 
     (sta16.zp :prompt '(:typeset . :char))
     (cpy16.zp '(:typeset . :raster) '(:typeset-cs . :tmp-raster))
@@ -456,7 +457,7 @@
 	   (print-message)
 	   (memcpy)
 	   (memset)
-	   
+	   (deref-w)
 	   (dcs :str1 "Millions of sad eyes peer out from the
 slime.")))
     

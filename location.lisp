@@ -54,7 +54,7 @@
      (BPL :next-row)
      (RTS)
      
-     (db :rope 0 #xc3 #x24 #x99 #x42 #x42 #x99 #x24 #xc3 0)))
+     (db :rope 0 0 #xc3 #x24 #x99 #x42 #x99 #x24 #xc3 0)))
 
 (defun middle-fleuron-column (text font)
   (if (< (count #\Newline text) (1- *max-lines*))
@@ -63,10 +63,39 @@
 			 font)
 	       -3))))
 
-;;TODO this takes far too many bytes to push all the parameters
-;;need to pass them by reference
-(defun dloc (name title img-file img-align text
-	     &key (font *act-font*) (colour *act-colour*))
+(defun location ()
+  (label :go-location)
+  (with-namespace :location
+    (alias :loc :A4)
+    ;;this is where pure assembler falls down; if we modelled the concept of
+    ;;functions we could select an alias that was spare by looking at the call
+    ;;graph, obviously here we have to choose A4 manually so that it doesn't clash
+    ;;with the addresses used in the typeset function.
+    
+    (alias :str '(:typeset-cs . :str))
+    (JSR :deref-w)
+    (STA.ZP (lo-addr :loc))
+    (STX.ZP (hi-addr :loc))
+    (cls #xf0)
+    (LDY 0)
+    (LDA.IZY :loc)
+    (STA.ZP (lo-add :str))
+    (INY)
+    (LDA.IZY :loc)
+    (STA.ZP (hi-add :str))
+    (sta16.zp (scradd line 0) '(:typeset . :raster))
+    (JSR :typeset-cs))
+    (call-typeset :title :present 0)
+ 
+    (JSR :top-fleuron)
+    (call-typeset :text font (+ *text-line-offset* *line-height*))
+    (LDA (middle-fleuron-column text font))
+    (JSR :middle-fleuron)
+    ;; todo get image width and height from file
+    (draw-image name sx sy img-align)
+    (RTS)))
+
+(defun dloc (name title img-file img-align text)
   (let ((sx 104) (sy 104))
     (with-namespace name
       (setf text
@@ -76,24 +105,13 @@
       (assert (< (count #\Newline text) *max-lines*) nil
 	      (format nil "The location description exceeds ~a lines ~%~a"
 		      *max-lines*
-		      text))    
-      (label :draw)
-      (dc (format nil "Draw ~a (~a)" title name))
-      (cls colour)
-      (sta16.zp (cons :font font) :font)
-      (call-typeset :title font 0)
-      (LDA (1+ (ash (measure-word title font) -3)))
-      (JSR :top-fleuron)
-      (call-typeset :text font (+ *text-line-offset* *line-height*))
-      (LDA (middle-fleuron-column text font))
-      (JSR :middle-fleuron)
-      ;; todo get image width and height from file
-      (draw-image name sx sy img-align)
-      (RTS)
-      (dc (format nil "Image data for ~a (~a)" title name))
-      (dimg name img-file sx sy)
-      (dcs :title title)
-      (dcs :text text))))
+		      text))
+      (dw :title (dstr title))
+      (db :tfleuron-col (1+ (ash (measure-word title font) -3)))
+      (dw :text (dstr text))
+      (db :mfleuron-col (+ *text-line-offset* *line-height*))
+      ;;TODO this relies on the image data being two words, pixels, colours
+      (dimg name img-file sx sy))))
 
 (defun scroller (label lines)
   (label label)

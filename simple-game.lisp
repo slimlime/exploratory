@@ -241,11 +241,11 @@
 
 	   (label :start)
 
-	   (JSR '(:corridor . :draw))
+	   (JSR '(:dungeon-cell . :draw))
 
 	   (label :test)
 	   (label :test2)
-	   (sta16.zp (cons :dispatcher :corridor)
+	   (sta16.zp (cons :dispatcher :dungeon-cell)
 		     :location-dispatch-table)
 
 	   (BRK)

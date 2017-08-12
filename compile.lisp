@@ -253,14 +253,20 @@
 	(setf label (cons ns label)))))
   (setf (gethash alias *compiler-aliases*) label))
 
-(defun ensure-aliases-different (&rest aliases)
+;;this function will ensure that a set of aliases have no members
+;;in another set of aliases. Used in conjunction with get-aliases
+;;this can tell us whether there will be a clash between 'functions'
+(defun ensure-aliases-different (these those)
   (when *compiler-final-pass*
-    (let ((addresses (make-hash-table)))
-      (dolist (alias aliases)
-	(let ((existing (gethash (resolve alias) addresses)))
-	  (assert (null existing)
-		  nil (format nil "Alias ~a conflicts with ~a" alias existing)))
-	(setf (gethash (resolve alias) addresses) alias)))))
+    (let ((these-addresses (make-hash-table)))
+      (dolist (this these)
+	(setf this (resolve this))
+	(setf (gethash this these-addresses) this))
+      (dolist (that those)
+	(assert (null (gethash (resolve that) these-addresses)) nil
+		(format nil "Alias clash '~a'. These aliases ~a. Those aliases ~a"
+			that these those))))))
+
 	
 (defun db (label &rest bytes)
   (add-hint (length bytes)
@@ -406,13 +412,24 @@
 		 ,name
 		 (- *compiler-ptr* ,ptrsym))))))
 
-(defun dump-aliases ()
-  (maphash #'(lambda (k v) (format t "~a -> ~a~%" (fmt-label k t) v)) *compiler-aliases*))
-
 (defun label-namespace (label)
   (if (consp label)
       (car label)
       nil))
+
+;;return the aliases labels for a namespace
+;;might be useful in seeing which are used in a 'function'
+(defun get-aliased-labels (namespace)
+  (let ((labels nil))
+    (maphash #'(lambda (k v)
+		 (when (equal (label-namespace k)
+			      namespace)
+		   (push v labels)))
+	     *compiler-aliases*)
+    labels))
+
+(defun dump-aliases ()
+  (maphash #'(lambda (k v) (format t "~a -> ~a~%" (fmt-label k t) v)) *compiler-aliases*))
 
 (defun dump-labels (&key (namespace nil namespace-p))  
   (maphash #'(lambda (k v)

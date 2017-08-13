@@ -1,14 +1,16 @@
 ## 11/8/2017 Passing parameters
 
-As I have added some extra locations for the test game I need a function for actually changing location. Since this will be a common operation we can't afford a long chain of loads and stores. To that end I created a subroutine which extracts a parameter off the stack. This is a generalisation of the code used in the print message function. As you can see this casts the space/time trade-off into sharp relief- it is a lot of (time) effort to simply pass a constant parameter. However, this is 5-bytes per call rather than 11.
+As I have added some extra locations for the test game I need a function for actually changing location. Since this will be a common operation we can't afford a long chain of loads and stores to pass the location as a parameter. To that end I created a subroutine which extracts a parameter from the callsite. This is a generalisation of the code used in the print message function (which has now been refactored to use this function). As you can see this casts the space/time trade-off into sharp relief- it is a lot of (time) effort to simply pass a constant parameter. However, this is 5-bytes per call rather than 11.
+
+This becomes tedious quickly if there are a lot of constant parameters, but in both cases one can simply pass the address of a list of constant parameters.
 
 Load/store method of passing a word,
 
 ~~~~
-		LDA hi
-		STA p1
 		LDA lo
-		STA p2
+		STA a
+		LDA hi
+		STA a+1
 		JSR my-routine
 ~~~~
 
@@ -19,12 +21,14 @@ Callsite method,
 		JSR my-routine
 		DW my-parameter
 		;;execution flow resumes here
+		...
 	
 	MY-ROUTINE:
 		;Dereference the parameter at the call-site
 		JSR deref-w
 		...
-		zeropage now contains my-parameter
+		X and A now contain the lo and hi word of
+		my-parameter respectively.
 		...
 		RTS
 
@@ -34,36 +38,34 @@ Here is the implementation of the dereferencing sub-routine. Other tricks are of
 
 ~~~~
 
-             DEREF-W 061E BA      TSX
-                     061F E8      INX        ;Points to return address of this function
-                     0620 E8      INX        ;Now skip to return address of grandparent
-                     0621 E8      INX
+             DEREF-W 0B28 BA      TSX
+                     0B29 E8      INX        ;Points to return address of this function
+                     0B2A E8      INX        ;Now skip to return address of grandparent
+                     0B2B E8      INX
                      ;Store the grandparent return address
-                     0622 BD0001  LDA $0100,X
-                     0625 8500    STA $00    ;A0
-                     0627 BD0101  LDA $0101,X
-                     062A 8501    STA $01    ;A0 + 1
+                     0B2C BD0001  LDA $0100,X
+                     0B2F 8519    STA $19    ;TMP
+                     0B31 BD0101  LDA $0101,X
+                     0B34 851A    STA $1A    ;TMP + 1
                      ;Now we have the address of the parameter (-1)
                      ;Add two to it so we can skip it when parent returns
-                     062C 18      CLC
-                     062D A902    LDA #$02
-                     062F 7D0001  ADC $0100,X
-                     0632 9D0001  STA $0100,X
-                     0635 A900    LDA #$00
-                     0637 7D0101  ADC $0101,X
-                     063A 9D0101  STA $0101,X
+                     0B36 18      CLC
+                     0B37 A902    LDA #$02
+                     0B39 7D0001  ADC $0100,X
+                     0B3C 9D0001  STA $0100,X
+                     0B3F A900    LDA #$00
+                     0B41 7D0101  ADC $0101,X
+                     0B44 9D0101  STA $0101,X
+                     0B47 A001    LDY #$01   ;Offset against -1 for return convention
                      ;Dereference the word at the parameter address
-                     063D A001    LDY #$01
-                     063F B100    LDA ($00),Y
-                     0641 AA      TAX
-                     0642 C8      INY
-                     0643 B100    LDA ($00),Y
-                     0645 8501    STA $01    ;A0 + 1
-                     0647 8A      TXA
-                     0648 8500    STA $00    ;A0
-                     064A 60      RTS
-
+                     0B49 B119    LDA ($19),Y
+                     0B4B AA      TAX
+                     0B4C C8      INY
+                     0B4D B119    LDA ($19),Y
+                     0B4F 60      RTS
 ~~~~
+
+Edit- original DEREF-W function put the parameter into an address in the callsite. This is now left to the calling routine.
 
 ## 6/8/2017 CLEAVE WIZARD re-visited
 

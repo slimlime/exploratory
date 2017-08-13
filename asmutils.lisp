@@ -1,3 +1,32 @@
+(defun zeropage ()
+
+  ;; Scratch Area
+  ;;
+  ;; This contains essentially 'local variables'
+  ;; How local they are depends on the use-case
+  ;; e.g. there are two co-operating functions
+  ;; in the string rendering- they take care to
+  ;; share the scratch area as they call each other
+  ;; Self contained functions can just use them
+  ;; as they see fit.
+
+  ;; TODO have it execute some code on start up to initialize
+  ;; values.
+  
+  (zp-w :A0)
+  (zp-w :A1)
+  (zp-w :A2)
+  (zp-w :A3)
+  (zp-w :A4)
+  
+  (zp-b :D0)
+  (zp-b :D1)
+  (zp-b :D2)
+  (zp-b :D3)
+  (zp-b :D4)
+  (zp-b :D5)
+  (zp-b :D6))
+
 (defun inc16.zp (label)
   "Increment a zero-page word"
   (with-local-namespace "inc16.zp"
@@ -15,6 +44,8 @@
   (LDA.ZP (hi-add zp))
   (SBC (hi value))
   (STA.ZP (hi-add zp)))
+
+
 
 (defun sbc16.zp (value zp)
   "Subtract a 16 bit value from a zero-page word without setting the carry first"

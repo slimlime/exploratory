@@ -6,36 +6,6 @@
 	 (setf (aref buf (+ i *char-memory-address*)) #x79))
     (setmem-copy buf)))
 
-(defun zeropage ()
-
-  ;; Scratch Area
-  ;;
-  ;; This contains essentially 'local variables'
-  ;; How local they are depends on the use-case
-  ;; e.g. there are two co-operating functions
-  ;; in the string rendering- they take care to
-  ;; share the scratch area as they call each other
-  ;; Self contained functions can just use them
-  ;; as they see fit.
-
-  ;; TODO move this to a more general place, and have
-  ;; it execute some code on start up to initialize
-  ;; values.
-  
-  (zp-w :A0)
-  (zp-w :A1)
-  (zp-w :A2)
-  (zp-w :A3)
-  (zp-w :A4)
-  
-  (zp-b :D0)
-  (zp-b :D1)
-  (zp-b :D2)
-  (zp-b :D3)
-  (zp-b :D4)
-  (zp-b :D5)
-  (zp-b :D6))
-
 (defun typeset ()
     
   (zp-w :font)
@@ -289,6 +259,15 @@
 
 (defun live-row (i)
   (+ 3 (* (+ i 13) *line-height*)))
+
+(defun scroller (label lines)
+  (label label)
+  (call-memcpy (scradd (live-row 1) 0)
+	       (scradd (live-row 0) 0)
+	       (* lines +screen-width-bytes+ *line-height*))
+  (call-memset 0 (scradd (live-row lines) 0)
+	       (* +screen-width-bytes+ *line-height*))
+  (RTS))
 
 (defun print-message ()
   (scroller :scroll-text 3)

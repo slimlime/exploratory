@@ -179,6 +179,7 @@
 (defun dimg (name file sx sy)
   (assert (= 0 (mod sx 8)))
   (assert (= 0 (mod sy 8)))
+  (dc (format nil "Image ~a ~ax~a (~a)" name sx sy file))
   (let ((img (gethash file *image-cache*)))
     (when (null img)
       (setf img (posterize-image sx sy (load-image file sx sy)))

@@ -63,117 +63,198 @@
 			 font)
 	       -3))))
 
-(defun location ()
-  (label :go-location)
-  (with-namespace :location
+(defun navigate (location)
+  (JSR :navigate)
+  (dw nil (resolve location)))
+
+(defun navigator ()
+  (label :navigate)
+  (with-namespace :navigate
     (alias :loc :A4)
-    ;;this is where pure assembler falls down; if we modelled the concept of
-    ;;functions we could select an alias that was spare by looking at the call
-    ;;graph, obviously here we have to choose A4 manually so that it doesn't clash
-    ;;with the addresses used in the typeset function.
+    ;;We could use the 'call' graph to figure out which things
+    ;;to check to ensure the variable we use here do clash
+
+    (ensure-aliases-different '(:A4) (get-aliased-labels :typeset-cs))
+    (ensure-aliases-different '(:A4) (get-aliased-labels :typeset))
+    (ensure-aliases-different '(:A4) (get-aliased-labels :decompress))
     
     (alias :str '(:typeset-cs . :str))
+    (alias :dest '(:decompress . :dest))
+    (alias :data '(:decompress . :data))
     (JSR :deref-w)
-    (STA.ZP (lo-addr :loc))
-    (STX.ZP (hi-addr :loc))
-    (cls #xf0)
+    (STX.ZP (lo-add :loc))
+    (STA.ZP (hi-add :loc))
+    (cls #x10)
+    (dc "Get the title string")
     (LDY 0)
     (LDA.IZY :loc)
     (STA.ZP (lo-add :str))
     (INY)
     (LDA.IZY :loc)
     (STA.ZP (hi-add :str))
-    (sta16.zp (scradd line 0) '(:typeset . :raster))
-    (JSR :typeset-cs))
-    (call-typeset :title :present 0)
- 
+    (sta16.zp (scradd 0 0) '(:typeset . :raster))
+    (JSR :typeset-cs)
+    (dc "Get the left column for the title fleuron")
+    (LDY 2)
+    (LDA.IZY :loc)
     (JSR :top-fleuron)
-    (call-typeset :text font (+ *text-line-offset* *line-height*))
-    (LDA (middle-fleuron-column text font))
+    (dc "Get the text")
+    (LDY 3)
+    (LDA.IZY :loc)
+    (STA.ZP (lo-add :str))
+    (INY)
+    (LDA.IZY :loc)
+    (STA.ZP (hi-add :str)) 
+    (sta16.zp (scradd (+ *text-line-offset* *line-height*) 0)
+	      '(:typeset . :raster))
+    (JSR :typeset-cs)
+    (dc "Get the left column for the middle fleuron")
+    (LDY 5)
+    (LDA.IZY :loc)
     (JSR :middle-fleuron)
-    ;; todo get image width and height from file
-    (draw-image name sx sy img-align)
-    (RTS)))
-
-(defun dloc (name title img-file img-align text)
+    (dc "Get the image width in bytes")
+    (LDY 6)
+    (LDA.IZY :loc)
+    (STA.ZP '(:decompress . :imgw))
+    (let ((dst (+ +screen-width-bytes+ *screen-memory-address*)))
+      (dc "Work out where to put the image")
+      (LDA (lo dst))
+      (SEC)
+      (SBC.ZP '(:decompress . :imgw))
+      (STA.ZP (lo-add :dest))
+      (LDA (hi dst))
+      (SBC 0)
+      (STA.ZP (hi-add :dest))
+      (dc "Now the address of the pixels")
+      (INY)
+      (LDA.IZY :loc)
+      (STA.ZP (lo-add :data))
+      (INY)
+      (LDA.IZY :loc)
+      (STA.ZP (hi-add :data))
+      (dc "Now the height of the image")
+      (INY)
+      (LDA.IZY :loc)
+      (JSR :decompress)
+      (dc "Work out where to put the colour data image")
+      (setf dst (+ +screen-width-bytes+ *char-memory-address*))
+      (LDA (lo dst))
+      (SEC)
+      (SBC.ZP '(:decompress . :imgw))
+      (STA.ZP (lo-add :dest))
+      (LDA (hi dst))
+      (SBC 0)
+      (STA.ZP (hi-add :dest))
+      (dc "Get the colour data for the image")
+      (LDY 10)
+      (LDA.IZY :loc)
+      (STA.ZP (lo-add '(:decompress . :data)))
+      (INY)
+      (LDA.IZY :loc)
+      (STA.ZP (hi-add '(:decompress . :data)))
+      (dc "Now the height again and divide by 8; colour attributes")
+      (dc "are in blocks of 8x8")
+      (LDY 9)
+      (LDA.IZY :loc)
+      (LSR)
+      (LSR)
+      (LSR)
+      (dc "Tail jump to decompress the colours and return")
+      (JMP :decompress))))
+  
+(defun dloc (name title img-file text)
+  (label name)
   (let ((sx 104) (sy 104))
     (with-namespace name
       (setf text
 	    (if img-file
-		(justify-with-image text sx (- sy (+ 1 *line-height*)) font)
-		(justify-with-image text 0 0 font)))
+		(justify-with-image text sx (- sy (+ 1 *line-height*)) :present)
+		(justify-with-image text 0 0 :present)))
       (assert (< (count #\Newline text) *max-lines*) nil
 	      (format nil "The location description exceeds ~a lines ~%~a"
 		      *max-lines*
 		      text))
+      ;;0
       (dw :title (dstr title))
-      (db :tfleuron-col (1+ (ash (measure-word title font) -3)))
+      ;;2
+      (db :tfleur-col (1+ (ash (measure-word title :present) -3)))
+      ;;3
       (dw :text (dstr text))
-      (db :mfleuron-col (+ *text-line-offset* *line-height*))
-      ;;TODO this relies on the image data being two words, pixels, colours
+      ;;5
+      (db :mfleur-col (middle-fleuron-column text :present))
+      ;;6
+      (db :imgw (/ sx 8))
+      ;;7
+      (dw :pixels (resolve (cons name :pixels)))
+      ;;9
+      (db :imgh sy)
+      ;;10
+      (dw :colours (resolve (cons name :colours)))
       (dimg name img-file sx sy))))
 
-(defun scroller (label lines)
-  (label label)
-  (call-memcpy (scradd (live-row 1) 0)
-	       (scradd (live-row 0) 0)
-	       (* lines +screen-width-bytes+ *line-height*))
-  (call-memset 0 (scradd (live-row lines) 0)
-	       (* +screen-width-bytes+ *line-height*))
-  (RTS))
-
 (defun location-test ()
+  
   (reset-compiler)
   (reset-symbol-table)
-  (flet ((pass ()
-	   (zeropage)	     
-	   (org #x600)
-	   (CLD)
-	   (label :loc-test)
-	   
-	   (JSR '(:rickety-stair . :draw))
+  (reset-bits)
+  (reset-parser)
 
-	   (call-typeset "Live 1"
-			 :present (+ 3 (* 13 *line-height*)))
-	   (call-typeset "Live 2"
-			 :past (+ 3 (* 14 *line-height*)))
-	   (call-typeset "Live 3"
-			 :future (+ 3 (* 15 *line-height*)))
-	   (call-typeset "Live 4"
-			 :present (+ 3 (* 16 *line-height*)))
-	   (call-typeset "User input"
-			 :past (+ 3 (* 17 *line-height*)))
+  ;;this (atm) must be called so the widths are initialised
+  ;;todo, make a font-init function which just does the widths.
 
-	   ;;(JSR :scroll-text)
+  (font-data)
+  (reset-compiler)
 
-	   (BRK)
+  (let ((pass-number 0))
+    (flet ((pass ()
+	     (format t "Pass ~a~%" (incf pass-number))
+	     (zeropage)	     
+	     (org #x600)
+	     (CLD)
+	     (label :start)
 
-	   (dolist (v '("Live 1"
-			"Live 2"
-			"Live 3"
-			"Live 4"
-			"User input"))
-	     (dcs v v))
-
-	   (scroller :scroll-all 4)
-	   (scroller :scroll-text 3)
-	   (memcpy)
-	   (memset)
-	   (typeset)
-	   (image-decompressor)
-	   (fleuron)
-
-	   (font-data)
-	   	   
-	   (dloc :rickety-stair
+	     (sta16.zp (cons :font :present) :font)
+	     
+	     (navigate :rickety-stair)
+	     
+	     (BRK)
+	     
+	     (memcpy)
+	     (memset)
+	     (typeset)
+	     (image-decompressor)
+	     (fleuron)
+	     (navigator)
+	     (deref-w)
+	     
+	     (dloc :rickety-stair
 		 "DANK STAIRCASE"
-		 "/home/dan/Downloads/cellardoor.bmp" :right
+		 "/home/dan/Downloads/cellardoor.bmp"
 		 "You are on a dank and foul smelling staircase. The door at the top is haloed with a brilliant light, encouraging you towards it. From behind the door emanates the sound of voices and merriment. A party? You feel like you should remember... These are extra lines added to the test string so that we have a total of 12, which gives enough room for the user input.")
-	   (label :end)))
+
+	     ;;TODO, This has to go after the strings, otherwise it makes the build
+	     ;;unstable. Presumably another pass would fix it, but it should be
+	     ;;stable by this point shouldn't it?
+	     (string-table)
+	     
+	     (label :end)
+	     (font-data)
+	     
+	     ))
+      (pass)
+      (build-symbol-table)
       
-    (build #'pass))
-  
-  (monitor-reset #x600)
-  (monitor-run)
-  
-  (setmem-copy (monitor-buffer)))
+      (pass)
+      (let ((end *compiler-ptr*))
+	(pass)
+	(assert (= end *compiler-ptr*) nil "Build was not stable"))
+      (setf *compiler-final-pass* t)
+      (pass)
+      
+      (format t "Build size ~a~%" (- *compiler-ptr* origin)))
+    
+    (monitor-reset #x600)
+    ;;(monitor-run)
+    (monitor-run :break-on :debug)
+    
+    (setmem-copy (monitor-buffer))))

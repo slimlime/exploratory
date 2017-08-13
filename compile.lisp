@@ -256,8 +256,12 @@
 ;;this function will ensure that a set of aliases have no members
 ;;in another set of aliases. Used in conjunction with get-aliases
 ;;this can tell us whether there will be a clash between 'functions'
-(defun ensure-aliases-different (these those)
+(defun ensure-aliases-different (these those &key (no-assert nil))
   (when *compiler-final-pass*
+    (unless no-assert
+      ;;probably a typo in the namespace
+      (assert these)
+      (assert those))
     (let ((these-addresses (make-hash-table)))
       (dolist (this these)
 	(setf this (resolve this))

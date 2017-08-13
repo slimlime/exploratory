@@ -18,7 +18,7 @@
   (defword :ATTACK :KILL :HIT :CLEAVE :PUNCH))
 
 (defun dungeon-cell ()
-  (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/Downloads/cellardoor.bmp" :right
+  (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/Downloads/cellardoor.bmp"
 	"You are in the dungeon prison of Wangband under the fortress of the Black Wizard, Beelzepops. Home to stench-rats, were-toads, sniveling goblins and you. Of the current denizens, you are currently the most wretched. A lime-green slime oozes out of the wall, making a rasping, wheezing sound. You must escape, but your cell has a door...")
   (with-location :dungeon-cell 
     (defbits t :key-in-crack :door-locked)
@@ -121,9 +121,7 @@
 	       (respond "The lock mechanism clicks shut. You really have got it in for yourself haven't you?"))))
     (action '((EXIT) (USE DOOR))
       (ifbit :door-open
-	     (progn
-	       (respond *far-out*)
-	       (respond "You go through the door..."))
+	     (navigate :corridor)
 	     (progn
 	       (respond "You walk into the closed door. Ouch.")
 	       (respond *snickering*))))
@@ -151,7 +149,7 @@
 		      (setbit :door-open)))))))
 
 (defun corridor ()
-  (dloc :corridor "CORRIDOR" "/home/dan/Downloads/bedroom.bmp" :right
+  (dloc :corridor "CORRIDOR" "/home/dan/Downloads/bedroom.bmp"
 	"A torch-lit corridor. You see a row of cell doors, identical to your own. Moans and pleas waft through the bars- sounds which you are not entirely certain are human in origin. At one end, a brick wall, at the other a green door, different than all the rest.")
   (with-location :corridor
     (defbits nil :green-door-open :torch-carried :torches-examined)
@@ -171,10 +169,10 @@
       (respond "You enter your cell."))
     (action '(ENTER GREEN DOOR)
       (ifbit :green-door-open
-	     (respond "You step through the green door.")
+	     (navigate :frazbolgs-closet)
 	     (respond "The green door is closed.")))
     (action '(ENTER CELL DOOR)
-      (respond "You go back into your cell."))
+      (navigate :dungeon-cell))
     (action '(EXAMINE WALL)
       (ifbit :torch-carried
 	     (progn
@@ -196,7 +194,7 @@
       (respond "Which one?"))))
 
 (defun frazbolgs-closet ()
-  (dloc :frazbolgs-closet "FRAZBOLG'S CLOSET" "/home/dan/Downloads/porsche.bmp" :right
+  (dloc :frazbolgs-closet "FRAZBOLG'S CLOSET" "/home/dan/Downloads/porsche.bmp"
 	"You are in the well-appointed closet of the goblin Frazbolg. Over centuries of guarding his prisoners he has amassed an impressive collection of posessions, a spare loin cloth- tattered, a toaster and a hundred-year-old copy of Modern Necromancer magazine.")
 
 ;;I need toto summon the shade of Wazbolg, my predecessor.
@@ -205,7 +203,7 @@
     (action '(EXAMINE CHAIR)
       (respond "It's broken."))
     (action '(EXIT)
-      (respond "You leave Frazbolg's closet."))))
+      (navigate :corridor))))
 
 (defun generic-handlers ()
   (with-location :generic
@@ -240,8 +238,9 @@
 	   (CLD)
 
 	   (label :start)
-
-	   (JSR '(:dungeon-cell . :draw))
+	   (sta16.zp (cons :font :present) :font)
+	      
+	   (navigate :dungeon-cell)
 
 	   (label :test)
 	   (label :test2)
@@ -274,6 +273,7 @@
 	   (memset)
 	   (typeset)
 	   (fleuron)
+	   (navigator)
 	   
 	   ;;process all the words we need for the parser
 	   
@@ -335,7 +335,6 @@
   (monitor-run :break-on break-on)
   (setmem-copy (monitor-buffer)))
 
-;;A goblin appears at the door. He flings some inedible slop through the bars.
 ;;You see a spanner
 
 ;;Frazbolg is engrossed in an article 'Entrails. Worth the mess?'

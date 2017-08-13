@@ -77,14 +77,16 @@
     (ensure-aliases-different '(:A4) (get-aliased-labels :typeset-cs))
     (ensure-aliases-different '(:A4) (get-aliased-labels :typeset))
     (ensure-aliases-different '(:A4) (get-aliased-labels :decompress))
-    
+   
     (alias :str '(:typeset-cs . :str))
     (alias :dest '(:decompress . :dest))
     (alias :data '(:decompress . :data))
     (JSR :deref-w)
     (STX.ZP (lo-add :loc))
     (STA.ZP (hi-add :loc))
-    (cls #x10)
+    (dc "Clear the top half of the screen")
+    (call-memset 0 *screen-memory-address*
+		 (* (live-row 0) +screen-width-bytes+))
     (dc "Get the title string")
     (LDY 0)
     (LDA.IZY :loc)
@@ -152,6 +154,13 @@
       (INY)
       (LDA.IZY :loc)
       (STA.ZP (hi-add '(:decompress . :data)))
+      (dc "Set the location dispatch table while we are here")
+      (INY)
+      (LDA.IZY :loc)
+      (STA.ZP (lo-add :location-dispatch-table))
+      (INY)
+      (LDA.IZY :loc)
+      (STA.ZP (hi-add :location-dispatch-table))
       (dc "Now the height again and divide by 8; colour attributes")
       (dc "are in blocks of 8x8")
       (LDY 9)
@@ -190,6 +199,8 @@
       (db :imgh sy)
       ;;10
       (dw :colours (resolve (cons name :colours)))
+      ;;12
+      (dw :dispatch (resolve (cons :dispatcher name)))
       (dimg name img-file sx sy))))
 
 (defun location-test ()

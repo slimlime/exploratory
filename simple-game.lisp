@@ -238,6 +238,7 @@
 	   (CLD)
 
 	   (label :start)
+	   (cls #x10)
 	   (sta16.zp (cons :font :present) :font)
 	      
 	   (navigate :dungeon-cell)

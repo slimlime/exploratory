@@ -65,7 +65,7 @@
 
 (defun navigate (location)
   (JSR :navigate)
-  (dw nil (resolve location)))
+  (dw nil location))
 
 (defun navigator ()
   (label :navigate)
@@ -194,13 +194,13 @@
       ;;6
       (db :imgw (/ sx 8))
       ;;7
-      (dw :pixels (resolve (cons name :pixels)))
+      (dw :pixels (cons name :pixels))
       ;;9
       (db :imgh sy)
       ;;10
-      (dw :colours (resolve (cons name :colours)))
+      (dw :colours (cons name :colours))
       ;;12
-      (dw :dispatch (resolve (cons :dispatcher name)))
+      (dw :dispatch (cons :dispatcher name))
       (dimg name img-file sx sy))))
 
 (defun location-test ()

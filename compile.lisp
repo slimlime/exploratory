@@ -272,7 +272,8 @@
 			that these those))))))
 
 	
-(defun db (label &rest bytes)
+(defun db (label byte &rest bytes)
+  (setf bytes (cons byte bytes))
   (add-hint (length bytes)
 	    (format nil "DB ~{$~2,'0X~^, ~}" bytes))
   (when label (label label))
@@ -285,7 +286,8 @@
   (dotimes (i count)
     (push-byte byte)))
 
-(defun dw (label &rest words)
+(defun dw (label word &rest words)
+  (setf words (mapcar #'resolve (cons word words)))
   (add-hint (* 2 (length words))
 	    (format nil "DW ~{$~4,'0X~^, ~}" words))
   (when label (label label))

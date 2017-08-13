@@ -427,7 +427,7 @@
 	   (JSR :typeset-cs)
 
 	   (JSR '(:print-message . 2))
-	   (dw nil (resolve :str1))
+	   (dw nil :str1)
 
 	   (BRK)
 

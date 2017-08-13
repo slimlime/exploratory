@@ -214,6 +214,48 @@
 
 (defparameter origin #x600)
 
+(defun test-render-input ()
+  ;;TODO create a mode that will render a string from the 1-26 basis
+  ;;TODO make the text scroll above the response message
+  (label :test-render-input)
+  (sta16.zp (scradd (live-row 3) 0) '(:typeset . :raster))
+  (CLC)
+  (LDY 39)
+  (label :copy-test-input)
+  (LDA.ABY '(:parser . :input))
+  (BEQ :null-terminator)
+  (ADC 8 "User input chars are 1-26, print charset is A=9")
+  (label :null-terminator)
+  (STA.ABY :char-input)
+  (DEY)
+  (BPL :copy-test-input)
+  (JSR '(:print-message . :print))
+  (dw nil :char-input)
+  (RTS)
+  (db :char-input 0 0 0 0 0 0 0 0 0 0)
+  (db nil 0 0 0 0 0 0 0 0 0 0)
+  (db nil 0 0 0 0 0 0 0 0 0 0)
+  (db nil 0 0 0 0 0 0 0 0 0 0))
+
+(defun enter-input (str &key (break-on 'brk))
+  ;;really need to make better 6502 emulator to avoid need
+  ;;for copying the buffer
+  (let ((buffer (cl-6502:get-range 0)))
+    ;;we must clear the buffer for new input
+    (loop for i from 0 to *max-input-length* do
+	 (setf (aref buffer (+ i (resolve '(:parser . :input)))) 0))
+    
+    (loop for c across str
+       for i from 0 to *max-input-length* do       
+	 (setf (aref buffer (+ i (resolve '(:parser . :input))))
+	       (to-alphabet-pos c)))
+    (setf (cl-6502:get-range 0) buffer))
+  (monitor-setpc :test-input)
+  (monitor-run :break-on break-on)
+  (setmem-copy (monitor-buffer))
+  ;;(vicky)
+  (values))
+      
 (defun build-game (&key (full-reset nil) (quick-parser t))
 
   (when full-reset
@@ -251,6 +293,7 @@
 	   (BRK)
 
 	   (label :test-input)
+	   (JSR :test-render-input)
 	   (JSR :parse)
 	   (JSR :dispatch)
 
@@ -275,6 +318,10 @@
 	   (typeset)
 	   (fleuron)
 	   (navigator)
+
+	   ;;testing functions
+
+	   (test-render-input)
 	   
 	   ;;process all the words we need for the parser
 	   
@@ -311,27 +358,8 @@
 
       (format t "Build size ~a~%" (- *compiler-ptr* origin))))
 
-(defun enter-input (str &key (break-on 'brk))
-  ;;really need to make better 6502 emulator to avoid need
-  ;;for copying the buffer
-  (let ((buffer (cl-6502:get-range 0)))
-    ;;we must clear the buffer for new input
-    (loop for i from 0 to *max-input-length* do
-	 (setf (aref buffer (+ i (resolve '(:parser . :input)))) 0))
-    
-    (loop for c across str
-       for i from 0 to *max-input-length* do       
-	 (setf (aref buffer (+ i (resolve '(:parser . :input))))
-	       (to-alphabet-pos c)))
-    (setf (cl-6502:get-range 0) buffer))
-  (monitor-setpc :test-input)
-  (monitor-run :break-on break-on)
-  (setmem-copy (monitor-buffer))
-  ;;(vicky)
-  (values))
-
-(defun run-game (&optional (break-on 'BRK))
-  (build-game)
+(defun run-game (&key (full-reset nil) (break-on 'BRK))
+  (build-game :full-reset full-reset)
   (monitor-reset #x600)
   (monitor-run :break-on break-on)
   (setmem-copy (monitor-buffer)))

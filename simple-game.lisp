@@ -137,12 +137,11 @@
       (ifbit :door-open
 	     (respond "The door is already open.")
 	     (ifbit :door-locked
-		    (ifbit :key-in-crack
+		    (nifbit :key-in-crack
 			   (respond "The door is locked.")
-			   (progn
-			     (respond
+			   (respond
 			      "Have you been licking the slime? It's hallucinogenic."
-			      "The door, not atypically for a dungeon, is locked.")))
+			      "The door, not atypically for a dungeon, is locked."))
 		    (progn
 		      (respond *far-out*)
 		      (respond "The door creaks open.")
@@ -156,9 +155,11 @@
     (action '((EXAMINE TORCHES) (EXAMINE TORCH))
       (progn
 	(setbit :torches-examined)
-	(respond "The flickering shadows make you think of something profound, like a orange crisp-packet caught in the wind.")))
+	(respond "The flickering shadows make you think of something profound, like an orange crisp-packet caught in the wind.")))
     (action '(TAKE TORCH)
-      (respond "You take one of the torches."))
+      (progn
+	(setbit :torch-carried)
+	(respond "You take one of the torches.")))
     (action '((CRISP) (PACKET))
       (ifbit :torches-examined
 	     (respond "There is no crisp packet! It was a metaphor for your situation.")
@@ -215,28 +216,65 @@
 (defparameter origin #x600)
 
 (defun test-render-input ()
-  ;;TODO create a mode that will render a string from the 1-26 basis
-  ;;TODO make the text scroll above the response message
   (label :test-render-input)
-  (sta16.zp (scradd (live-row 3) 0) '(:typeset . :raster))
-  (CLC)
-  (LDY 39)
-  (label :copy-test-input)
-  (LDA.ABY '(:parser . :input))
-  (BEQ :null-terminator)
-  (ADC 8 "User input chars are 1-26, print charset is A=9")
-  (label :null-terminator)
-  (STA.ABY :char-input)
-  (DEY)
-  (BPL :copy-test-input)
-  (JSR '(:print-message . :print))
-  (dw nil :char-input)
-  (RTS)
-  (db :char-input 0 0 0 0 0 0 0 0 0 0)
-  (db nil 0 0 0 0 0 0 0 0 0 0)
-  (db nil 0 0 0 0 0 0 0 0 0 0)
-  (db nil 0 0 0 0 0 0 0 0 0 0))
+  (with-namespace :test-render-input
+    ;;this simulates the user having already entered the text on the bottom
+    ;;row and pressing return. The existing text in the 4 lines above is
+    ;;scrolled up and the text is posted on line 4 (not five, which remains empty)
+    (call-memcpy (scradd (live-row 1) 0)
+		 (scradd (live-row 0) 0)
+		 (* 4 +screen-width-bytes+ *line-height*))
+    (call-memset 0 (scradd (live-row 3) 0)
+		 (* 1 +screen-width-bytes+ *line-height*))
+    (sta16.zp (scradd (live-row 3) 0) '(:typeset . :raster))
+    (alias :tmp-raster :A3)
+    (alias :pos :D4)
+    (alias :str :A2)
+    (label :typeset-is nil)
+    (LDY 0)
+    (STY.ZP '(:typeset . :shift))
+    (STY.ZP '(:typeset . :prev-width))
+    (sta16.zp '(:parser . :input) :str)
+    (label :next)
+    (STY.ZP :pos)
+    (LDA.IZY :str)
+    (BNE :not-space)
+    (LDA (lo '(:present . #\ )))
+    (STA.ZP (lo-add '(:typeset . :char)))
+    (LDA (hi '(:present . #\ )))
+    (STA.ZP (hi-add '(:typeset . :char)))
+    (JMP :emit)
+    (label :not-space)
+    (TAX)
+    (LDA.ABX (1- (resolve ':1ch-lo)))
+    (CLC)
+    (dc "Add the offset of the font")
+    (ADC.ZP (lo-add :font))
+    (STA.ZP (lo-add '(:typeset . :char)))	
+    (LDA.ABX (1- (resolve ':1ch-hi)))
+    (ADC.ZP (hi-add :font))
+    (STA.ZP (hi-add '(:typeset . :char)))
+    (label :emit)
+    (JSR :typeset)
+    (LDY.ZP :pos)
+    (INY)
+    (CPY *max-input-length*)
+    (BNE :next)
+    (RTS)
 
+    ;; We shouldn't need this table really, once the compressed
+    ;; string table contains all the letters.
+    
+    (let ((lo (list :1ch-lo))
+	  (hi (list :1ch-hi)))
+      (loop for c across "ABCDEFGHIJKLMNOPQRSTUVWXYZ" do
+	   (let ((offset (- (resolve (cons :present c))
+			    (resolve '(:font . :present)))))
+	     (push (lo offset) lo)
+	     (push (hi offset) hi)))
+      (apply #'db (nreverse lo))
+      (apply #'db (nreverse hi)))))
+  
 (defun enter-input (str &key (break-on 'brk))
   ;;really need to make better 6502 emulator to avoid need
   ;;for copying the buffer

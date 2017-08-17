@@ -271,16 +271,17 @@
 
 (defun print-message ()
   (scroller :scroll-text 3)
-
-  ;;these entry points are a bit expensive 160 bytes!
-  ;;TODO Some fancy scheme
   
   (label '(:print-message . 3))
 
-  (call-memset 0 (scradd (live-row 0) 0)
+  (call-memcpy (scradd (live-row 3) 0)
+	       (scradd (live-row 0) 0)
+	       (* 1 +screen-width-bytes+ *line-height*))
+  
+  (call-memset 0 (scradd (live-row 1) 0)
 	       (* 3 +screen-width-bytes+ *line-height*))
 
-  (sta16.zp (scradd (live-row 0) 0) '(:typeset . :raster))
+  (sta16.zp (scradd (live-row 1) 0) '(:typeset . :raster))
   
   (JMP '(:print-message . :print))
   
@@ -288,12 +289,12 @@
 
   (call-memcpy (scradd (live-row 2) 0)
 	       (scradd (live-row 0) 0)
-	       (* 1 +screen-width-bytes+ *line-height*))
-
-  (call-memset 0 (scradd (live-row 1) 0)
 	       (* 2 +screen-width-bytes+ *line-height*))
 
-  (sta16.zp (scradd (live-row 1) 0) '(:typeset . :raster))
+  (call-memset 0 (scradd (live-row 2) 0)
+	       (* 2 +screen-width-bytes+ *line-height*))
+
+  (sta16.zp (scradd (live-row 2) 0) '(:typeset . :raster))
   
   (JMP '(:print-message . :print))
   
@@ -301,12 +302,12 @@
   
   (call-memcpy (scradd (live-row 1) 0)
 	       (scradd (live-row 0) 0)
-	       (* 2 +screen-width-bytes+ *line-height*))
+	       (* 3 +screen-width-bytes+ *line-height*))
 
-  (call-memset 0 (scradd (live-row 2) 0)
+  (call-memset 0 (scradd (live-row 3) 0)
 	       (* 1 +screen-width-bytes+ *line-height*))
 
-  (sta16.zp (scradd (live-row 2) 0) '(:typeset . :raster))
+  (sta16.zp (scradd (live-row 3) 0) '(:typeset . :raster))
   
   (with-namespace :print-message
     (label :print)

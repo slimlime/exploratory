@@ -19,6 +19,7 @@
   (bload "graphics.lisp")
   (bload "compress.lisp")
   (bload "parse.lisp")
+  (bload "dispatcher.lisp")
   (bload "location.lisp")
   (bload "analysis.lisp")
   (bload "declarations.lisp")

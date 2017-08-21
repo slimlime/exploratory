@@ -3,42 +3,39 @@
 ;; binary search.
 
 (defparameter *word-id-count* nil)
-(defparameter *word-ids* nil)
-(defparameter *id-meanings* nil)
-(defparameter *word-hash-table* (make-array 256))
-(defparameter *hash-fudge-factors* nil)
+(defparameter *word->meaning* nil)
+(defparameter *meaning->word* nil)
 (defparameter *word-collisions* nil)
-(defparameter *handlers* nil)
-
 (defparameter *max-input-length* 40)
+(defparameter *binary-search-table* nil) ;;for debugging
 (defparameter *max-words* 4) ;;bit misleading as this is the max words in the input buffer
 ;;but we only parse 3 of them.
 
-;;TODO I am wondering if I should have made the input buffer 0 terminated
-
+(defparameter *handlers* nil)
+;;TODO this is boring, also it rightly belongs
+;;with the dispatcher code.
 (defun reset-parser-between-passes ()
   (setf *handlers* (make-hash-table)))
 
 (defun reset-parser ()
-  (setf *word-ids* (make-hash-table :test 'equal))
-  (setf *id-meanings* (make-hash-table))
+  (setf *word->meaning* (make-hash-table :test 'equal))
+  (setf *meaning->word* (make-hash-table))
   (setf *word-id-count* 1)
-  (setf *word-hash-table* (make-array 256))
-  (setf *hash-fudge-factors* nil)
   (setf *word-collisions* nil)
+  (setf *binary-search-table* nil)
   (reset-parser-between-passes))
 
 (defun defword (word &rest synonyms)
   ;;don't do anything once the table has already been built
-  (unless *hash-fudge-factors*
-    (setf word (symbol-name word))
-    (assert (null (gethash word *word-ids*)) nil (format nil "~a already in dictionary" word))
-    (setf (gethash word *word-ids*) *word-id-count*)
-    (setf (gethash *word-id-count* *id-meanings*) word)
+  (unless *word-table-built*
+    (unless (stringp word) (setf word (symbol-name word)))
+    (assert (null (gethash word *word->meaning*)) nil (format nil "~a already in dictionary" word))
+    (setf (gethash word *word->meaning*) *word-id-count*)
+    (setf (gethash *word-id-count* *meaning->word*) word) 
     (dolist (synonym synonyms)
-      (setf synonym (symbol-name synonym))
-      (assert (null (gethash synonym *word-ids*)))
-      (setf (gethash synonym *word-ids*) *word-id-count*))
+      (unless (stringp synonym) (setf synonym (symbol-name synonym)))
+      (assert (null (gethash synonym *word->meaning*)))
+      (setf (gethash synonym *word->meaning*) *word-id-count*))
     (incf *word-id-count*)))
 
 (defun to-alphabet-pos (char)
@@ -64,11 +61,11 @@
 ;;Binary tree parser to disambiguate words which collide
 ;;when hashed. Expects A0 to contain the input buffer and
 ;;Y to contain the offset.
-(defun binary-parser ()
+(defun binary-parser (wordlist)
   (label :binary-parser)
   (with-namespace :binary-parser
     (alias :word :A0)
-    (let ((words (coerce *word-collisions* 'vector))
+    (let ((words (coerce wordlist 'vector))
 	  (label-number 1))
       (setf words (sort words #'string<))
       (dc (format nil "~a" words))
@@ -97,10 +94,11 @@
 		   pos))
 	       (generate (i j k y)
 		 (if (= i j)
-		     (let* ((id (gethash (elt words i) *word-ids*))
-			    (prim (gethash id *id-meanings*)))
-			 (LDA id (format nil "~a" prim))
-			 (RTS))
+		     (let ((id (gethash (elt words i) *word->meaning*))) 
+		       (LDA id (format nil "~a (~a)"
+				       (elt words i)
+				       (gethash id *meaning->word*)))
+		       (RTS))
 		     (let ((split (split i j k)))
 		       (if (null split)
 			   (generate i j (1+ k) y)
@@ -125,96 +123,27 @@
 	(LDA.IZY :word)
 	(generate 0 (1- (length words)) 0 0)))))
 
-(defun hash (word a b c d)
-  (flet ((g (i) (to-alphabet-pos (elt word i))))
-    (let ((len (length word))
-	  (h (+ (g 0) a)))
-      (when (> len 1) (setf h (logxor (ash h 1) (+ (g 1) b))))
-      (when (> len 2) (setf h (logxor (ash h 1) (+ (g 2) c))))
-      (when (> len 3) (setf h (logxor (ash h 1) (+ (g 3) d))))
-      (when (> len 4) (setf h (logxor h (- 128 (g 4)))))
-      (logand #xff h))))
+(defun char-or-space (string index)
+  (if (>= index (length string))
+      0
+      (to-alphabet-pos (char string index))))
 
-(defun build-table (a b c d)
-  (let ((hashes (make-hash-table))
-	(collisions (make-hash-table :test 'equal)))
-    (maphash #'(lambda (k v)
-		 (declare (ignorable v))
-		 (let* ((h (hash k a b c d))
-			(existing (gethash h hashes)))
-		     ;;It's not a collision if the word maps to the same
-		     ;;word id, for example, CHADRIX, CHADRIC, which
-		     ;;is going to be quite common for words with 4 letters
-		     ;;the same!
-		   (if (and existing (/= (gethash existing *word-ids*)
-					 (gethash k *word-ids*)))
-		       (progn
-			 (setf (gethash existing collisions) t)
-			 (setf (gethash k collisions) t))
-		       (setf (gethash h hashes) k))))
-	     *word-ids*)
-    (let ((collision-list nil))
-      (maphash #'(lambda (k v)
-		   (declare (ignorable v))
-		   (push k collision-list))
-	       collisions)
-      (values hashes collision-list (hash-table-count collisions)))))
-
-(defun count-collisions (a b c d)
-  (multiple-value-bind (hashes collisions collision-count)
-      (build-table a b c d)
-    (declare (ignorable hashes collisions))
-    collision-count))
-
-(defun build-hash-table (&optional (quick t))
-  ;(declare (optimize (speed 3) (safety 0) (debug 0)))
-  (let ((max 0)
-	(min 9999)
-	(r nil)
-	(low (if quick 0 -16))
-	(hi (if quick 0 16)))
-    (loop for a from low to hi do
-	 (loop for b from low to hi do
-	      (loop for c from low to hi do
-		   (loop for d from low to hi do
-			(let ((l (count-collisions a b c d)))
-			  (when (> l max)
-			    (setf max l))
-			  (when (< l min)
-			    (setf min l)
-			    (setf r (list a b c d))))))))
-    (format t "Collisions ~a~% (worst was ~a) Fudge Factors ~a~%" min max r)
-    (multiple-value-bind (hashes collisions collision-count)
-	(apply 'build-table r)
-      (declare (ignorable collision-count))
-      (format t "Collisions:~a" collisions)
-      (setf *word-collisions* collisions)
-      ;;fill the word meaning table with values
-      (maphash #'(lambda (k v)
-		   (setf (aref *word-hash-table* k)
-			 (gethash v *word-ids*)))
-	       hashes)
-      ;;clear the colliding ones, just in case
-      (loop for w in collisions do
-	   (setf (aref *word-hash-table* (apply 'hash w r)) 0))
-      (setf *hash-fudge-factors* (coerce r 'vector)))))
-
-(defun test-hashing (w collision-p)
-  (let ((hash-id (aref *word-hash-table* (apply 'hash w *hash-fudge-factors*)))
-	(word-id (gethash w *word-ids*)))
-    (if collision-p
-	(assert (= hash-id 0))
-	(assert (= hash-id word-id)))))
-
+(defun collides-p (a b)
+  (and (>= (length a) 4)
+       (>= (length b) 4)
+       (equal (subseq a 0 4)
+	      (subseq b 0 4))))
+  
 (defun parser ()
   (label :parse)
   (with-namespace :parser
     (alias :pos :D0)
-    (alias :tmp :D1)
+    (alias :delta :D1)
     (alias :word-start :D2)
     (alias :word-index :D3)
     (alias :inp :A0)
-    ;;store our input address so we can use zp indexing
+    (alias :index :D4) ;;binary search array index
+
     (sta16.zp :input :inp)
     (label :parse-direct)
     (LDX 0 "X is our word pointer")
@@ -227,70 +156,83 @@
     (INY)
     (LDA.IZY :inp)
     (BEQ :trim)
-    (label :next)
-    (STY.ZP :word-start "Store position in-case of collision")
-    ;;Now try to build up a hash for the word. Stop when
-    ;;we get to a space or end of line etc.
-    ;;Buffer is zero terminated so we can't overrun
-    (dc "Character 0")
-    (LDA.IZY :inp)
-    (BEQ :word-end)
-    (CLC)
-    (ADC (to-ubyte (aref *hash-fudge-factors* 0)) "Fudge 0")
-    (STA.ZP :tmp)
-    (dc "Character 1")
-    (INY)
-    (LDA.IZY :inp)
-    (BEQ :word-end)
-    (CLC)
-    (ADC (to-ubyte (aref *hash-fudge-factors* 1)) "Fudge 1")
-    (ASL.ZP :tmp)
-    (EOR.ZP :tmp)
-    (STA.ZP :tmp)
-    (dc "Character 2")
-    (INY)
-    (LDA.IZY :inp)
-    (BEQ :word-end)
-    (CLC)
-    (ADC (to-ubyte (aref *hash-fudge-factors* 2)) "Fudge 2")
-    (ASL.ZP :tmp)
-    (EOR.ZP :tmp)
-    (STA.ZP :tmp)
-    (dc "Character 3")
-    (INY)
-    (LDA.IZY :inp)
-    (BEQ :word-end)
-    (CLC)
-    (ADC (to-ubyte (aref *hash-fudge-factors* 3)) "Fudge 3")
-    (ASL.ZP :tmp)
-    (EOR.ZP :tmp)
-    (STA.ZP :tmp)
-    (INY)
-    (LDA.IZY :inp)
-    (BEQ :word-end)
-    (dc "128 - 4 character is xored into the hash")
-    (LDA 128)
-    (SEC)
-    (SBC.IZY :inp)
-    (EOR.ZP :tmp)
-    (STA.ZP :tmp)
-    (label :word-end)
-    (dc "Did we go off the end of the buffer?")
+    (label :next-word)
     (CPY *max-input-length*)
     (BPL :done)
-    (LDX.ZP :tmp)
-    (dc "Look up the word meaning")
-    (LDA.ABX :word-meanings)
-    (when *word-collisions*
-      (BNE :store-result)
-      (dc "Colliding word, lets have a go with")
-      (dc "the binary parser to resolve it")
-      (LDY.ZP :word-start)
-      (JSR :binary-parser)
-      (dc "Since the binary parser isn't too fussy about")
-      (dc "where it stops, rewind back to the beginning")
-      (dc "of the word before we look for the next space")
-      (LDY.ZP :word-start))
+    (dc "Now start a binary search")
+    (dc "but first save word index in case")
+    (dc "we need to resolve a collision")
+    (STY.ZP :pos)
+    (LDA (ash 1 7) "Search depth")
+    (STA.ZP :delta)
+    (label :next-entry)
+    (LDY.ZP :pos)
+    (STA.ZP :index)
+    (TAX)
+    (LDA.IZY :inp)
+    (CMP.ABX (1- (resolve :tbl1)) "tbl1 - 1")
+    (BNE :not-match)
+    
+    (INY)
+    (LDA.IZY :inp)
+    (CMP.ABX (1- (resolve :tbl2)) "tbl2 - 1")
+    (BNE :not-match)
+    (dc "Might be a one letter word")
+    (CMP 0 "Check for space")
+    (BEQ :found)
+    
+    (INY)
+    (LDA.IZY :inp)
+    (CMP.ABX (1- (resolve :tbl3)) "tbl3 - 1")
+
+    (BNE :not-match)
+    (dc "Might be a two letter word")
+    (CMP 0 "Check for space")
+    (BEQ :found)
+
+    (INY)
+    (LDA.IZY :inp)
+    (CMP.ABX (1- (resolve :tbl4)) "tbl4 - 1")
+    (BEQ :found)
+    
+    (label :not-match)
+    (BPL :gt)
+    (dc "Less than...")
+    (LSR.ZP :delta)
+    (BEQ :not-found)
+    (LDA.ZP :index)
+    (SEC)
+    (SBC.ZP :delta)
+    (dc "Always jump... A != 0 since 128 - 64 ... - 1 = 1")
+    (BNE :next-entry)
+    (label :gt)
+    (dc "Greater than...")
+    (LSR.ZP :delta)
+    (BEQ :not-found)
+    (LDA.ZP :index)
+    (CLC)
+    (ADC.ZP :delta)
+    (BNE :next-entry)
+    (label :found)
+    (dc "The word is in our dictionary")
+    (dc "Let us look up its meaning")
+    (LDX.ZP :index)
+    (LDA.ABX (1- (resolve :word-meanings)) "Look up word meaning, 1 based")
+    (BNE :store-result)
+    ;;TODO Save the word position here, at the end of the 4
+    ;;character word match
+    (dc "Colliding word, lets have a go with")
+    (dc "the binary parser to resolve it")
+    (LDY.ZP :word-start)
+    (JSR :binary-parser)
+    (dc "Since the binary parser isn't too fussy about")
+    (dc "where it stops, rewind back to the beginning")
+    (dc "of the word before we look for the next space")
+    (LDY.ZP :word-start)
+    (JMP :store-result) ;;TODO, we can use SKIP trick for this
+			;;e.g. (skip-to :not-found) which could assert if not 2 bytes
+    (label :not-found)
+    (LDA 0)
     (label :store-result)
     (LDX.ZP :word-index)
     (STA.ABX :words)
@@ -308,39 +250,88 @@
     (INX)
     (STX.ZP :word-index)
     (CPX *max-words*)
-    (BNE :next)
+    (BNE :next-word)
     (label :done)
     (RTS)
-    
+
+    ;;TODO Ensure that only real collisions are added, e.g. CHADRIC and CHADRIX
+    ;;are synonymous, but CHEETOWS and CHEEZOWS are not.
     (dc "The parsed word meanings get put here")
     (dbs :words *max-words*)
     (dc "The user input buffer")
     (dc "Terminated with many zeroes for convenience.")
     (dbs :input (+ *max-words* *max-input-length*))
-    (dc "Table mapping hash values to word meanings")
-    (apply 'db :word-meanings (coerce *word-hash-table* 'list))))
+    
+    (let ((strings nil)
+	  (collisions (make-hash-table :test 'equal))
+	  (string-count nil))
+      
+      (let ((all-strings nil))
+	(maphash #'(lambda (k v)
+		     (declare (ignorable v))
+		     (push k all-strings))
+		 *word->meaning*)
+	(setf all-strings (sort all-strings #'string<))
+	(dolist (string all-strings)
+	  (if (collides-p string (car strings))
+	      (progn
+		(setf (gethash string collisions) t)
+		(setf (gethash (car strings) collisions) t))
+	      (push string strings)))
+	(setf string-count (length strings))
+	(assert (< string-count 256) nil "Too many words")
+	(dotimes (_ (- 255 string-count))
+	  (push "ZZZZ" strings))
+	(setf strings (nreverse strings))
+	(assert (= (length strings) 255) nil "Dodgy array length"))
 
+      (setf *binary-search-table* strings)
+            
+      (dc "Word tables, by character position")
+	  
+      (apply #'db :tbl1 (mapcar #'(lambda (s) (char-or-space s 0)) strings))
+      (apply #'db :tbl2 (mapcar #'(lambda (s) (char-or-space s 1)) strings))
+      (apply #'db :tbl3 (mapcar #'(lambda (s) (char-or-space s 2)) strings))
+      (apply #'db :tbl4 (mapcar #'(lambda (s) (char-or-space s 3)) strings))
+      
+      (dc "Table of word meanings")
+
+      (let ((meanings nil))
+	(dotimes (_ string-count)
+	  (push (gethash (pop strings) *word->meaning*) meanings))
+	(apply 'db :word-meanings (nreverse meanings)))
+	  
+      (dc "Binary tree parser")
+
+      (setf *word-collisions* nil)
+
+      (maphash #'(lambda (k v) (declare (ignore v))
+			 (push k *word-collisions*))
+	       collisions)
+      
+      (binary-parser *word-collisions*))))
+  
 (defun dump-words ()
-  (let ((i 0))
+  (let ((i 0)
+	(sorted nil))
     (maphash #'(lambda (k v)
-		 (format t "~a=#x~x (#x~x) " k v
-			 (apply 'hash k
-				(coerce *hash-fudge-factors* 'list)))
+		 (push (cons k v) sorted)
+		 (format t "~a=~a " k v)
 		 (when (zerop (mod (incf i) 5))
 		   (terpri)))
-	     *word-ids*))
-  (print "Collisions:")
-  (print *word-collisions*)
+	     *word->meaning*)
+    (setf sorted (sort sorted #'string< :key #'car))
+    (print sorted))
   (values))
 
-(defun build-hash-test (pass)
+(defun build-parse-word-test (pass)
   (funcall pass)
   (build-symbol-table)
   (funcall pass)
   (setf *compiler-final-pass* t)
   (funcall pass))
 
-(defun hash-test (word)
+(defun parse-word-test (word)
   (reset-compiler)
   (reset-symbol-table)
   
@@ -349,6 +340,8 @@
 	   (org #x600)
 	   (CLD)
 
+	   (label :start)
+	   
 	   (sta16.zp :word '(:parser . :inp))
 	   
 	   (JSR '(:parser . :parse-direct))
@@ -359,26 +352,26 @@
 	   (db nil 0 0 0 0 0)
 	   
 	   (parser)
-	   (when *word-collisions*
-	     (binary-parser))
 	   
 	   (label :end)))
     
-    (build-hash-test #'pass))
+    (build-parse-word-test #'pass)
+    
+    ;;(dump-words)
+    
+    (monitor-reset #x600)
+    (monitor-run :print nil)
+    
+    (aref (monitor-buffer) (resolve '(:parser . :words)))))
 
-  ;;(dump-words)
-  
-  (monitor-reset #x600)
-  (monitor-run :print nil)
-  
-  (aref (monitor-buffer) (resolve '(:parser . :words))))
-
-(defun test-hash-word (word id &optional (hash-only nil))
-  (assert (= (hash-test word)
-	     (if (and hash-only (find word *word-collisions*))
-		 0 id))
-	  nil
-	  (format nil "The word ~a hashed to the wrong value" word)))
+(defun test-parse-word (word meaning &key (debug nil))
+  (when debug (format t "Checking ~a~%" word))
+  (unless    
+      (= (parse-word-test word) meaning)
+    (let ((msg (format debug "The word ~a parsed to the wrong value" word)))
+      (if debug
+	  (terpri)
+	  (assert nil nil msg)))))
   
 ;; Test all words in the list
 
@@ -424,10 +417,8 @@
 (defword :I :INVENTORY)
 (defword :DROP)
 
-(build-hash-table t)
-
-(maphash #'(lambda (k v) (test-hash-word k v)) *word-ids*)
-
+(maphash #'(lambda (k v) (test-parse-word k v :debug t)) *word->meaning*)
+#|
 (defun parse-words-tester (input &key (break-on 'brk))
   (reset-compiler)
   (reset-symbol-table)
@@ -487,210 +478,4 @@
 (test-parse-input "PUSH  CYLINDER" '(PUSH CYLINDER))
 (test-parse-input "PRESS   CYLINDER" '(PUSH CYLINDER))
 (test-parse-input "    OPEN  FRABJOUS  DOOR  " '(OPEN ? DOOR))
-(test-parse-input "OPEN     DOOR      CLOSE    " '(OPEN DOOR CLOSE))
-
-;;Push a sentence handler into the list of handlers for a location
-;;Note that the location is NOT automatically applied to the handler address
-(defun defsentence (words handler-address &optional (location :generic))
-  ;;put all words in the table that aren't already in there
-  ;;as it stands we won't be able to declare any synonyms
-  ;;once they have been declared here, but perhaps that is yagni
-  (dolist (word words)
-    (unless (gethash (symbol-name word) *word-ids*)
-      (defword word)))
-
-  (assert (null (find words (gethash location *handlers* )
-		      :key #'car :test #'equal))
-	  nil (format nil "The words ~a already appear with a handler." words))
-  ;;if this throws and shouldn't has the handlers table been reset?
-  (push (cons words handler-address)
-	(gethash location *handlers*)))
-	   
-(defun dispatcher ()
-  (label :dispatch)
-  ;;when we enter a location, this dispatch table should be set
-  (zp-w :location-dispatch-table)
-  (with-namespace :dispatcher
-    (alias :dispatch-table :A0)
-    (alias :handled :D0)
-    (alias :dispatch-ptr :D1)
-    (alias :tries :D2)
-    ;;TODO Does it make sense for parse and dispatch to be
-    ;;two separate functions? i.e. should we call parse
-    ;;from here?
-    (LDA 2)
-    (STA.ZP :tries)
-    (dc "Choose the location based table")
-    (cpy16.zp :location-dispatch-table :dispatch-table)
-    (label :dispatch)
-    (LDY 0)
-    (LDA.IZY :dispatch-table)
-    (dc "Is this the last entry in the dispatch table?")
-    (BNE :compare-word)
-    (DEC.ZP :tries)
-    (dc "We only try 2 tables, then return")
-    (BNE :try-generic)
-    (RTS)
-    (label :try-generic)
-    (dc "Choose the generic table")
-    (sta16.zp :generic :dispatch-table)
-    (LDY 0)
-    (label :compare-word)
-    (LDX 0)
-    (label :next-word)
-    (LDA.IZY :dispatch-table)
-    ;;TODO store wildcard match so it can be used
-    ;;by the handler.
-    (BEQ :matched-word "0 always matches")
-    (CMP.ABX '(:parser . :words))
-    (BNE :next-input-word)
-    (label :matched-word)
-    (dc "Great work kid, now match another one.")
-    (INY)
-    (CPY 3)
-    (BEQ :matched-sentence)
-    (label :next-input-word)    
-    (INX)
-    (CPX *max-words*)
-    (BNE :next-word)
-    (dc "We exhausted the input words")
-    (label :next-handler)
-    (dc "Skip to next entry in dispatch table")
-    (add16.zp 5 :dispatch-table)
-    (dc "Assume the carry is clear after long add")
-    (BCC :dispatch)
-    (label :matched-sentence)
-    (dc "Push the dispatch address on the stack")
-    (LDA.IZY :dispatch-table)
-    (PHA)
-    (INY)
-    (LDA.IZY :dispatch-table)
-    (PHA)
-    (dc "Call the handler, which will return to the top-level caller")
-    (RTS)
-    
-    ;;now build the tables
-
-    (maphash
-     #'(lambda (location entry-list)
-	 (dc (format nil "~a dispatch table" location))
-	 (label location)
-	 (dolist (entry (reverse entry-list))
-	   (let ((words
-		  ;;this just means that we always get a list of three elements
-		  ;;todo, look at how to do this nicelier.
-		  (coerce (subseq (coerce (append (car entry) '(? ? ?)) 'vector)
-				  0 3)
-			  'list))
-		 (handler (cdr entry)))
-	     (dc (format nil "~{~a ~} -> ~a" words (fmt-label handler t)))
-	     (apply 'db nil (append
-			     (mapcar #'(lambda (word)
-					 (let* ((symb (symbol-name word))
-					    (id (if (equal "?" symb) 0
-						    (gethash symb *word-ids*))))
-					   (assert id nil "Unknown word ~a" word)
-					   id))
-				     words)
-			     ;;rts jump requires address offset by one
-			     (let ((rts-jmp-handler (1- (resolve handler))))
-			       (list (hi rts-jmp-handler)
-				     (lo rts-jmp-handler)))))))
-	 (dc (format nil "Terminating byte for ~a" location))
-	 (db nil 0))
-    *handlers*)))
-
-(defun dump-handlers ()
-  (maphash #'(lambda (k v)
-	       (format t "In ~a~%" k)
-	       (dolist (entry v)
-		 (format t "  ~a -> ~a~%"
-			 (car entry)
-			 (cdr entry))))
-	   *handlers*))
-
-(defun dispatch-tester (input location expected-handler)
-  (reset-compiler)
-  (reset-symbol-table)
-  (format t "Testing ~a in ~a -> ~a~%" input location expected-handler)
-  (flet ((pass ()
-	   (zeropage)	     
-	   (org #x600)
-	   (CLD)
-	   (label :start)
-	   ;;Set the room handler
-	   (sta16.zp (cons :dispatcher location) :location-dispatch-table)
-	   (JSR :parse)
-	   (JSR :dispatch)
-	   (BRK)
-	   (dispatcher)
-	   
-
-	   ;; install all the handlers, with the expected
-	   ;; one setting the output byte to a 1
-	   
-	   (maphash #'(lambda (loc entries)
-			(declare (ignorable loc))
-			(dolist (entry entries)
-			  (label (cdr entry))
-			  (when (equal (cdr entry) expected-handler)
-			    (LDA 1)
-			    (STA.AB :output))
-			  (RTS)))
-		    *handlers*)
-
-	   (db :output 0)
-
-	   (label :end)
-	   
-	   (parser)
-	   (when *word-collisions*
-	     (binary-parser))
-
-	   ))
-    
-    (build-hash-test #'pass))
-
-  ;; install the string into the input buffer
-
-  (loop for c across input
-        for i from 0 to *max-input-length* do       
-       (setf (aref *compiler-buffer* (+ i (resolve '(:parser . :input))))
-	     (to-alphabet-pos c)))
-  
-  (monitor-reset #x600)
-  (monitor-run :print nil)
-
-  ;; return the output byte which will have been set
-  ;; if the correct handler is called.
-  
-  (if (= 1 (aref (monitor-buffer) (resolve :output)))
-	 1
-	 nil))
-
-(defsentence '(OPEN DOOR) :open-door :room)
-(defsentence '(CLOSE DOOR) :close-door :room)
-(defsentence '(TAKE CHEEZOWS) :take-cheezows :room) ;i.e. specialization
-(defsentence '(INVENTORY) :inventory)
-(defsentence '(TAKE ?) :take)
-(defsentence '(DROP ?) :drop)
-;;existential angst
-(defsentence nil :nihil :void)
-
-(assert (dispatch-tester "OPEN DOOR" :room :open-door))
-(assert (dispatch-tester "CLOSE DOOR" :room :close-door))
-(assert (not (dispatch-tester "CLOSE DOOR" :room :open-door)))
-(assert (dispatch-tester "TAKE CHEEZOWS" :room :take-cheezows))
-(assert (dispatch-tester "TAKE ELEPHANT" :room :take))
-(assert (dispatch-tester "GET CHEEZOWS" :room :take-cheezows))
-(assert (dispatch-tester "DROP MONKEY" :room :drop))
-;;generci handlers should be called here only
-(assert (not (dispatch-tester "OPEN DOOR" :void :open-door)))
-(assert (not (dispatch-tester "CLOSE DOOR" :void :close-door)))
-(assert (not (dispatch-tester "TAKE CHEEZOWS" :void :take-cheezows)))
-(assert (dispatch-tester "TAKE CHEEZOWS" :void :take))
-(assert (dispatch-tester "TAKE ELEPHANT" :void :take))
-(assert (not (dispatch-tester "GET CHEEZOWS" :void :take-cheezows)))
-(assert (dispatch-tester "GET CHEEZOWS" :void :take))
-(assert (dispatch-tester "DROP MONKEY" :void :drop))
-
+(test-parse-input "OPEN     DOOR      CLOSE    " '(OPEN DOOR CLOSE))|#

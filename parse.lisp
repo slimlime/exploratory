@@ -1,6 +1,5 @@
-;; Hybrid approach. Put all words in a hash-table. Fill the hash-table
-;; with the word meanings. For colliding hashes, use a discriminating
-;; binary search.
+;; Hybrid approach. Binary search on table of 4 character words
+;; any collisions resolved with a binary tree.
 
 (defparameter *word-id-count* nil)
 (defparameter *word->meaning* nil)
@@ -132,17 +131,18 @@
   (and (>= (length a) 4)
        (>= (length b) 4)
        (equal (subseq a 0 4)
-	      (subseq b 0 4))))
-  
+	      (subseq b 0 4))
+       (not (= (gethash a *word->meaning*)
+	       (gethash b *word->meaning*)))))
+
 (defun parser ()
   (label :parse)
   (with-namespace :parser
-    (alias :pos :D0)
+    (alias :word-start :D0)
     (alias :delta :D1)
-    (alias :word-start :D2)
-    (alias :word-index :D3)
+    (alias :word-index :D2)
     (alias :inp :A0)
-    (alias :index :D4) ;;binary search array index
+    (alias :index :D3) ;;binary search array index
 
     (sta16.zp :input :inp)
     (label :parse-direct)
@@ -162,11 +162,11 @@
     (dc "Now start a binary search")
     (dc "but first save word index in case")
     (dc "we need to resolve a collision")
-    (STY.ZP :pos)
+    (STY.ZP :word-start)
     (LDA (ash 1 7) "Search depth")
     (STA.ZP :delta)
     (label :next-entry)
-    (LDY.ZP :pos)
+    (LDY.ZP :word-start)
     (STA.ZP :index)
     (TAX)
     (LDA.IZY :inp)
@@ -219,8 +219,7 @@
     (LDX.ZP :index)
     (LDA.ABX (1- (resolve :word-meanings)) "Look up word meaning, 1 based")
     (BNE :store-result)
-    ;;TODO Save the word position here, at the end of the 4
-    ;;character word match
+    
     (dc "Colliding word, lets have a go with")
     (dc "the binary parser to resolve it")
     (LDY.ZP :word-start)
@@ -298,7 +297,11 @@
 
       (let ((meanings nil))
 	(dotimes (_ string-count)
-	  (push (gethash (pop strings) *word->meaning*) meanings))
+	  (let ((string (pop strings)))
+	    (push (if (gethash string collisions)
+		      0
+		      (gethash string *word->meaning*))
+		  meanings)))
 	(apply 'db :word-meanings (nreverse meanings)))
 	  
       (dc "Binary tree parser")
@@ -417,8 +420,25 @@
 (defword :I :INVENTORY)
 (defword :DROP)
 
-(maphash #'(lambda (k v) (test-parse-word k v :debug t)) *word->meaning*)
-#|
+(maphash #'(lambda (k v) (test-parse-word k v :debug nil)) *word->meaning*)
+
+(test-parse-word " OPEN" (gethash "OPEN" *word->meaning*))
+
+(flet ((check (item)
+	 (find item *word-collisions* :test 'equal)))
+
+  (assert (check "OPEN"))
+  (assert (check "OPENER"))
+  (assert (check "CHEETOS"))
+  (assert (check "CHEEZOWS"))
+
+  ;; The following words should not be considered collisions
+  ;; as they resolve to the same meaning.
+
+  (assert (null (check "CHADRIX")))
+  (assert (null (check "CHAD")))
+  (assert (null (check "CHADRIC"))))
+
 (defun parse-words-tester (input &key (break-on 'brk))
   (reset-compiler)
   (reset-symbol-table)
@@ -431,11 +451,9 @@
 	   (JSR :parse)
 	   (BRK)
 	   (parser)
-	   (when *word-collisions*
-	     (binary-parser))
 	   (label :end)))
     
-    (build-hash-test #'pass))
+    (build-parse-word-test #'pass))
 
   ;; install the string into the input buffer
 
@@ -460,7 +478,7 @@
        for e in expected
        for r in words do
 	 (unless (eq '? e)
-	   (assert (equal r (gethash (symbol-name e) *word-ids*)))))
+	   (assert (equal r (gethash (symbol-name e) *word->meaning*)))))
     ;;we must insist the parser stops parsing at the end of the string
     (loop for i from (length expected) to 2 do
 	 (assert (equal 0 (elt words i)) nil
@@ -478,4 +496,4 @@
 (test-parse-input "PUSH  CYLINDER" '(PUSH CYLINDER))
 (test-parse-input "PRESS   CYLINDER" '(PUSH CYLINDER))
 (test-parse-input "    OPEN  FRABJOUS  DOOR  " '(OPEN ? DOOR))
-(test-parse-input "OPEN     DOOR      CLOSE    " '(OPEN DOOR CLOSE))|#
+(test-parse-input "OPEN     DOOR      CLOSE    " '(OPEN DOOR CLOSE))

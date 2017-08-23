@@ -49,7 +49,7 @@
 		      (respond "A crack in the floor, just like any other."
 			       "One might hide a small key-like object here."
 			       "Like, for example, a key.")))
-	     (respond "The Veil of Maia, or your shocking hangover prevents you from seeing anything interesting.")))
+	     (respond "The Veil of Maia prevents you from seeing anything interesting.")))
     (action '(TAKE KEY)
       (ifbit :crack-examined
 	     (ifbit :key-in-crack
@@ -97,8 +97,8 @@
 	     (progn
 	       (respond "Wise guy, eh? The lock doesn't budge. Your finger is now sore.")
 	       (respond *snickering*))
-	     (respond "You do realise you just put your finger in the keyhole of an unlocked door?")))
-    (action '(UNLOCK DOOR)
+	     (respond "You put your finger in the keyhole of an unlocked door.")))
+    (action '((UNLOCK DOOR) (USE KEY DOOR))
       (ifbit :door-locked
 	     (ifbit :key-in-crack
 		    (respond "With what? Your finger?")
@@ -119,11 +119,12 @@
 	       (setbit :door-locked)
 	       (clrbit :door-open)
 	       (respond "The lock mechanism clicks shut. You really have got it in for yourself haven't you?"))))
+    
     (action '((EXIT) (USE DOOR))
       (ifbit :door-open
 	     (navigate :corridor)
 	     (progn
-	       (respond "You walk into the closed door. Ouch.")
+	       (respond "Ouch! You walk into the closed door.")
 	       (respond *snickering*))))
     (action '(LICK SLIME)
       (nifbit :slime-licked
@@ -198,7 +199,7 @@
   (dloc :frazbolgs-closet "FRAZBOLG'S CLOSET" "/home/dan/Downloads/porsche.bmp"
 	"You are in the well-appointed closet of the goblin Frazbolg. Over centuries of guarding his prisoners he has amassed an impressive collection of posessions, a spare loin cloth- tattered, a toaster and a hundred-year-old copy of Modern Necromancer magazine.")
 
-;;I need toto summon the shade of Wazbolg, my predecessor.
+;;I need to summon the shade of Wazbolg, my predecessor.
 
   (with-location :frazbolgs-closet
     (action '(EXAMINE CHAIR)

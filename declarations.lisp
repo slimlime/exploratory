@@ -90,9 +90,20 @@
 		 ,then)
 	       (label :endif)))))))
 
+(defun ends-with-punctuation (string)
+  (let ((char (char string (1- (length string)))))
+    (or (char= char #\.)
+	(char= char #\!)
+	(char= char #\?))))
+
 ;;todo make justification work with the - at the beginning without actually
 ;;puting it into the string table
 (defun respond (message &rest messages)
+  (when *compiler-final-pass*
+    (dolist (s (cons message messages))
+      (unless (ends-with-punctuation s)
+	(format t "WARNING string '~a' does not end with punctuation~%" s))))
+  
   (let* ((text
 	  ;;TODO this is an abuse of the justify function, which
 	  ;;     is to account for the prompt
@@ -102,6 +113,7 @@
     (assert (<= lines 3) nil
 	    (format nil "Response would have more than 3 lines~%~a"
 		    text))
+    
     (JSR (cons :print-message lines))
     (dc (format nil "~a" text) t)
     (dw nil (dstr text))))

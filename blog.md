@@ -1,3 +1,33 @@
+## 23/8/2017
+
+## Bye bye Hash table.
+
+The hash table parsing code has been deleted in its entirety and replaced with a binary search based approach. This new approach only recognises words that it has in its dictionary, and does not mistake words it does not know (up to four characters).
+
+So yet again I have learned the lesson of YAGNI the hard way.  It wasn't that it was the wrong decision to do it that way at first, it was the fact that I spent too much effort on getting it nice. Now all that effort has been wasted. It wouldn't have saved me from having to change it, but at least I would have saved all the time I spent making utilities, and doing the brute force search algorithm etc. I think what I will try next time I have an idea is making the Minimum Effort Solution that Actually works, that way if they survive the next round of re-factoring, there is less waste, and you can nicey them up at the end.
+
+The end of the month is approaching, and while I have abandoned the idea that I can finish a full game for the IF competition deadline in September, my target is to have a complete mini-game consisting of three rooms. Left to do,
+
+- Finish rooms 2 and 3
+- Create object model (e.g. GET/DROP in places)
+- Javascript emulator
+
+There is a JS emulator online somewhere, so hopefully I can get it up on a site somewhere.
+
+Further ideas
+
+- Allow saving of state- this will be important for the competition.
+  To do this, I may just UUENCODE the state and update the URL. This is a simple solution for users, thought it may be a bit tricky to ensure it works consistently.
+
+- Keyboard input.
+  I have decided there is no point in doing a keyboard driver for fake hardware. I will provide a function which can be called to add a char/backspace which will trigger the emulator to execute it.
+
+
+- C64 port
+  This would be really nice, but I think I am going to wait until I have finished the full game and see the reaction to it before I do this as it could be significant effort.
+
+
+
 ## 11/8/2017 Passing parameters
 
 As I have added some extra locations for the test game I need a function for actually changing location. Since this will be a common operation we can't afford a long chain of loads and stores to pass the location as a parameter. To that end I created a subroutine which extracts a parameter from the callsite. This is a generalisation of the code used in the print message function (which has now been refactored to use this function). As you can see this casts the space/time trade-off into sharp relief- it is a lot of (time) effort to simply pass a constant parameter. However, this is 5-bytes per call rather than 11.

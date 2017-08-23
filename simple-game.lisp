@@ -71,8 +71,8 @@
 		(nifbit :slop-flung
 			(progn
 			  (setbit :slop-flung)
-			  (respond "He flings some inedible slop through the bars."))
-			(respond "He tells you to keep the noise down using a colourful stream of goblin profanities.")))))
+			  (respond "He flings some inedible slop through the bars. You hear a key rattling in the lock."))
+			(respond "He tells you to keep the noise down using a stream of vowel-free goblin profanities. KRRPKCHK DRGKPK!")))))
     (action '(EXAMINE SLOP)
       (ifbit :slop-flung
 	     (respond "A balanced soup of entrails, small amphibians and mandibles. Ooh! Garlic croutons!")))
@@ -102,9 +102,11 @@
       (ifbit :door-locked
 	     (ifbit :key-in-crack
 		    (respond "With what? Your finger?")
-		    (progn
-		      (clrbit :door-locked)
-		      (respond "The lock mechanism clicks...")))
+		    (ifbit :slop-flung
+			   (progn
+			     (clrbit :door-locked)
+			     (respond "The lock mechanism clicks..."))
+			   (respond "You rattle the key in the lock, but there is a key stuck in the other side.")))
 	     (respond "The door is already unlocked.")))
     (action '(CLOSE DOOR)
       (ifbit :door-open
@@ -148,6 +150,9 @@
 		      (respond "The door creaks open.")
 		      (setbit :door-open)))))))
 
+(defun test-exit-dungeon-cell ()
+  (mapc #'enter-input '("EXAMINE WINDOW" "LICK SLIME" "EXAMINE CRACK" "TAKE KEY" "UNLOCK DOOR" "OPEN DOOR" "USE DOOR")))	
+
 (defun corridor ()
   (dloc :corridor "CORRIDOR" "/home/dan/Downloads/bedroom.bmp"
 	"A torch-lit corridor. You see a row of cell doors, identical to your own. Moans and pleas waft through the bars- sounds which you are not entirely certain are human in origin. At one end, a brick wall, at the other a green door, different than all the rest.")
@@ -156,14 +161,14 @@
     (action '((EXAMINE TORCHES) (EXAMINE TORCH))
       (progn
 	(setbit :torches-examined)
-	(respond "The flickering shadows make you think of something profound, like an orange crisp-packet caught in the wind.")))
+	(respond "The flickering shadows make you think of something profound, like a packet of Cheezows caught in the wind.")))
     (action '(TAKE TORCH)
       (progn
 	(setbit :torch-carried)
 	(respond "You take one of the torches.")))
-    (action '((CRISP) (PACKET))
+    (action '((CHEEZOWS) (PACKET))
       (ifbit :torches-examined
-	     (respond "There is no crisp packet! It was a metaphor for your situation.")
+	     (respond "There are no Cheezows! It was a metaphor for your situation.")
 	     (respond "What a strange thing to say.")))
     (action '(EXAMINE METAPHOR)
       (respond "That is really taking the biscuit."))

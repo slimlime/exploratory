@@ -6,23 +6,21 @@
 (defparameter *meaning->word* nil)
 (defparameter *word-collisions* nil)
 (defparameter *max-input-length* 40)
+;;this following parameter is boring because it just suppresses the
+;;defword assertion that a word not already be in the table.
+;;and so needs to be set at the end of the build pass.
+(defparameter *word-table-built* nil)
 (defparameter *binary-search-table* nil) ;;for debugging
 (defparameter *max-words* 4) ;;bit misleading as this is the max words in the input buffer
 ;;but we only parse 3 of them.
 
-(defparameter *handlers* nil)
-;;TODO this is boring, also it rightly belongs
-;;with the dispatcher code.
-(defun reset-parser-between-passes ()
-  (setf *handlers* (make-hash-table)))
-
 (defun reset-parser ()
+  (setf *word-table-built* nil)
   (setf *word->meaning* (make-hash-table :test 'equal))
   (setf *meaning->word* (make-hash-table))
   (setf *word-id-count* 1)
   (setf *word-collisions* nil)
-  (setf *binary-search-table* nil)
-  (reset-parser-between-passes))
+  (setf *binary-search-table* nil))
 
 (defun defword (word &rest synonyms)
   ;;don't do anything once the table has already been built
@@ -329,6 +327,7 @@
 
 (defun build-parse-word-test (pass)
   (funcall pass)
+  (setf *word-table-built* t)
   (build-symbol-table)
   (funcall pass)
   (setf *compiler-final-pass* t)

@@ -1,3 +1,7 @@
+(defparameter *handlers* nil)
+
+(defun reset-dispatcher ()
+  (setf *handlers* (make-hash-table)))
 
 ;;Push a sentence handler into the list of handlers for a location
 ;;Note that the location is NOT automatically applied to the handler address
@@ -6,10 +10,10 @@
   ;;as it stands we won't be able to declare any synonyms
   ;;once they have been declared here, but perhaps that is yagni
   (dolist (word words)
-    (unless (gethash (symbol-name word) *word-ids*)
+    (unless (gethash (symbol-name word) *word->meaning*)
       (defword word)))
 
-  (assert (null (find words (gethash location *handlers* )
+  (assert (null (find words (gethash location *handlers*)
 		      :key #'car :test #'equal))
 	  nil (format nil "The words ~a already appear with a handler." words))
   ;;if this throws and shouldn't has the handlers table been reset?
@@ -98,7 +102,7 @@
 			     (mapcar #'(lambda (word)
 					 (let* ((symb (symbol-name word))
 					    (id (if (equal "?" symb) 0
-						    (gethash symb *word-ids*))))
+						    (gethash symb *word->meaning*))))
 					   (assert id nil "Unknown word ~a" word)
 					   id))
 				     words)
@@ -153,13 +157,9 @@
 
 	   (label :end)
 	   
-	   (parser)
-	   (when *word-collisions*
-	     (binary-parser))
-
-	   ))
-    
-    (build-hash-test #'pass))
+	   (parser)))
+    ;;todo use build function specific to this
+    (build-parse-word-test #'pass))
 
   ;; install the string into the input buffer
 
@@ -178,6 +178,8 @@
 	 1
 	 nil))
 
+(reset-dispatcher)
+
 (defsentence '(OPEN DOOR) :open-door :room)
 (defsentence '(CLOSE DOOR) :close-door :room)
 (defsentence '(TAKE CHEEZOWS) :take-cheezows :room) ;i.e. specialization
@@ -194,7 +196,7 @@
 (assert (dispatch-tester "TAKE ELEPHANT" :room :take))
 (assert (dispatch-tester "GET CHEEZOWS" :room :take-cheezows))
 (assert (dispatch-tester "DROP MONKEY" :room :drop))
-;;generci handlers should be called here only
+;;generic handlers should be called here only
 (assert (not (dispatch-tester "OPEN DOOR" :void :open-door)))
 (assert (not (dispatch-tester "CLOSE DOOR" :void :close-door)))
 (assert (not (dispatch-tester "TAKE CHEEZOWS" :void :take-cheezows)))

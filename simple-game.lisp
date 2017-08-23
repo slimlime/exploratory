@@ -294,7 +294,7 @@
   ;;(vicky)
   (values))
       
-(defun build-game (&key (full-reset nil) (quick-parser t))
+(defun build-game (&key (full-reset nil))
 
   (when full-reset
     (reset-image-cache))
@@ -311,7 +311,7 @@
   
   (flet ((pass ()
 
-	   (reset-parser-between-passes)
+	   (reset-dispatcher)
 	   
 	   (zeropage)	     
 	   (org origin)
@@ -361,16 +361,8 @@
 
 	   (test-render-input)
 	   
-	   ;;process all the words we need for the parser
-	   
-	   (unless *hash-fudge-factors* ;;only build the parser hash table once
-	     (build-hash-table quick-parser))	   
-
 	   (parser)
 	   
-	   (when *word-collisions*
-	     (binary-parser))
-
 	   (dispatcher)
 	   (string-table)
 	   
@@ -382,7 +374,8 @@
     
     (pass)
     (build-symbol-table)
-
+    ;;TODO This is BORING
+    (setf *word-table-built* t)
     ;;penultimate pass to ensure everything got a go and the structure
     ;;hasn't changed
 
@@ -412,4 +405,8 @@
 ;;Frazbolg is engrossed in an article 'One weird trick for a bloated corpse.'
 ;;Frazbolg says 'I am stuck here until I can afford Necromancer school.'
 
-;;You gaze into the toaster. The toaster gazes into you.
+;;You gaze into the toaster. The toaster gazes into you. Some toast pops out and hits you in the face.
+
+;;use key- nothing
+;;use key on door "You walk into the closed door"
+;;OUCH! YOU WALK INTO THE CLOSED DOOR

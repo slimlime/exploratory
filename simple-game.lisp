@@ -13,7 +13,7 @@
   (defword :EXAMINE :LOOK)
   (defword :TAKE :GET :PICK :GRAB)
   (defword :LICK :EAT :TASTE)
-  (defword :SLIME :OOZE :PUDDING)
+  (defword :SLIME :OOZE)
   (defword :EXIT :OUT :GO)
   (defword :ATTACK :KILL :HIT :CLEAVE :PUNCH))
 

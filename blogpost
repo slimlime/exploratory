@@ -1,3 +1,34 @@
+## 24/8/2017
+
+At first I decided that an 'object model' was unnecessary. I would model everything with bits of state and if statements. In the test game there is a key buried in a crack in the floor which cannot be seen. You can take the key once you have performed the action which allows it to be seen. You can also examine it if you can see it. But.. you can also examine it if you are carrying it, that is if you have typed TAKE KEY. At the moment you can't drop it. Other things you can't do
+
+- Disambiguate easily between that KEY and another 'KEY'
+- Put it back in the crack
+- Drop it somewhere else
+- Examine it when you have dropped it elsewhere
+
+So an object model really is required. I know that for the main game I will need to drop objects and also put them in places, e.g. DROP COIN IN WELL.
+
+Physical objects have the idea of place, also, you have to be able to distinguish between different objects with the same names So I am going to model PLACE and OBJECT-ID. For practicalities sake, these will be bytes. I am not altogether confident that PLACE will fit into byte, but it is just a concept- if the implementation has to change later then so be it.
+
+PLACE can be either a LOCATION or a SPECIAL LOCATION. A LOCATION is any of the game locations. Each LOCATION will be a PLACE. Each location will be assigned a PLACE. The special locations will be EGO and VOID. In memory there will be an array, where the index is the object ID and the value will be the PLACE. To determine whether an object is 'present' we can perform the check
+
+(IF CURRENT-LOCATION==PLACE[ID] || PLACE[ID]==EGO)
+
+To extend this, more places will be defined which correspond to objects that can carry other objects, e.g. bags. This is Yaggers at the moment as the implementation may be a bit tricky. I think that each object that could be considered a 'bag' would be added to the PLACE list first, along with the special locations so that each location id==place id(location). It would also be preferable to make (for the 'bag' objects at least) object-id==place-id. I am going to have to think about how practical this is (and I am not sure if it is possible).
+
+So, every object has a place. Every place that an object can be is a byte. Every location is a place. The locations, EGO and VOID are places. Every object that can carry another object is a place such that PLACE-ID==OBJECT-ID.
+
+Additionally, this array merely describes the location of the objects, not the behaviour. Generic behaviour must be defined for each object- it might have to be the case that we have OBJECT dispatch tables. This is essentially a v-table for each object, with an entry if and only if there is specialised behaviour relating to that object. For example,
+
+TAKE MJOLNIR
+
+would have an entry which checked for Thorness, whereas
+
+TAKE APPLE
+
+could probably be handled by the generic TAKE handler.
+
 ## 23/8/2017
 
 Bye bye Hash table.

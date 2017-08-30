@@ -201,6 +201,7 @@
       (dw :colours (cons name :colours))
       ;;12
       (dw :dispatch (cons :dispatcher name))
+      (defplace name) ;;all locations are also places
       (dimg name img-file sx sy))))
 
 (defun location-test ()

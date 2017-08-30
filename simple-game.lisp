@@ -20,7 +20,11 @@
 (defun dungeon-cell ()
   (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/Downloads/cellardoor.bmp"
 	"You are in the dungeon prison of Wangband under the fortress of the Black Wizard, Beelzepops. Home to stench-rats, were-toads, sniveling goblins and you. Of the current denizens, you are currently the most wretched. A lime-green slime oozes out of the wall, making a rasping, wheezing sound. You must escape, but your cell has a door...")
-  (with-location :dungeon-cell 
+  (with-location :dungeon-cell
+
+    ;;todo verify object description, and refactor it with the response verification
+    (defobject "BRONZE HOOK" :dungeon-cell "A sharp metal hook with a spherical handle. The gods only know what purpose it served.")
+    
     (defbits t :key-in-crack :door-locked)
     (defbits nil :slime-examined :slime-licked :crack-examined
 	     :door-open :slop-flung)
@@ -214,6 +218,9 @@
 
 (defun generic-handlers ()
   (with-location :generic
+
+
+    
     (action '(TAKE KEY)
       (nifbit '(:dungeon-cell . :key-in-crack)
 	      (respond "You already have the key!"
@@ -345,6 +352,7 @@
 
 	   ;;game state
 
+	   (object-table)
 	   (synonyms)
 	   (dungeon-cell)
 	   (corridor)

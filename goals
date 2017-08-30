@@ -1,0 +1,33 @@
+SEPTEMBER 2017
+
+Given that there are only two days left of August I'm going to have the following goals.
+
+i) Generic object examine
+ii) Generic object take
+iii) Generic object drop
+iv) Adjective resolution (in other words, if there are two KEYS, choose the correct one if the adjective is supplied, otherwise display a message, e.g. You'll have to be more specific.
+v) Ensure we can move between the locations of the test game correctly
+
+Here is a whole bunch of stuff that needs to be done for the competition next year.
+
+Title page
+Character input
+Character backspace
+Javascript engine
+Save and restore state
+Look command (show objects in room)
+Inventory command
+Create a bookmark that is a save game
+Finish three room test game
+Alpha test the test game on the web
+Timed events
+Random events (e.g. the D&D scene)
+Plot out game fully
+Implement first third, with images
+Implement middle third, with images
+Implement final third, with images
+Alpha testing of the full game
+
+AUGUST 2018
+
+Beta testing of full-game and final bug fixes

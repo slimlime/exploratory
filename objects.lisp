@@ -10,15 +10,18 @@
 ;; LOCATION has a PLACE ID
 ;; ELSEWHERE and INVENTORY are PLACES
 
+(defparameter *object-name->id* nil)
 (defparameter *object-id->data* nil)
 (defparameter *place->id* nil)
 (defparameter *next-place-id* nil)
 
 (defun defplace (place)
-  (setf (gethash place *place->id*) *next-place-id*)
-  (incf *next-place-id*))
+  (unless (gethash place *place->id*)
+    (setf (gethash place *place->id*) *next-place-id*)
+    (incf *next-place-id*)))
 
 (defun reset-object-model ()
+  (setf *object-name->id* (make-hash-table :test 'equal))
   (setf *object-id->data* (make-hash-table :test 'equal))
   (setf *place->id* (make-hash-table :test 'equal))
   (setf *next-place-id* 0)
@@ -49,11 +52,12 @@
     (when adj
       (unless (gethash adj *word->meaning*)
 	(defword adj)))
-    (setf (gethash (cons (gethash name *word->meaning*)
-			 (gethash adj *word->meaning*))
-		   *object-id->data*)
-	  (list name place (dstr (justify-with-image description
-			    5 4 *act-font*))))))
+    (let ((id (cons (gethash name *word->meaning*)
+		    (gethash adj *word->meaning*))))
+      (setf (gethash name *object-name->id*) id)
+      (setf (gethash id *object-id->data*)
+	    (list name place (dstr (justify-with-image description
+						       5 4 *act-font*)))))))
 
 ;;First use case- EXAMINE [ADJECTIVE] OBJECT
 
@@ -88,18 +92,19 @@
 
 (defun object-table ()
   ;;return values - Y = index of matching item
-  ;;                A (and Z) with other matching item
+  ;;                C = Set if not unique
+  ;;                Z = Set if not found
   (when *word-table-built*
     (label :find-object-index)
     (zp-b :current-place)
-    (with-namespace :get-object-index
+    (with-namespace :find-object-index
       (alias :name :D0)
-      (alias :adj :D1)
+      (alias :adjective :D1)
       (alias :pos :A0)
       (alias :found-index :D2)
       (dc "Linear search for the name")
       (LDY 0)
-      (STY.ZP :result)
+      (STY.ZP :found-index)
       (label :next-name)
       (LDA.ZP :name)
       (label :next-name1)
@@ -111,19 +116,18 @@
       (label :not-found)
       ;;i.e. the name id < the name id in the table, and since they
       ;;are in order of name id.
-      (dc "We went past it, can't possibly find it (or another) now")
-      (LDY :found-index)
-      (LDA 0)
+      (CLC "Definitely not a duplicate if we are here")
+      (LDY.ZP :found-index)
       (RTS)
       (label :found-name)
       (dc "Check adjective")
-      (LDA :adj)
+      (LDA.ZP :adjective)
       (BEQ :adjective-matches "Zero adjective always matches...")
       (CMP.ABY (1- (resolve :adjectives)))
       (BNE :next-name)
       (label :adjective-matches)
       (dc "Now check it is in our place")
-      (LDA.ABY :places)
+      (LDA.ABY (1- (resolve :places)))
       (BEQ :next-name "Object is elsewhere")
       (CMP 1)
       (BEQ :found "Object is in our inventory")
@@ -134,23 +138,24 @@
       (BNE :next-name)
       (label :found)
       (dc "If we already have found one then return")
-      (LDY.ZP :found-index)
+      (LDA.ZP :found-index)
       (BNE :already-found)
       (STY.ZP :found-index)
       (BEQ :next-name)
       (label :already-found)
-      (LDA.ZP :found-index)
+      (dc "Carry AND not-zero, i.e. duplicate AND found")
+      (SEC)
       (RTS)
 
       ;;make a list of words and sort it (id-wise) by name
       ;;then adjective.
-
+      
       (let ((objects nil))
 	(maphash #'(lambda (k v)
 		     ;;basically this number is the 16 bit object id
 		     ;;name adjective
-		     (push (cons (logior (ash (car k) 8)
-					 (cdr k))
+		     (push (cons (logior (ash (nil->0 (car k)) 8)
+					 (nil->0 (cdr k)))
 				 v)
 			   objects))
 		 *object-id->data*)
@@ -160,23 +165,158 @@
 
 	;; function to initialise the objects
 	
-	(label :init-objects)
-	(LDY (length object))
+	(label :init-objects nil)
+
+	(LDY (length objects))
 	(label :copy-place)
 	(LDA.ABY (1- (resolve :initial-places)))
 	(STA.ABY (1- (resolve :places)))
 	(DEY)
 	(BNE :copy-place)
+	(RTS)
 	
 	;;now we can generate the object data tables
 	
-	(apply #'db :names (mapcar #'(lambda (o) (ash (car o) -8))))
-	(apply #'db :adjectives (mapcar #'(lambda (o) (logand #xff (car o)))))
-	(let ((places (mapcar #'(lambda (o) (gethash *place->id* (cadr o))))))
+	(apply #'db :names (mapcar #'(lambda (o) (ash (car o) -8)) objects))
+	(apply #'db :adjectives (mapcar #'(lambda (o) (logand #xff (car o))) objects))
+	(let ((places (mapcar #'(lambda (o)
+				  (nil->0 (gethash (third o) *place->id*)))
+			      objects)))
 	  (apply #'db :places places)
 	  (apply #'db :initial-places places))
-	(apply #'db :description-hi (mapcar #'(lambda (o) (hi (caddr o)))))
-	(apply #'db :description-lo (mapcar #'(lambda (o) (lo (caddr o)))))))))
+	
+	(apply #'db :description-hi (mapcar #'(lambda (o) (hi (fourth o))) objects))
+	(apply #'db :description-lo (mapcar #'(lambda (o) (lo (fourth o))) objects))))))
+
+(defun dump-objects ()
+  (let ((objects nil))
+	(maphash #'(lambda (k v)
+		     ;;basically this number is the 16 bit object id
+		     ;;name adjective
+		     (push (cons (logior (ash (nil->0 (car k)) 8)
+					 (nil->0 (cdr k)))
+				 v)
+			   objects))
+		 *object-id->data*)
+	;;sort them so they are in name adjective order
+	
+	(setf objects (sort objects #'< :key #'car))
+	(dolist (object objects)
+	  (print object))))
+
+(defun dump-places ()
+  (maphash #'(lambda (k v) (format t "~a -> ~a~%" k v)) *place->id*))
+
+;;test finding object id
+
+(defun object-tester (name-id adj-id current-place)
+  (reset-compiler)
+  (reset-symbol-table)
+  (font-data)
+  (reset-compiler)
+  (let ((p 0))
+    (flet ((pass ()
+	     (format t "Pass ~a~%" (incf p))
+	     (zeropage)	     
+	     (org #x600)
+	     (CLD)
+	     (label :start)
+	   
+	     (JSR :init-objects)
+	   
+	     (LDA name-id)
+	     (STA.ZP '(:find-object-index . :name))
+	     (LDA adj-id)
+	     (STA.ZP '(:find-object-index . :adjective))
+	     (LDA current-place)
+	     (STA.ZP :current-place)
+
+	     (JSR :find-object-index)
+	  
+	     (BRK)
+	   
+	     (object-table)
+	     (string-table)
+	   
+	     (label :end)
+
+	     (font-data)))
+      (pass)
+      (build-symbol-table)
+      (setf *word-table-built* t)
+    
+      (pass)
+      (let ((end *compiler-ptr*))
+	(pass)
+	(assert (= end *compiler-ptr*) nil "Build was not stable"))
+      (setf *compiler-final-pass* t)
+      (pass)
+    
+      (format t "Build size ~a~%" (- *compiler-ptr* origin))))
+
+  (monitor-reset #x600)
+  (monitor-run :print nil)
+
+  (multiple-value-bind (buffer pc sp sr a x y)
+      (funcall *monitor-get-state*)
+    (declare (ignore buffer pc sp x a y))
+    (print sr)
+    
+    (values (if (zerop (logand sr 2)) :found :not-found)
+	    (if (zerop (logand sr 1)) :unique :duplicate))))
+
+(defun test-object-find (adjective name place expected-found expected-duplicate)
+  (multiple-value-bind (found duplicate)
+      (object-tester (nil->0 (gethash name *word->meaning*))
+		     (nil->0 (gethash adjective *word->meaning*))
+		     (gethash place *place->id*))
+    (assert (eq found expected-found))
+    (assert (eq duplicate expected-duplicate))))
+
+(reset-object-model)
+(reset-parser)
+
+(defplace :ur)
+(defplace :nippur)
+(defplace :babylon)
+
+(defobject "MARDUK STATUE" :ur "A bronze statue")
+(defobject "STONE STATUE" :ur "A stone statue")
+(defobject "GINGER BISCUIT" :ur "A tasty snack")
+(defobject "ENTRAILS" :nippur "Animal guts")
+(defobject "POCKET FLUFF" :inventory "Lovely pocket fluff")
+(defobject "OBSIDIAN CUBE" :elsewhere "Black cube")
+(defobject "CAT FLUFF" :babylon "Cat fluff")
+
+(test-object-find "MARDUK" "STATUE" :ur :found :unique)
+(test-object-find "STONE" "STATUE" :ur :found :unique)
+(test-object-find "GINGER" "BISCUIT" :ur :found :unique)
+(test-object-find nil "BISCUIT" :ur :found :unique)
+(test-object-find "POCKET" "FLUFF" :ur :found :unique)
+(test-object-find "POCKET" "FLUFF" :nippur :found :unique)
+(test-object-find nil "FLUFF" :ur :found :unique)
+(test-object-find nil "FLUFF" :nippur :found :unique)
+(test-object-find nil "FLUFF" :babylon :found :duplicate)
+(test-object-find nil "STATUE" :ur :found :duplicate)
+(test-object-find nil "STATUE" :nippur :not-found :unique)
+
+(test-object-find "MARDUK" "STATUE" :nippur :not-found :unique)
+(test-object-find "STONE" "STATUE" :nippur :not-found :unique)
+(test-object-find nil "ENTRAILS" :nippur :found :unique)
+(test-object-find nil "ENTRAILS" :ur :not-found :unique)
+
+(test-object-find "GINGER" "STATUE" :ur :not-found :unique)
+(test-object-find "STONE" "BISCUIT" :ur :not-found :unique)
+(test-object-find "ENTRAILS" "FLUFF" :ur :not-found :unique)
+(test-object-find nil "GINGER" :ur :not-found :unique)
+	  
+
+
+
+
+
+
+
 
 
       

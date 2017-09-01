@@ -23,8 +23,8 @@
   (with-location :dungeon-cell
 
     ;;todo verify object description, and refactor it with the response verification
-    (defobject "BRONZE HOOK" :dungeon-cell "A sharp metal hook with a spherical handle. The gods only know what purpose it served.")
-    
+    (defobject "BRONZE HOOK" "A sharp metal hook with a spherical handle.")
+        
     (defbits t :key-in-crack :door-locked)
     (defbits nil :slime-examined :slime-licked :crack-examined
 	     :door-open :slop-flung)
@@ -218,9 +218,49 @@
 
 (defun generic-handlers ()
   (with-location :generic
-
-
-    
+    (action '(EXAMINE)
+      (dc "Load the second and third words into the name")
+      (dc "and adjective positions")
+      ;;THIS SECTION SHOULD BE REFACTORED, AS IT WILL BE
+      ;;USED IN ALL ACTIONS THAT REQUIRE A GENERIC WORD
+      (LDA.AB (+ 2 (resolve '(:parser . :words))))
+      (BEQ :no-adjective)
+      (STA.ZP '(:find-object-index . :name))
+      (LDA.AB (+ 1 (resolve '(:parser . :words))))
+      (STA.ZP '(:find-object-index . :adjective))
+      (JMP :loaded-words)
+      (label :no-adjective)
+      (STA.ZP '(:find-object-index . :adjective))
+      (LDA.AB (+ 1 (resolve '(:parser . :words))))
+      (STA.ZP '(:find-object-index . :name))
+      (label :loaded-words)
+      (JSR :find-object-index)
+      (BCS :duplicate-found)
+      (BEQ :not-found)
+      (dc "Now print the description")
+      ;;The object description must be one line long verdammit
+      ;;also the calling convention is poor. Should not need
+      ;;self modifying code- TODO provide a run-time entry point
+      ;;for the string
+      ;;TODO support multi-line object descriptions. Perhaps
+      ;;could hook into the rendering routine to scroll the line
+      ;;on each newline encountered OR, store the number of lines
+      ;;in the object description, this will need an extra byte
+      ;;or will need to scavenge some bits somewhere
+      (LDA.ABY (1- (resolve '(:find-object-index . :description-hi))))
+      (STA.AB :description-hi)
+      (LDA.ABY (1- (resolve '(:find-object-index . :description-lo))))
+      (STA.AB :description-lo)
+      (JSR '(:print-message . 1))
+      (DB :description-lo 0)
+      (DB :description-hi 0)
+      (RTS)
+      (label :duplicate-found)
+      (respond "Which one?")
+      (RTS)
+      (label :not-found)
+      (respond "I don't know what that is."))
+      
     (action '(TAKE KEY)
       (nifbit '(:dungeon-cell . :key-in-crack)
 	      (respond "You already have the key!"
@@ -316,6 +356,7 @@
   (reset-symbol-table)
   (reset-bits)
   (reset-parser)
+  (reset-object-model)
 
   ;;this (atm) must be called so the widths are initialised
   ;;todo, make a font-init function which just does the widths.
@@ -352,7 +393,6 @@
 
 	   ;;game state
 
-	   (object-table)
 	   (synonyms)
 	   (dungeon-cell)
 	   (corridor)
@@ -375,6 +415,7 @@
 
 	   (test-render-input)
 	   
+	   (object-table)
 	   (parser)
 	   
 	   (dispatcher)

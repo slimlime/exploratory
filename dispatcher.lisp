@@ -139,7 +139,6 @@
 	   (BRK)
 	   (dispatcher)
 	   
-
 	   ;; install all the handlers, with the expected
 	   ;; one setting the output byte to a 1
 	   

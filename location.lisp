@@ -87,6 +87,11 @@
     (dc "Clear the top half of the screen")
     (call-memset 0 *screen-memory-address*
 		 (* (live-row 0) +screen-width-bytes+))
+
+    (dc "Set the current place")
+    (LDY 14)
+    (LDA.IZY :loc)
+    (STA.ZP :current-place)
     (dc "Get the title string")
     (LDY 0)
     (LDA.IZY :loc)
@@ -201,7 +206,8 @@
       (dw :colours (cons name :colours))
       ;;12
       (dw :dispatch (cons :dispatcher name))
-      (defplace name) ;;all locations are also places
+      ;;14
+      (db :place (defplace name))
       (dimg name img-file sx sy))))
 
 (defun location-test ()

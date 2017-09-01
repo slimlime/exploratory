@@ -16,9 +16,11 @@
 (defparameter *next-place-id* nil)
 
 (defun defplace (place)
-  (unless (gethash place *place->id*)
-    (setf (gethash place *place->id*) *next-place-id*)
-    (incf *next-place-id*)))
+  (aif (gethash place *place->id*)  
+       it
+       (progn
+	 (setf (gethash place *place->id*) *next-place-id*)
+	 (1- (incf *next-place-id*)))))
 
 (defun reset-object-model ()
   (setf *object-name->id* (make-hash-table :test 'equal))
@@ -39,7 +41,7 @@
 	      (subseq name (1+ pos)))
 	(cons name nil))))
 
-(defun defobject (name place description)
+(defun defobject (name description &key (initial-place *current-location*))
   ;;Ok, so we're going to take the name and split it
   ;;if there are two words then the first word is the
   ;;adjective, which is not normally required unless
@@ -56,8 +58,11 @@
 		    (gethash adj *word->meaning*))))
       (setf (gethash name *object-name->id*) id)
       (setf (gethash id *object-id->data*)
-	    (list name place (dstr (justify-with-image description
-						       5 4 *act-font*)))))))
+	    (let* ((text (justify-with-image description
+					     5 4 *act-font*))
+		   (lines (1+ (count #\Newline text))))
+	      (assert (= 1 lines) nil (format nil "Object description must be one line ~a" text))
+	    (list name initial-place (dstr text)))))))
 
 ;;First use case- EXAMINE [ADJECTIVE] OBJECT
 
@@ -216,7 +221,7 @@
   (reset-compiler)
   (let ((p 0))
     (flet ((pass ()
-	     (format t "Pass ~a~%" (incf p))
+	     ;(format t "Pass ~a~%" (incf p))
 	     (zeropage)	     
 	     (org #x600)
 	     (CLD)
@@ -252,7 +257,8 @@
       (setf *compiler-final-pass* t)
       (pass)
     
-      (format t "Build size ~a~%" (- *compiler-ptr* origin))))
+      ;;(format t "Build size ~a~%" (- *compiler-ptr* origin))
+      ))
 
   (monitor-reset #x600)
   (monitor-run :print nil)
@@ -260,8 +266,6 @@
   (multiple-value-bind (buffer pc sp sr a x y)
       (funcall *monitor-get-state*)
     (declare (ignore buffer pc sp x a y))
-    (print sr)
-    
     (values (if (zerop (logand sr 2)) :found :not-found)
 	    (if (zerop (logand sr 1)) :unique :duplicate))))
 
@@ -275,18 +279,19 @@
 
 (reset-object-model)
 (reset-parser)
+(font-data)
 
 (defplace :ur)
 (defplace :nippur)
 (defplace :babylon)
 
-(defobject "MARDUK STATUE" :ur "A bronze statue")
-(defobject "STONE STATUE" :ur "A stone statue")
-(defobject "GINGER BISCUIT" :ur "A tasty snack")
-(defobject "ENTRAILS" :nippur "Animal guts")
-(defobject "POCKET FLUFF" :inventory "Lovely pocket fluff")
-(defobject "OBSIDIAN CUBE" :elsewhere "Black cube")
-(defobject "CAT FLUFF" :babylon "Cat fluff")
+(defobject "MARDUK STATUE" "A bronze statue" :initial-place :ur)
+(defobject "STONE STATUE" "A stone statue" :initial-place :ur)
+(defobject "GINGER BISCUIT" "A tasty snack" :initial-place :ur)
+(defobject "ENTRAILS" "Animal guts" :initial-place :nippur)
+(defobject "POCKET FLUFF" "Lovely pocket fluff" :initial-place :inventory)
+(defobject "OBSIDIAN CUBE" "Black cube" :initial-place :elsewhere)
+(defobject "CAT FLUFF" "Cat fluff" :initial-place :babylon)
 
 (test-object-find "MARDUK" "STATUE" :ur :found :unique)
 (test-object-find "STONE" "STATUE" :ur :found :unique)

@@ -1,6 +1,5 @@
 ;; Here are the functions which will be used to declare the game data
 
-(defparameter *current-location* nil)
 (defparameter *bits* nil)
 
 (defun reset-bits ()

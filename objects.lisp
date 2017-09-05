@@ -10,6 +10,8 @@
 ;; LOCATION has a PLACE ID
 ;; ELSEWHERE and INVENTORY are PLACES
 
+(defparameter *current-location* nil)
+
 (defparameter *object-name->id* nil)
 (defparameter *object-id->data* nil)
 (defparameter *place->id* nil)

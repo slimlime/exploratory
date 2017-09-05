@@ -1,4 +1,6 @@
 (defparameter *line-spacing* (* (1+ *font-height*) 40))
+(defparameter *act-font* :present)
+(defparameter *act-colour* #x10)
 
 (defun update-vicky ()
   (let ((buf (monitor-buffer))) ;need to abstract out the memory, ditch cl-6502

@@ -4,9 +4,6 @@
 
 ;;todo intern strings
 
-(defparameter *act-font* :present)
-(defparameter *act-colour* #x10)
-
 ;;TODO render live message
 ;;TODO enter user character, delete user character
 ;;TODO left image align

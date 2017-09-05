@@ -1,3 +1,56 @@
+## 5/8/2017
+
+## Autumn BRK
+
+So autumn is here and we must go on hiatus as I move onto other things until next year. Next years IF competition is a reasonable deadline to complete the entire project. So what has happened since the last entry?
+
+![Alt text](/blog/examine.png)
+
+Generic EXAMINE has been implemented, that's what. In the code we now have a list of places, and each object in the game is assigned a place. There are two special places so far, elsewhere which is also nowhere and inventory, which is also everywhere.
+
+~~~~
+0 ELSEWHERE
+1 INVENTORY
+2 A LOCATION
+3 B LOCATION
+...
+~~~~
+
+There is a routine which takes two words, a noun and an optional adjective and tries to find the object in the obect list (which is sorted alphabetically by noun, then adjective)
+
+~~~~
+0 BLUE AXE
+1 YELLOW AXE
+3 PINK ELEPHANT
+4 PAPER TIGER
+...
+~~~~
+
+A linear search is made on the list, terminating once we have gone past the entry alphabetically. Once we have found something that matched by name, we see if the adjective matches. If no adjective was entered, just matching the name is sufficient. A check is then made to see if either a) the object is elsewhere b) the object is in the inventory or c) the object is in the current place. If so, we note the object down somewhere and have another look. If there is another object which matches, we return and set a flag indicating that we can't resolve the object and so we can display a message, e.g. "You will have to be more specific."
+
+So we can now define an object in the game code thusly,
+
+~~~~
+(defobject "BRONZE HOOK" "A sharp metal hook with a spherical handle.")
+~~~~
+
+Generic TAKE and DROP will be next. Also there are some other intriguing possibilities for objects, such as, implementing object features so that we don't have to define explicit handlers for EXAMINE (e.g. EXAMINE DOOR, it's pretty boring to have to specify a handler for every bloody door).
+
+I am determined to have the KEY be pickable upable and puttable downable in the next installment, but that may be some time away now. I think I am pretty far along to having an engine in which it will be possible to implement a full game, but here are some of the things still missing.
+
+- Title page
+- Character input
+- Character backspace
+- Javascript engine
+- Save and restore state
+- Look command (show objects in room)
+- Inventory command
+- Create a bookmark that is a save game
+- Finish three room test game
+- Alpha test the test game on the web
+- Timed events
+- Random events (specifically, print a message or construct a message from random parts)
+
 ## 24/8/2017
 
 At first I decided that an 'object model' was unnecessary. I would model everything with bits of state and if statements. In the test game there is a key buried in a crack in the floor which cannot be seen. You can take the key once you have performed the action which allows it to be seen. You can also examine it if you can see it. But.. you can also examine it if you are carrying it, that is if you have typed TAKE KEY. At the moment you can't drop it. Other things you can't do

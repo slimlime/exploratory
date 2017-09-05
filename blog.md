@@ -2,7 +2,11 @@
 
 ## Autumn BRK
 
-So autumn is here and we must go on hiatus as I move onto other things until next year. Next years IF competition is a reasonable deadline to complete the entire project. So what has happened since the last entry?
+So autumn is here and we must go on hiatus as I move onto other things until next year. Next years IF competition is a reasonable deadline to complete the entire project.
+
+For a special guilty nerd-pleasure, here is the [disassembly](/listing.md) of the entire test game so far. I simply can't imagine people did this for a living long-hand in the eighties. Giants they most certainly were.
+
+So what has happened since the last entry?
 
 ![Alt text](/blog/examine.png)
 

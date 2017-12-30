@@ -23,7 +23,8 @@
        (progn
 	 (setf (gethash place *place->id*) *next-place-id*)
 	 (1- (incf *next-place-id*)))))
-
+;;ELSEWHERE = 0
+;;INVENTORY = 1
 (defun reset-object-model ()
   (setf *object-name->id* (make-hash-table :test 'equal))
   (setf *object-id->data* (make-hash-table :test 'equal))
@@ -43,28 +44,44 @@
 	      (subseq name (1+ pos)))
 	(cons name nil))))
 
-(defun defobject (name description &key (initial-place *current-location*))
+(defun name-with-indefinite-article (name)
+  (let ((name (string-downcase name)))
+    (format nil "~a ~a"
+	    (if (find (elt name 0) "aeiou")
+		"An"
+		"A")
+	    name)))
+
+(assert (string= "An apple" (name-with-indefinite-article "APPLE")))
+(assert (string= "A telephone" (name-with-indefinite-article "TELEPHONE")))
+
+(defun defobject (name description
+		  &key (initial-place *current-location*)
+		    (name-override nil name-override-p))
   ;;Ok, so we're going to take the name and split it
   ;;if there are two words then the first word is the
   ;;adjective, which is not normally required unless
   ;;there are multiple objects of the same name.
   (let* ((pair (split name))
-	 (name (if (cdr pair) (cdr pair) (car pair)))
+	 (noun (if (cdr pair) (cdr pair) (car pair)))
 	 (adj (if (cdr pair) (car pair) nil)))
-    (unless (gethash name *word->meaning*)
-      (defword name))
+    (unless (gethash noun *word->meaning*)
+      (defword noun))
     (when adj
       (unless (gethash adj *word->meaning*)
 	(defword adj)))
-    (let ((id (cons (gethash name *word->meaning*)
+    (let ((id (cons (gethash noun *word->meaning*)
 		    (gethash adj *word->meaning*))))
-      (setf (gethash name *object-name->id*) id)
+      (setf (gethash noun *object-name->id*) id)
       (setf (gethash id *object-id->data*)
 	    (let* ((text (justify-with-image description
 					     5 4 *act-font*))
 		   (lines (1+ (count #\Newline text))))
 	      (assert (= 1 lines) nil (format nil "Object description must be one line ~a" text))
-	    (list name initial-place (dstr text)))))))
+	      (list noun initial-place (dstr text)
+		    (dstr (if name-override-p
+			      name-override
+			      (name-with-indefinite-article name)))))))))
 
 ;;First use case- EXAMINE [ADJECTIVE] OBJECT
 
@@ -102,9 +119,9 @@
   ;;                C = Set if not unique
   ;;                Z = Set if not found
   (when *word-table-built*
-    (label :find-object-index)
     (zp-b :current-place)
-    (with-namespace :find-object-index
+    (label :find-object-index)
+    (with-namespace :object-table
       (alias :name :D0)
       (alias :adjective :D1)
       (alias :pos :A0)
@@ -160,7 +177,8 @@
       (let ((objects nil))
 	(maphash #'(lambda (k v)
 		     ;;basically this number is the 16 bit object id
-		     ;;name adjective
+		     ;;name adjective.
+		     ;;add it to the list to make ID NOUN ADJ DESC NAME
 		     (push (cons (logior (ash (nil->0 (car k)) 8)
 					 (nil->0 (cdr k)))
 				 v)
@@ -191,6 +209,13 @@
 			      objects)))
 	  (apply #'db :places places)
 	  (apply #'db :initial-places places))
+
+	;; object names. seems a shame to have to have this, but meh
+	
+	(apply #'db :name-hi (mapcar #'(lambda (o) (hi (fifth o))) objects))
+	(apply #'db :name-lo (mapcar #'(lambda (o) (lo (fifth o))) objects))
+
+	;; object descriptions
 	
 	(apply #'db :description-hi (mapcar #'(lambda (o) (hi (fourth o))) objects))
 	(apply #'db :description-lo (mapcar #'(lambda (o) (lo (fourth o))) objects))))))
@@ -211,6 +236,9 @@
 	(dolist (object objects)
 	  (print object))))
 
+(defun objects-count ()
+  (hash-table-count *object-id->data*))
+
 (defun dump-places ()
   (maphash #'(lambda (k v) (format t "~a -> ~a~%" k v)) *place->id*))
 
@@ -221,50 +249,49 @@
   (reset-symbol-table)
   (font-data)
   (reset-compiler)
-  (let ((p 0))
-    (flet ((pass ()
-	     ;(format t "Pass ~a~%" (incf p))
-	     (zeropage)	     
-	     (org #x600)
-	     (CLD)
-	     (label :start)
+  (flet ((pass ()
+					;(format t "Pass ~a~%" (incf p))
+	   (zeropage)	     
+	   (org #x600)
+	   (CLD)
+	   (label :start)
 	   
-	     (JSR :init-objects)
+	   (JSR :init-objects)
 	   
-	     (LDA name-id)
-	     (STA.ZP '(:find-object-index . :name))
-	     (LDA adj-id)
-	     (STA.ZP '(:find-object-index . :adjective))
-	     (LDA current-place)
-	     (STA.ZP :current-place)
-
-	     (JSR :find-object-index)
-	  
-	     (BRK)
+	   (LDA name-id)
+	   (STA.ZP '(:object-table . :name))
+	   (LDA adj-id)
+	   (STA.ZP '(:object-table . :adjective))
+	   (LDA current-place)
+	   (STA.ZP :current-place)
 	   
-	     (object-table)
-	     (string-table)
+	   (JSR :find-object-index)
 	   
-	     (label :end)
-
-	     (font-data)))
-      (pass)
-      (build-symbol-table)
-      (setf *word-table-built* t)
+	   (BRK)
+	   
+	   (object-table)
+	   (string-table)
+	   
+	   (label :end)
+	   
+	   (font-data)))
+    (pass)
+    (build-symbol-table)
+    (setf *word-table-built* t)
     
+    (pass)
+    (let ((end *compiler-ptr*))
       (pass)
-      (let ((end *compiler-ptr*))
-	(pass)
-	(assert (= end *compiler-ptr*) nil "Build was not stable"))
-      (setf *compiler-final-pass* t)
-      (pass)
+      (assert (= end *compiler-ptr*) nil "Build was not stable"))
+    (setf *compiler-final-pass* t)
+    (pass)
     
-      ;;(format t "Build size ~a~%" (- *compiler-ptr* origin))
-      ))
-
+    ;;(format t "Build size ~a~%" (- *compiler-ptr* origin))
+    )
+  
   (monitor-reset #x600)
   (monitor-run :print nil)
-
+  
   (multiple-value-bind (buffer pc sp sr a x y)
       (funcall *monitor-get-state*)
     (declare (ignore buffer pc sp x a y))

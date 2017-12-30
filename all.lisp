@@ -22,7 +22,7 @@
   (bload "parse.lisp")
   (bload "dispatcher.lisp")
   (bload "objects.lisp")
-  (bload "location.lisp")
   (bload "analysis.lisp")
   (bload "declarations.lisp")
+  (bload "location.lisp")
   (bload "simple-game.lisp"))

@@ -18,13 +18,15 @@
   (defword :ATTACK :KILL :HIT :CLEAVE :PUNCH))
 
 (defun dungeon-cell ()
-  (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/Downloads/cellardoor.bmp"
+  (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/exploratory/images/cell.bmp"
 	"You are in the dungeon prison of Wangband under the fortress of the Black Wizard, Beelzepops. Home to stench-rats, were-toads, sniveling goblins and you. Of the current denizens, you are currently the most wretched. A lime-green slime oozes out of the wall, making a rasping, wheezing sound. You must escape, but your cell has a door...")
   (with-location :dungeon-cell
 
     ;;todo verify object description, and refactor it with the response verification
     (defobject "BRONZE HOOK" "A sharp metal hook with a spherical handle.")
-        
+    (defobject "TEST OBJECT" "An object with no purpose in this life.")
+    (defobject "SWORD" "A very important sword." :name-override "The sword of destiny")
+
     (defbits t :key-in-crack :door-locked)
     (defbits nil :slime-examined :slime-licked :crack-examined
 	     :door-open :slop-flung)
@@ -158,7 +160,7 @@
   (mapc #'enter-input '("EXAMINE WINDOW" "LICK SLIME" "EXAMINE CRACK" "TAKE KEY" "UNLOCK DOOR" "OPEN DOOR" "USE DOOR")))	
 
 (defun corridor ()
-  (dloc :corridor "CORRIDOR" "/home/dan/Downloads/bedroom.bmp"
+  (dloc :corridor "CORRIDOR" "/home/dan/exploratory/images/corridor.bmp"
 	"A torch-lit corridor. You see a row of cell doors, identical to your own. Moans and pleas waft through the bars- sounds which you are not entirely certain are human in origin. At one end, a brick wall, at the other a green door, different than all the rest.")
   (with-location :corridor
     (defbits nil :green-door-open :torch-carried :torches-examined)
@@ -196,7 +198,7 @@
       (respond "You hear mumbling and sighing from behind the door."))
     (action '(KNOCK GREEN DOOR)
       (ifbit :green-door-open
-	     (respond "Politely, you knock on the already open green door, but theres is no answer.")
+	     (respond "Politely, you knock on the already open green door, but there is no answer.")
 	     (progn
 	       (setbit :green-door-open)
 	       (respond "You knock on the door and wait patiently.")
@@ -205,7 +207,7 @@
       (respond "Which one?"))))
 
 (defun frazbolgs-closet ()
-  (dloc :frazbolgs-closet "FRAZBOLG'S CLOSET" "/home/dan/Downloads/porsche.bmp"
+  (dloc :frazbolgs-closet "FRAZBOLG'S CLOSET" "/home/dan/exploratory/images/porsche.bmp"
 	"You are in the well-appointed closet of the goblin Frazbolg. Over centuries of guarding his prisoners he has amassed an impressive collection of posessions, a spare loin cloth- tattered, a toaster and a hundred-year-old copy of Modern Necromancer magazine.")
 
 ;;I need to summon the shade of Wazbolg, my predecessor.
@@ -218,38 +220,94 @@
 
 (defun generic-handlers ()
   (with-location :generic
+
+    (db :object-count 0)
+
+    (action '(INVENTORY) '(I)
+      (respond "You have...")
+      (LDA 1 "Inventory is Place 1")
+      (label :scan-objects)
+      (dc "Reset matching object count to 0")
+      (LDX 0)
+      (STX.AB :object-count)
+      ;;shared entry point with LOOK
+      (LDY (objects-count))
+      (label :next-object)
+      (dc "List the object in the place in A")
+      (dc "Look in one-based object places table")
+      (CMP.ABY (1- (resolve '(:object-table . :places))))
+      (BNE :object-not-here)
+      (dc "Save A and Y")
+      (PHA)
+      (TYA)
+      (PHA)
+      (dc "Now print the object name")
+      ;;See below, this self-modifying code needs refactoring
+      (LDA.ABY (1- (resolve '(:object-table . :name-hi))))
+      (STA.AB :name-hi)
+      (LDA.ABY (1- (resolve '(:object-table . :name-lo))))
+      (STA.AB :name-lo)
+      (JSR '(:print-message . 1))
+      (DB :name-lo 0)
+      (DB :name-hi 0)
+      (dc "Restore Y and A")
+      (PLA)
+      (TAY)
+      (PLA)
+      (INC.AB :object-count)
+      (label :object-not-here)
+      (DEY)
+      (BNE :next-object)
+      (LDX.AB :object-count)
+      (BNE :not-empty)
+      (respond "Nothing.")
+      (label :not-empty)
+      (RTS))
+
     (action '(EXAMINE)
+
+      ;;TODO. It would be nice if there was a way of specifying
+      ;;      a pattern matcher that only took a single word
+      ;;      i.e. the difference between EXAMINE and EXAMINE ? ?
+            
       (dc "Load the second and third words into the name")
       (dc "and adjective positions")
       ;;THIS SECTION SHOULD BE REFACTORED, AS IT WILL BE
       ;;USED IN ALL ACTIONS THAT REQUIRE A GENERIC WORD
       (LDA.AB (+ 2 (resolve '(:parser . :words))))
       (BEQ :no-adjective)
-      (STA.ZP '(:find-object-index . :name))
+      (STA.ZP '(:object-table . :name))
       (LDA.AB (+ 1 (resolve '(:parser . :words))))
-      (STA.ZP '(:find-object-index . :adjective))
+      (STA.ZP '(:object-table . :adjective))
       (JMP :loaded-words)
       (label :no-adjective)
-      (STA.ZP '(:find-object-index . :adjective))
+      (STA.ZP '(:object-table . :adjective))
       (LDA.AB (+ 1 (resolve '(:parser . :words))))
-      (STA.ZP '(:find-object-index . :name))
-      (label :loaded-words)
+      (STA.ZP '(:object-table . :name))
+      (BNE :loaded-words)
+      (dc "No name or adjective was specified")
+      (dc "this means just LOOK around")
+      (respond "You take a look around and see...")
+      (LDA.ZP :current-place)
+      (JMP :scan-objects)
+      (label :loaded-words)     
       (JSR :find-object-index)
       (BCS :duplicate-found)
       (BEQ :not-found)
       (dc "Now print the description")
-      ;;The object description must be one line long verdammit
+      ;;The object description must be one line long
       ;;also the calling convention is poor. Should not need
       ;;self modifying code- TODO provide a run-time entry point
       ;;for the string
-      ;;TODO support multi-line object descriptions. Perhaps
+      ;;TODO support multi-line object descriptions.
+      ;;Perhaps
       ;;could hook into the rendering routine to scroll the line
       ;;on each newline encountered OR, store the number of lines
       ;;in the object description, this will need an extra byte
       ;;or will need to scavenge some bits somewhere
-      (LDA.ABY (1- (resolve '(:find-object-index . :description-hi))))
+      (LDA.ABY (1- (resolve '(:object-table . :description-hi))))
       (STA.AB :description-hi)
-      (LDA.ABY (1- (resolve '(:find-object-index . :description-lo))))
+      (LDA.ABY (1- (resolve '(:object-table . :description-lo))))
       (STA.AB :description-lo)
       (JSR '(:print-message . 1))
       (DB :description-lo 0)

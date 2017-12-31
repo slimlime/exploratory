@@ -120,23 +120,44 @@
   ;;                Z = Set if not found
   (when *word-table-built*
     (zp-b :current-place)
-    (label :find-object-index)
+
     (with-namespace :object-table
-      (alias :name :D0)
+      (alias :noun :D0)
       (alias :adjective :D1)
       (alias :pos :A0)
       (alias :found-index :D2)
-      (dc "Linear search for the name")
+
+      (when (resolves '(:parser . :words))
+	;;some of the test functions don't use the parser
+	;;so this entry point won't compile- exclude it if
+	;;that is the case
+	(label :find-object-index-from-input nil)
+
+	(dc "Get the third word, e.g. TAKE ADJ NOUN")
+	(LDA.AB (+ 2 (resolve '(:parser . :words))))
+	(BEQ :no-adjective "Could be of form TAKE NOUN")
+	(STA.ZP :noun)
+	(LDA.AB (+ 1 (resolve '(:parser . :words))))
+	(STA.ZP :adjective)
+	(JMP :find-object-index)
+	(label :no-adjective)
+	(STA.ZP :adjective)
+	(LDA.AB (+ 1 (resolve '(:parser . :words))))
+	(STA.ZP :noun))
+
+      (label :find-object-index nil)
+
+      (dc "Linear search for the noun")
       (LDY 0)
       (STY.ZP :found-index)
-      (label :next-name)
-      (LDA.ZP :name)
-      (label :next-name1)
+      (label :next-noun)
+      (LDA.ZP :noun)
+      (label :next-noun1)
       (INY)
       (dc "Check in one-based name table")
       (CMP.ABY (1- (resolve :names)))
       (BEQ :found-name)
-      (BPL :next-name1)
+      (BPL :next-noun1)
       (label :not-found)
       ;;i.e. the name id < the name id in the table, and since they
       ;;are in order of name id.
@@ -148,24 +169,24 @@
       (LDA.ZP :adjective)
       (BEQ :adjective-matches "Zero adjective always matches...")
       (CMP.ABY (1- (resolve :adjectives)))
-      (BNE :next-name)
+      (BNE :next-noun)
       (label :adjective-matches)
       (dc "Now check it is in our place")
       (LDA.ABY (1- (resolve :places)))
-      (BEQ :next-name "Object is elsewhere")
+      (BEQ :next-noun "Object is elsewhere")
       (CMP 1)
       (BEQ :found "Object is in our inventory")
       (CMP.ZP :current-place)
       (BEQ :found "Object is in our current location")
       ;;TODO check to see if the place is a container
       ;;then go up there.
-      (BNE :next-name)
+      (BNE :next-noun)
       (label :found)
       (dc "If we already have found one then return")
       (LDA.ZP :found-index)
       (BNE :already-found)
       (STY.ZP :found-index)
-      (BEQ :next-name)
+      (BEQ :next-noun)
       (label :already-found)
       (dc "Carry AND not-zero, i.e. duplicate AND found")
       (SEC)

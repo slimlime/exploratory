@@ -25,4 +25,5 @@
   (bload "analysis.lisp")
   (bload "declarations.lisp")
   (bload "location.lisp")
+  (bload "handlers.lisp")
   (bload "simple-game.lisp"))

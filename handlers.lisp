@@ -3,13 +3,13 @@
 
 ;; Test-game stuff also in here
 
+(defparameter *discern* "You'll have to be more specific...")
+
 (defun generic-generic-handlers ()
   (with-location :generic
 
     (action '(TAKE)
       (with-namespace :take
-	(dc "Load the second and third words into the name")
-	(dc "and adjective positions")
 	(JSR :find-object-index-from-input)
 	(BCS :duplicate-found)
 	(BEQ :not-found)
@@ -28,10 +28,31 @@
 	;;carrying the RED SWORD and you try to TAKE the BLUE SWORD
 	;;by typing TAKE SWORD. The computer is going to earn
 	;;it's reputation as a pedant here.
-	(respond "Which one?")
+	(respond *discern*)
 	(RTS)
 	(label :not-found)
 	(respond "Take what?")))
+
+    (action '(DROP)
+      (with-namespace :drop
+	(JSR :find-object-index-from-input)
+	(BCS :duplicate-found)
+	(BEQ :not-found)
+	(dc "Check we have this object about our person")
+	(LDA 1)
+	(CMP.ABY (1- (resolve '(:object-table . :places))))
+	(BNE :not-found)
+	(label :drop-it)
+	(dc "Now set its place to the current place")
+	(LDA.ZP :current-place)
+	(STA.ABY (1- (resolve '(:object-table . :places))))
+	(respond "You dropped it!")
+	(RTS)
+	(label :duplicate-found)
+	(respond *discern*)
+	(RTS)
+	(label :not-found)
+	(respond "Drop what?")))
 
     (defword :INVENTORY :I)
 
@@ -109,7 +130,7 @@
 	(DB :description-hi 0)
 	(RTS)
 	(label :duplicate-found)
-	(respond "Which one?")
+	(respond *discern*)
 	(RTS)
 	(label :not-found)
 	(respond "Examine what?")))

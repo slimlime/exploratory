@@ -1,3 +1,27 @@
+## 30/12/2017
+
+## And So It Begins Again
+
+Today's modification was adding LOOK and INVENTORY, which are the same thing except when you LOOK you are LOOKing in the current room, which is a place, and when you INVENTORY you are LOOKing in yourself, which is also a place, but a very special place. There are two special places, ELSEWHERE and INVENTORY and they have the ids 0 and 1 respectively.
+
+### Curse of YAGNI
+
+
+~~~~
+      (LDA.ABY (1- (resolve '(:object-table . :description-hi))))
+      (STA.AB :description-hi)
+      (LDA.ABY (1- (resolve '(:object-table . :description-lo))))
+      (STA.AB :description-lo)
+      (JSR '(:print-message . 1))
+      (DB :description-lo 0)
+      (DB :description-hi 0)
+      (RTS)
+~~~~
+
+See [here](http://forum.6502.org/viewtopic.php?f=2&t=4639).
+
+Basically, there are a lot of messages to be printed in the game, hard-coded messages and this is a way of passing the address of the message by inlining the address at the call-site. This is not so efficient when the message is dynamic and could be loaded into, say X and Y. In fact most honorable people would see this code occuring twice then shrink back in horror before immediately burning it in the cleansing fires of refactoring. BUT. It works, and I have been likewise burnt by a lack of respect for YAGNI many times, so I am going to leave it, until it becomes obvious it needs fixing for some other reason. I can think of one reason, and that is at some point I will have to add multi-line object descriptions... so it can wait till then.
+
 ## 5/8/2017
 
 ## Autumn BRK

@@ -262,54 +262,41 @@
 (defun live-row (i)
   (+ 3 (* (+ i 13) *line-height*)))
 
-(defun scroller (label lines)
-  (label label)
-  (call-memcpy (scradd (live-row 1) 0)
+(defun inline-scroll (lines)
+  (label (cons :print-message lines))
+  ;;this expands into a lot of boring code
+  ;;which should be in a subroutine!
+  (call-memcpy (scradd (live-row lines) 0)
 	       (scradd (live-row 0) 0)
+	       (* (- 4 lines) +screen-width-bytes+ *line-height*))
+  
+  (call-memset 0 (scradd (live-row (- 4 lines)) 0)
 	       (* lines +screen-width-bytes+ *line-height*))
-  (call-memset 0 (scradd (live-row lines) 0)
-	       (* +screen-width-bytes+ *line-height*))
-  (RTS))
+
+  (sta16.zp (scradd (live-row (- 4 lines)) 0) '(:typeset . :raster))
+  
+  (JMP '(:print-message . :print)))
 
 (defun print-message ()
-  (scroller :scroll-text 3)
-  
-  (label '(:print-message . 3))
 
-  (call-memcpy (scradd (live-row 3) 0)
-	       (scradd (live-row 0) 0)
-	       (* 1 +screen-width-bytes+ *line-height*))
+  ;; define three entry points, one for
+  ;; each of the sizes of messages we can have.
+  ;; not happy with the amount of code this expands into
   
-  (call-memset 0 (scradd (live-row 1) 0)
-	       (* 3 +screen-width-bytes+ *line-height*))
+  (inline-scroll 3)
+  (inline-scroll 2)
+  (inline-scroll 1)
 
-  (sta16.zp (scradd (live-row 1) 0) '(:typeset . :raster))
+  ;; this entry point expects the number of lines, 1, 2 or 3
+  ;; to be in A
   
-  (JMP '(:print-message . :print))
-  
-  (label '(:print-message . 2))
-
-  (call-memcpy (scradd (live-row 2) 0)
-	       (scradd (live-row 0) 0)
-	       (* 2 +screen-width-bytes+ *line-height*))
-
-  (call-memset 0 (scradd (live-row 2) 0)
-	       (* 2 +screen-width-bytes+ *line-height*))
-
-  (sta16.zp (scradd (live-row 2) 0) '(:typeset . :raster))
-  
-  (JMP '(:print-message . :print))
-  
-  (label '(:print-message . 1))
-  
-  (call-memcpy (scradd (live-row 1) 0)
-	       (scradd (live-row 0) 0)
-	       (* 3 +screen-width-bytes+ *line-height*))
-
-  (call-memset 0 (scradd (live-row 3) 0)
-	       (* 1 +screen-width-bytes+ *line-height*))
-
-  (sta16.zp (scradd (live-row 3) 0) '(:typeset . :raster))
+  (label :print-message)
+  (CMP 2)
+  (BEQ '(:print-message . 2))
+  (CMP 1)
+  (BEQ '(:print-message . 1))
+  (dc "Must be a three line message")
+  (JMP '(:print-message . 3))
   
   (with-namespace :print-message
     (label :print)

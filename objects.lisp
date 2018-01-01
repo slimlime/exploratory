@@ -77,11 +77,12 @@
 	    (let* ((text (justify-with-image description
 					     5 4 *act-font*))
 		   (lines (1+ (count #\Newline text))))
-	      (assert (= 1 lines) nil (format nil "Object description must be one line ~a" text))
+	      (assert (< lines 4) nil (format nil "Object description must be 1-3 lines, was ~a ~a" lines text))
 	      (list noun initial-place (dstr text)
 		    (dstr (if name-override-p
 			      name-override
-			      (name-with-indefinite-article name)))))))))
+			      (name-with-indefinite-article name)))
+		    lines))))))
 
 ;;First use case- EXAMINE [ADJECTIVE] OBJECT
 
@@ -239,7 +240,8 @@
 	;; object descriptions
 	
 	(apply #'db :description-hi (mapcar #'(lambda (o) (hi (fourth o))) objects))
-	(apply #'db :description-lo (mapcar #'(lambda (o) (lo (fourth o))) objects))))))
+	(apply #'db :description-lo (mapcar #'(lambda (o) (lo (fourth o))) objects))
+	(apply #'db :description-lines (mapcar #'(lambda (o) (lo (sixth o))) objects))))))
 
 (defun dump-objects ()
   (let ((objects nil))
@@ -280,7 +282,7 @@
 	   (JSR :init-objects)
 	   
 	   (LDA name-id)
-	   (STA.ZP '(:object-table . :name))
+	   (STA.ZP '(:object-table . :noun))
 	   (LDA adj-id)
 	   (STA.ZP '(:object-table . :adjective))
 	   (LDA current-place)

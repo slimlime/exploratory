@@ -24,7 +24,7 @@
     ;;todo verify object description, and refactor it with the response verification
     (defobject "BRONZE HOOK" "A sharp metal hook with a spherical handle.")
     (defobject "TEST OBJECT" "An object with no purpose in this life.")
-    (defobject "SWORD" "A very important sword." :name-override "The sword of destiny")
+    (defobject "SWORD" "A very important sword, the description of which spans many lines." :name-override "The sword of destiny")
 
     (defbits t :key-in-crack :door-locked)
     (defbits nil :slime-examined :slime-licked :crack-examined

@@ -3,7 +3,7 @@
 
 ;; Test-game stuff also in here
 
-(defparameter *discern* "You'll have to be more specific...")
+(defparameter *be-more-specific* "You'll have to be more specific...")
 
 (defun generic-generic-handlers ()
   (with-location :generic
@@ -28,7 +28,7 @@
 	;;carrying the RED SWORD and you try to TAKE the BLUE SWORD
 	;;by typing TAKE SWORD. The computer is going to earn
 	;;it's reputation as a pedant here.
-	(respond *discern*)
+	(respond *be-more-specific*)
 	(RTS)
 	(label :not-found)
 	(respond "Take what?")))
@@ -49,7 +49,7 @@
 	(respond "You dropped it!")
 	(RTS)
 	(label :duplicate-found)
-	(respond *discern*)
+	(respond *be-more-specific*)
 	(RTS)
 	(label :not-found)
 	(respond "Drop what?")))
@@ -125,12 +125,13 @@
 	(STA.AB :description-hi)
 	(LDA.ABY (1- (resolve '(:object-table . :description-lo))))
 	(STA.AB :description-lo)
-	(JSR '(:print-message . 1))
+	(LDA.ABY (1- (resolve '(:object-table . :description-lines))))
+	(JSR :print-message)
 	(DB :description-lo 0)
 	(DB :description-hi 0)
 	(RTS)
 	(label :duplicate-found)
-	(respond *discern*)
+	(respond *be-more-specific*)
 	(RTS)
 	(label :not-found)
 	(respond "Examine what?")))

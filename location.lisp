@@ -264,9 +264,7 @@
 	(pass)
 	(assert (= end *compiler-ptr*) nil "Build was not stable"))
       (setf *compiler-final-pass* t)
-      (pass)
-      
-      (format t "Build size ~a~%" (- *compiler-ptr* origin)))
+      (pass))
     
     (monitor-reset #x600)
     ;;(monitor-run)

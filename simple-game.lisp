@@ -19,7 +19,7 @@
   (defword :ATTACK :KILL :HIT :CLEAVE :PUNCH))
 
 (defun object-place-address (name)
-  (+ (object-id "SHINY KEY") -1 (resolve '(:object-table . :places))))
+  (+ (object-id name) -1 (resolve '(:object-table . :places))))
 
 (defun dungeon-cell ()
   (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/exploratory/images/cell.bmp"
@@ -28,12 +28,13 @@
 
     (defplace :crack)
     
-    (defobject "SHINY KEY" "It's a key, man." :initial-place :crack)   
+    (defobject "SHINY KEY" "It's a key, man." :initial-place :crack)
+    ;;(defobject "GOBLIN SLOP" "A balanced soup of entrails, small amphibians and mandibles. Ooh! Garlic croutons!" :initial-place :elsewhere)
 
     (defbits t :door-locked)
 
     (defbits nil
-      :slime-examined
+	:slime-examined
       :slime-licked
       :crack-examined
       :door-open
@@ -42,7 +43,7 @@
     (action '(EXAMINE SLIME)
       (respond "Millions of sad eyes peer out from the slime.")
       (if-in-place "SHINY KEY" :crack
-	(respond "They seem to be staring at the floor.")))
+		   (respond "They seem to be staring at the floor.")))
 
     (action '(EXAMINE WALL)
       (respond "The wall oozes with a repellant green slime.")
@@ -54,34 +55,39 @@
     (action '(EXAMINE FLOOR)
       (respond "There is a crack in the floor.")
       (if-in-place "SHINY KEY" :crack
-	(respond "Perhaps it bears further examination?")))
+		   (respond "Perhaps it bears further examination?")))
     
     (action '(EXAMINE CRACK)
       (ifbit :slime-licked
 	     (progn
-	       (ifbit :key-in-crack
-		      (progn
-			(respond "A glint of metal shines back at you..."
-				 "A key!")
-			(setbit :crack-examined))
-		      (respond "A crack in the floor, just like any other."
-			       "One might hide a small key-like object here."
-			       "Like, for example, a key.")))
-	     (respond "The Veil of Maia prevents you from seeing anything interesting.")))
-    (action '(TAKE KEY)
-      (ifbit :crack-examined
-	     (ifbit :key-in-crack
-		    (progn
-		      (respond "You take the shiny key.")
-		      (clrbit :key-in-crack))
-		    (respond "It's in your pocket..."
-			     "Perhaps the dungeon air is getting to you?"))
-	     (respond "What key? Do you know something I don't?")))
+	       (if-in-place "SHINY KEY" :crack
+			    (progn
+			      (respond "A glint of metal shines back at you..."
+				       "A key!")
+			      (setbit :crack-examined))
+			    (respond "A crack in the floor, just like any other."
+				     "One might hide a small key-like object here."
+				     "Like, for example, a key.")))
+	     (respond "The Veil of Maya prevents you from seeing anything interesting.")))
+
+    ;; Figure out how to override the default handler to add the hilarious
+    ;; responses below
+    ;;(action '(TAKE KEY)
+    ;;  (ifbit :crack-examined
+	;;     (ifbit :key-in-crack
+	;;	    (progn
+	;;	      (respond "You take the shiny key.")
+	;;	      (clrbit :key-in-crack))
+	;;	    (respond "It's in your pocket..."
+	;;		     "Perhaps the dungeon air is getting to you?"))
+	  ;;   (respond "What key? Do you know something I don't?")))
+    
     (action '(EXAMINE DOOR)
       (respond "The door is a grim iron affair with a tiny barred window and a keyhole.") 
       (ifbit :door-open
 	     (respond "The door is open.")
 	     (respond "The door is closed.")))
+    
     (action '(EXAMINE WINDOW)
       (nifbit :door-open
 	      (progn
@@ -91,41 +97,52 @@
 			  (setbit :slop-flung)
 			  (respond "He flings some inedible slop through the bars. You hear a key rattling in the lock."))
 			(respond "He tells you to keep the noise down using a stream of vowel-free goblin profanities. KRRPKCHK DRGKPK!")))))
-    (action '(EXAMINE SLOP)
-      (ifbit :slop-flung
-	     (respond "A balanced soup of entrails, small amphibians and mandibles. Ooh! Garlic croutons!")))
+
+
+    ;; these two actions could be refactored to a new set of handlers
+    ;; VERB OBJECT- where the object can be in inventory or in the room
+    
     (action '(EAT FOOD)
       (ifbit :slop-flung
 	     (respond "I would hardly call the goblin's slop food.")))
+
     (action '(EAT SLOP)
       (ifbit :slop-flung
 	     (respond *thegodslookaway*)))
+
     (action '(EXAMINE KEYHOLE) (respond "It's a keyhole, man."))
+
     (action '(TAKE CRACK) (respond "Inadvisable."))
+
     (action '(LICK CRACK) (respond *thegodslookaway*))
+
     (action '(ATTACK SLIME) (respond "Your hand is stayed by the slime's gaze of infinite sadness."))
+
     (action '(UNLOCK DOOR FINGER)
       (ifbit :door-locked
 	     (progn
 	       (respond "Wise guy, eh? The lock doesn't budge. Your finger is now sore.")
 	       (respond *snickering*))
 	     (respond "You put your finger in the keyhole of an unlocked door.")))
+
     (action '((UNLOCK DOOR) (USE KEY DOOR))
       (ifbit :door-locked
-	     (ifbit :key-in-crack
-		    (respond "With what? Your finger?")
+	     (if-in-place "SHINY KEY" :inventory
 		    (ifbit :slop-flung
 			   (progn
 			     (clrbit :door-locked)
 			     (respond "The lock mechanism clicks..."))
-			   (respond "You rattle the key in the lock, but there is a key stuck in the other side.")))
+			   (respond "You rattle the key in the lock, but there is a key stuck in the other side."))
+		    (respond "With what? Your finger?"))
 	     (respond "The door is already unlocked.")))
+    
     (action '(CLOSE DOOR)
       (ifbit :door-open
 	     (progn
 	       (clrbit :door-open)
 	       (respond "The door closes.")
 	       (respond *thegodslookaway*))))
+
     (action '(LOCK DOOR)
       (ifbit :door-locked
 	     (respond "The door is already locked.")
@@ -140,6 +157,7 @@
 	     (progn
 	       (respond "Ouch! You walk into the closed door.")
 	       (respond *snickering*))))
+
     (action '(LICK SLIME)
       (nifbit :slime-licked
 	      (progn
@@ -148,15 +166,18 @@
 		(respond "Myriad colours break in waves upon your ears. Maia's cosmic tears rain down on you in a shower of gold. The slime smiles."))
 	      (respond "Nothing happens. Your third eye is already open."
 		       "But... you do feel a strange urge to grow a beard and play the guitar.")))
+
     (action '(OPEN DOOR)
       (ifbit :door-open
 	     (respond "The door is already open.")
 	     (ifbit :door-locked
-		    (nifbit :key-in-crack
-			    (respond "The door is locked.")
-			    (respond
+		    (if-in-place "SHINY KEY" :crack
+				 ;;give them a clue, if they haven't already
+				 ;;found the key
+				 (respond
 			     "Have you been licking the slime? It's hallucinogenic."
-			     "The door, not atypically for a dungeon, is locked."))
+			     "The door, not unusually for a dungeon, is locked.")
+			    (respond "The door is locked."))
 		    (progn
 		      (respond *far-out*)
 		      (respond "The door creaks open.")
@@ -227,11 +248,9 @@
 (defun generic-handlers ()
   ;;install the handlers common to all games
   (generic-generic-handlers)
-  (with-location :generic
-    (action '(TAKE KEY)
-      (nifbit '(:dungeon-cell . :key-in-crack)
-	      (respond "You already have the key!"
-		       "Perhaps the dungeon air is getting to you.")))))
+  ;;then generic handlers for all the locations in this game
+
+  )
 
 (defparameter origin #x600)
       

@@ -1,4 +1,6 @@
 ;; Here are the functions which will be used to declare the game data
+;; TODO the S flag optimization in the bit check doesn't really work
+;; as almost everything affects the S flag.
 
 (defparameter *bits* nil)
 
@@ -32,9 +34,9 @@
 (defun setbit (bit &optional (set t))
   (if set
       (progn
-	(SEC)
+	(SEC) ;;set bit 7
 	(ROR.* bit))
-      (LSR.* bit)))
+      (LSR.* bit))) ;;clear bit 7
 
 (defun clrbit (bit)
   (setbit bit nil))
@@ -68,7 +70,6 @@
 		       ;;if there is an RTS immediately preceeding
 		       ;;Also, uses a branch rather than a JMP
 		       ;;if it can prove the S flag was not affected
-		       
 		       (unless (= (peek-last-byte) #x60) ;;RTS
 			 (if (code-affects-flag 'S ,then-addr (1- *compiler-ptr*))
 			     (JMP :endif)
@@ -97,15 +98,15 @@
 ;;the amount of work explicitly inside the macro.
 
 (defun if-in-place-fn (fn object-name place)
-  (with-namespace :if-in-place
+  (with-local-namespace
     (LDA (place-id place) (format nil "~a" place))
     (CMP.AB (object-place-address object-name) (format nil "Place of ~a" object-name))
-    (BNE :end-if)
+    (BNE :endif)
     (funcall fn)
-    (label :end-if)))
+    (label :endif)))
 
 (defun if-else-in-place-fn (fn else-fn object-name place)
-  (with-namespace :if-in-place
+  (with-local-namespace
     (LDA (place-id place) (format nil "~a" place))
     (CMP.AB (object-place-address object-name) (format nil "Place of ~a" object-name))
     (BNE :else)
@@ -119,11 +120,11 @@
 	;;by almost every operation, so the optimisation would likely
 	;;never be applied
 	(if (code-affects-flag 'C then-addr (1- *compiler-ptr*))
-	    (JMP :end-if)
-	    (BCS :end-if))))
+	    (JMP :endif)
+	    (BCS :endif))))
     (label :else)
     (funcall else-fn)
-    (label :end-if)))
+    (label :endif)))
 
 (defmacro if-in-place (object-name place then &optional (else nil else-supplied-p))
   (if else-supplied-p
@@ -183,18 +184,23 @@
 (defmacro action (words &body body)
   `(action-fn ,words #'(lambda () ,@body)))
 
-(defun test-ifbit (is-set expected test-fn)
+(defun test-ifbit-fn (is-set expected test-fn)
 
   (reset-compiler)
      
   (flet ((src ()
 	   (org #x600)
-	      
-	   (label :start)
+
+	   (JSR :start)
+	   (JMP :finish)
+	   
+	   (label :start)	   
 
 	   (LDA 42)
 
 	   (funcall test-fn)
+
+	   (label :finish)
 	      
 	   (STA.AB :output)
 	      
@@ -219,110 +225,33 @@
   (let ((buf (monitor-buffer)))
     (assert (= (aref buf (resolve :output)) expected))))
 
-;;true clause does not affect V
+(defmacro test-ifbit (is-set expected &body body)
+  `(test-ifbit-fn ,is-set ,expected #'(lambda () ,@body)))
 
-(test-ifbit t 5
-	    #'(lambda ()
-		(ifbit :bit
-		       (LDA 5)
-		       (LDA 6))))
-
-;;true clause does affect V
-
-(test-ifbit t 5
-	    #'(lambda ()
-		(ifbit :bit
-		       (progn
-			 (LDA 4)
-			 (CLC)
-			 (ADC 1))
-		       (LDA 6))))
-
-;;false, true clause does not affect V
-
-(test-ifbit nil 6
-	    #'(lambda ()
-		(ifbit :bit
-		       (LDA 5)
-		       (LDA 6))))
-
-;;false, true clause does affect V
-
-(test-ifbit NIL 6
-	    #'(lambda ()
-		(ifbit :bit
-		       (progn
-			 (LDA 4)
-			 (CLC)
-			 (ADC 1))
-		       (LDA 6))))
-
-;;true, does not affect V, missing else
-
-(test-ifbit t 5
-	    #'(lambda ()
-		(ifbit :bit
-		       (LDA 5))))
-
-;;false, does not affect V, missing else
-
-(test-ifbit nil 42
-	    #'(lambda ()
-		(ifbit :bit
-		       (LDA 5))))
-
-;;true, affects V, missing else
-
-(test-ifbit t 5
-	    #'(lambda ()
-		(ifbit :bit
-		       (progn
-			 (LDA 4)
-			 (CLC)
-			 (ADC 1)))))
-
-;;false, affects V, missing else
-
-(test-ifbit nil 42
-	    #'(lambda ()
-		(ifbit :bit
-		       (progn
-			 (LDA 4)
-			 (CLC)
-			 (ADC 1)))))
+(test-ifbit t 5 (ifbit :bit (LDA 5) (LDA 6)))
+(test-ifbit nil 6 (ifbit :bit (LDA 5) (LDA 6)))
+(test-ifbit t 5	(ifbit :bit (LDA 5)))
+(test-ifbit nil 42 (ifbit :bit (LDA 5)))
 
 ;;true, has return
 
-(test-ifbit t 5
-	    #'(lambda ()
-		(JSR :test)
-		(JMP :test-end)
-		(label :test)
-		(ifbit :bit
+(test-ifbit t 5	(ifbit :bit
 		       (progn (LDA 5)
 			      (RTS))
 		       (progn (LDA 6)
-			      (RTS)))
-		(label :test-end)))
+			      (RTS))))
 
 ;;false, has return
 
-(test-ifbit nil 6
-	    #'(lambda ()
-		(JSR :test)
-		(JMP :test-end)
-		(label :test)
-		(ifbit :bit
-		       (progn (LDA 5)
-			      (RTS))
-		       (progn (LDA 6)
-			      (RTS)))
-		(label :test-end)))
+(test-ifbit nil 6 (ifbit :bit
+			 (progn (LDA 5)
+				(RTS))
+			 (progn (LDA 6)
+				(RTS))))
 
 ;;test zpg true / false, note override of parameter zpgbit
 
 (test-ifbit nil 5
-	    #'(lambda ()
 		(zp-b :zpgbit)
 		(LDA #xFF)
 		(STA.ZP :zpgbit)
@@ -331,10 +260,9 @@
 			 (LDA 4)
 			 (CLC)
 			 (ADC 1))
-		       (LDA 55))))
+		       (LDA 55)))
 
 (test-ifbit nil 55
-	    #'(lambda ()
 		(zp-b :zpgbit)
 		(LDA.ZP #x00)
 		(STA.ZP :zpgbit)
@@ -343,29 +271,12 @@
 			 (LDA 4)
 			 (CLC)
 			 (ADC 1))
-		       (LDA 55))))
+		       (LDA 55)))
 
-;; test nifbit
-
-(test-ifbit nil 5
-	     #'(lambda ()
-		 (nifbit :bit
-			 (LDA 5))))
-(test-ifbit t 42
-	     #'(lambda ()
-		 (nifbit :bit
-			 (LDA 5))))
-
-(test-ifbit nil 5
-	     #'(lambda ()
-		 (nifbit :bit
-			 (LDA 5)
-			 (LDA 6))))
-(test-ifbit t 6
-	     #'(lambda ()
-		 (nifbit :bit
-			 (LDA 5)
-			 (LDA 6))))
+(test-ifbit nil 5 (nifbit :bit (LDA 5)))
+(test-ifbit t 42 (nifbit :bit (LDA 5)))
+(test-ifbit nil 5 (nifbit :bit (LDA 5) (LDA 6)))
+(test-ifbit t 6 (nifbit :bit (LDA 5) (LDA 6)))
 
 ;; test if-in-place
 
@@ -392,13 +303,18 @@
 	   (zeropage)
 	   
 	   (org #x600)
+
+	   (JSR :start)   
+	   (JMP :finish)   ;;clause can terminate with RTS, and
+	    ;;will go through same path as if it hadn't
 	      
 	   (label :start)
 
 	   (LDX 42)
 
 	   (funcall test-fn)
-	      
+
+	   (label :finish)
 	   (STX.AB :output)
 	      
 	   (BRK)
@@ -408,9 +324,7 @@
 	   (object-table)
 	   (string-table)
 	   
-	   (label :end)
-
-	   ))
+	   (label :end)))
     (reset-compiler)
     (src)
     (build-symbol-table)
@@ -433,6 +347,8 @@
 
 ;;Relying on X not being modified by the executed code
 
+;; Single clause
+
 (test-if-in-place 1 (if-in-place "KEY" :crack (LDX 1)))
 (test-if-in-place 42 (if-in-place "KEY" :elsewhere (LDX 1)))
 (test-if-in-place 42 (if-in-place "KEY" :inventory (LDX 1)))
@@ -443,11 +359,13 @@
 (test-if-in-place 42 (if-in-place "HORSE" :inventory (LDX 1)))
 (test-if-in-place 1 (if-in-place "HORSE" :mountain (LDX 1)))
 
-(test-if-in-place 1 (if-in-place "KEY" :crack (progn (LDX 1) (label :then-end)) (LDX 2)))
+(test-if-in-place 1 (if-in-place "KEY" :crack
+				 (progn (LDX 1) (label :then-end nil))
+				 (LDX 2)))
 
-;; Carry was not modified- must use BCS rather than JMP
+;; Dual clause
 
-(assert (= #x4c (peek-byte (resolve :then-end))))
+(assert (= #xB0 (peek-byte (resolve :then-end)))) ;;BCS optimization
 
 (test-if-in-place 2 (if-in-place "KEY" :elsewhere (LDX 1) (LDX 2)))
 (test-if-in-place 2 (if-in-place "KEY" :inventory (LDX 1) (LDX 2)))
@@ -462,9 +380,22 @@
 		      (progn (CLC) (LDX 1) (label :then-end nil))
 		      (LDX 2)))
 
-;; Carry was modified- must use JMP rather than BCS
-(assert (= #x4c (peek-byte (resolve :then-end))))
+(assert (= #x4C (peek-byte (resolve :then-end)))) ;;Uses JMP
 
 (test-if-in-place 2 (if-in-place "HORSE" :elsewhere (progn (CLC) (LDX 1)) (LDX 2)))
 (test-if-in-place 2 (if-in-place "HORSE" :inventory (progn (CLC) (LDX 1)) (LDX 2)))
 (test-if-in-place 1 (if-in-place "HORSE" :mountain (progn (CLC) (LDX 1)) (LDX 2)))
+
+;; Return in true clause
+
+(test-if-in-place 2 (if-in-place "HORSE" :crack
+		      (progn (LDX 1) (RTS) (label :then-end nil))
+		      (LDX 2)))
+
+(assert (= #xA2 (peek-byte (resolve :then-end)))) ;;Goes straight to LDX- no jump
+
+(test-if-in-place 1 (if-in-place "HORSE" :mountain
+		      (progn (LDX 1) (RTS) (label :then-end nil))
+		      (LDX 2)))
+
+(assert (= #xA2 (peek-byte (resolve :then-end)))) ;;Goes straight to LDX- no jump

@@ -24,8 +24,6 @@
 	(setf ns (first bit))
 	(dc (format nil "Bits for ~a" ns)))
       (zp-b (second bit) (if (third bit) #xff #x00))))))
-      
-      ;;(db (second bit) (if (third bit) #xff #x00))))))
 
 (defun defbits (initially-set &rest bits)
   (dolist (bit bits)
@@ -371,17 +369,24 @@
 
 ;; test if-in-place
 
-(defun test-if-in-place-fn (expected test-fn)
+(defun reset-test-data ()
 
   (reset-compiler)
+  (reset-symbol-table)
+  (reset-bits)
+  (reset-parser)
   (reset-object-model)
 
   (defplace :crack)
   (defplace :mountain)
   
   (defobject "KEY" "Some key or other" :initial-place :crack)
-  (defobject "HORSE" "Deer" :initial-place :mountain)
+  (defobject "HORSE" "Deer" :initial-place :mountain))
 
+(defun test-if-in-place-fn (expected test-fn)
+
+  (reset-test-data)
+  
   (flet ((src ()
 
 	   (zeropage)
@@ -401,11 +406,16 @@
 	   (db :output 0)
 
 	   (object-table)
-	      
+	   (string-table)
+	   
 	   (label :end)
 
 	   ))
     (reset-compiler)
+    (src)
+    (build-symbol-table)
+    ;;TODO This is BORING
+    (setf *word-table-built* t)
     (src)
     (setf *compiler-final-pass* t)
     (src))
@@ -419,6 +429,8 @@
 (defmacro test-if-in-place (expected &body body)
   `(test-if-in-place-fn ,expected (lambda () ,@body)))
 
+(reset-test-data)
+
 ;;Relying on X not being modified by the executed code
 
 (test-if-in-place 1 (if-in-place "KEY" :crack (LDX 1)))
@@ -431,7 +443,12 @@
 (test-if-in-place 42 (if-in-place "HORSE" :inventory (LDX 1)))
 (test-if-in-place 1 (if-in-place "HORSE" :mountain (LDX 1)))
 
-(test-if-in-place 1 (if-in-place "KEY" :crack (LDX 1) (LDX 2)))
+(test-if-in-place 1 (if-in-place "KEY" :crack (progn (LDX 1) (label :then-end)) (LDX 2)))
+
+;; Carry was not modified- must use BCS rather than JMP
+
+(assert (= #x4c (peek-byte (resolve :then-end))))
+
 (test-if-in-place 2 (if-in-place "KEY" :elsewhere (LDX 1) (LDX 2)))
 (test-if-in-place 2 (if-in-place "KEY" :inventory (LDX 1) (LDX 2)))
 (test-if-in-place 2 (if-in-place "KEY" :mountain (LDX 1) (LDX 2)))
@@ -440,3 +457,14 @@
 (test-if-in-place 2 (if-in-place "HORSE" :elsewhere (LDX 1) (LDX 2)))
 (test-if-in-place 2 (if-in-place "HORSE" :inventory (LDX 1) (LDX 2)))
 (test-if-in-place 1 (if-in-place "HORSE" :mountain (LDX 1) (LDX 2)))
+
+(test-if-in-place 2 (if-in-place "HORSE" :crack
+		      (progn (CLC) (LDX 1) (label :then-end nil))
+		      (LDX 2)))
+
+;; Carry was modified- must use JMP rather than BCS
+(assert (= #x4c (peek-byte (resolve :then-end))))
+
+(test-if-in-place 2 (if-in-place "HORSE" :elsewhere (progn (CLC) (LDX 1)) (LDX 2)))
+(test-if-in-place 2 (if-in-place "HORSE" :inventory (progn (CLC) (LDX 1)) (LDX 2)))
+(test-if-in-place 1 (if-in-place "HORSE" :mountain (progn (CLC) (LDX 1)) (LDX 2)))

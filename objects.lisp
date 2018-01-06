@@ -72,7 +72,7 @@
 	(defword adj)))
     (let ((id (cons (gethash noun *word->meaning*)
 		    (gethash adj *word->meaning*))))
-      (setf (gethash noun *object-name->id*) id)
+      (setf (gethash name *object-name->id*) id)
       (setf (gethash id *object-id->data*)
 	    (let* ((text (justify-with-image description
 					     5 4 *act-font*))
@@ -82,7 +82,8 @@
 		    (dstr (if name-override-p
 			      name-override
 			      (name-with-indefinite-article name)))
-		    lines))))))
+		    lines
+		    name))))))
 
 ;;First use case- EXAMINE [ADJECTIVE] OBJECT
 
@@ -114,6 +115,25 @@
 ;; this better without making some trade-off which is also not
 ;; so excellent. Linear search will be used at first, though it
 ;; could be improved by binary search.
+
+
+;; Build a table where the objects are sorted alphabetically
+;; by name then adjective
+(defun build-object-table ()
+  (let ((objects nil))
+    (maphash #'(lambda (k v)
+		 ;;basically this number is the 16 bit object id
+		 ;;name adjective.
+		 ;;add it to the list to make ID NOUN ADJ DESC NAME
+		 (push (cons (logior (ash (nil->0 (car k)) 8)
+				     (nil->0 (cdr k)))
+			     v)
+		       objects))
+	     *object-id->data*)
+    ;;sort them so they are in name adjective order
+    
+    (setf objects (sort objects #'< :key #'car))
+    objects))
 
 (defun object-table ()
   ;;return values - Y = index of matching item
@@ -196,20 +216,8 @@
       ;;make a list of words and sort it (id-wise) by name
       ;;then adjective.
       
-      (let ((objects nil))
-	(maphash #'(lambda (k v)
-		     ;;basically this number is the 16 bit object id
-		     ;;name adjective.
-		     ;;add it to the list to make ID NOUN ADJ DESC NAME
-		     (push (cons (logior (ash (nil->0 (car k)) 8)
-					 (nil->0 (cdr k)))
-				 v)
-			   objects))
-		 *object-id->data*)
-	;;sort them so they are in name adjective order
+      (let ((objects (build-object-table)))
 	
-	(setf objects (sort objects #'< :key #'car))
-
 	;; function to initialise the objects
 	
 	(label :init-objects nil)
@@ -244,20 +252,8 @@
 	(apply #'db :description-lines (mapcar #'(lambda (o) (lo (sixth o))) objects))))))
 
 (defun dump-objects ()
-  (let ((objects nil))
-	(maphash #'(lambda (k v)
-		     ;;basically this number is the 16 bit object id
-		     ;;name adjective
-		     (push (cons (logior (ash (nil->0 (car k)) 8)
-					 (nil->0 (cdr k)))
-				 v)
-			   objects))
-		 *object-id->data*)
-	;;sort them so they are in name adjective order
-	
-	(setf objects (sort objects #'< :key #'car))
-	(dolist (object objects)
-	  (print object))))
+  (dolist (object (build-object-table))
+    (print object)))
 
 (defun objects-count ()
   (hash-table-count *object-id->data*))
@@ -265,6 +261,26 @@
 (defun dump-places ()
   (maphash #'(lambda (k v) (format t "~a -> ~a~%" k v)) *place->id*))
 
+(defun place-id (place)
+  "Get the id for a place, e.g. :dungeon"
+  (let ((id (gethash place *place->id*)))
+    (when *compiler-final-pass*
+      (assert id (place) "~a is not a valid place" place))
+    (if id id 0)))
+
+(defun object-id (name)
+  ;;this is really inefficient as we build the object table every time
+  ;;it should be done only once.
+  (if *compiler-final-pass*
+      (let ((id (position name (build-object-table) :key #'seventh :test #'equal)))
+	(assert id (name) "~a is not a valid object name" name)
+	(1+ id))
+      0))
+
+(defun object-place-address (name)
+  "Get the object place address"
+  (+ -1 (resolve '(:object-table . :places)) (object-id name)))
+  
 ;;test finding object id
 
 (defun object-tester (name-id adj-id current-place)
@@ -344,6 +360,14 @@
 (defobject "POCKET FLUFF" "Lovely pocket fluff" :initial-place :inventory)
 (defobject "OBSIDIAN CUBE" "Black cube" :initial-place :elsewhere)
 (defobject "CAT FLUFF" "Cat fluff" :initial-place :babylon)
+
+(assert (= 1 (object-id "MARDUK STATUE")))
+(assert (= 2 (object-id "STONE STATUE")))
+(assert (= 3 (object-id "GINGER BISCUIT")))
+(assert (= 4 (object-id "ENTRAILS")))
+(assert (= 5 (object-id "POCKET FLUFF")))
+(assert (= 6 (object-id "CAT FLUFF")))
+(assert (= 7 (object-id "OBSIDIAN CUBE")))
 
 (test-object-find "MARDUK" "STATUE" :ur :found :unique)
 (test-object-find "STONE" "STATUE" :ur :found :unique)

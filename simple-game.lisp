@@ -1,6 +1,8 @@
 
 ; A simple game to test all the bits work
 
+;; No assembly in here...
+
 ;; catchphrases
 
 (defparameter *snickering* "You hear the faint sound of snickering...")
@@ -16,33 +18,44 @@
   (defword :EXIT :OUT :GO)
   (defword :ATTACK :KILL :HIT :CLEAVE :PUNCH))
 
+(defun object-place-address (name)
+  (+ (object-id "SHINY KEY") -1 (resolve '(:object-table . :places))))
+
 (defun dungeon-cell ()
   (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/exploratory/images/cell.bmp"
 	"You are in the dungeon prison of Wangband under the fortress of the Black Wizard, Beelzepops. Home to stench-rats, were-toads, sniveling goblins and you. Of the current denizens, you are currently the most wretched. A lime-green slime oozes out of the wall, making a rasping, wheezing sound. You must escape, but your cell has a door...")
   (with-location :dungeon-cell
 
-    ;;todo verify object description, and refactor it with the response verification
-    (defobject "BRONZE HOOK" "A sharp metal hook with a spherical handle.")
-    (defobject "TEST OBJECT" "An object with no purpose in this life.")
-    (defobject "SWORD" "A very important sword, the description of which spans many lines." :name-override "The sword of destiny")
+    (defplace :crack)
+    
+    (defobject "SHINY KEY" "It's a key, man." :initial-place :crack)   
 
-    (defbits t :key-in-crack :door-locked)
-    (defbits nil :slime-examined :slime-licked :crack-examined
-	     :door-open :slop-flung)
+    (defbits t :door-locked)
+
+    (defbits nil
+      :slime-examined
+      :slime-licked
+      :crack-examined
+      :door-open
+      :slop-flung)
+
     (action '(EXAMINE SLIME)
       (respond "Millions of sad eyes peer out from the slime.")
-      (ifbit :key-in-crack
-	     (respond "They seem to be staring at the floor.")))
+      (if-in-place "SHINY KEY" :crack
+	(respond "They seem to be staring at the floor.")))
+
     (action '(EXAMINE WALL)
       (respond "The wall oozes with a repellant green slime.")
       (nifbit :slime-examined
 	      (progn
 		(setbit :slime-examined)
 		(respond "Eugh! The slime is looking at you!"))))
+    
     (action '(EXAMINE FLOOR)
       (respond "There is a crack in the floor.")
-      (ifbit :key-in-crack
-	     (respond "Perhaps it bears further examination?")))
+      (if-in-place "SHINY KEY" :crack
+	(respond "Perhaps it bears further examination?")))
+    
     (action '(EXAMINE CRACK)
       (ifbit :slime-licked
 	     (progn
@@ -87,12 +100,6 @@
     (action '(EAT SLOP)
       (ifbit :slop-flung
 	     (respond *thegodslookaway*)))
-    (action '(EXAMINE KEY)
-      (ifbit :crack-examined
-	     ;;it is clear we are at the limits here of what we can do
-	     ;;without an object model. Where IS the key?
-	     (respond "It's a key, man.")
-	     (respond "What key?")))
     (action '(EXAMINE KEYHOLE) (respond "It's a keyhole, man."))
     (action '(TAKE CRACK) (respond "Inadvisable."))
     (action '(LICK CRACK) (respond *thegodslookaway*))
@@ -146,10 +153,10 @@
 	     (respond "The door is already open.")
 	     (ifbit :door-locked
 		    (nifbit :key-in-crack
-			   (respond "The door is locked.")
-			   (respond
-			      "Have you been licking the slime? It's hallucinogenic."
-			      "The door, not atypically for a dungeon, is locked."))
+			    (respond "The door is locked.")
+			    (respond
+			     "Have you been licking the slime? It's hallucinogenic."
+			     "The door, not atypically for a dungeon, is locked."))
 		    (progn
 		      (respond *far-out*)
 		      (respond "The door creaks open.")

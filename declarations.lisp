@@ -65,14 +65,19 @@
 	     (with-namespace namespace
 	       ,then)
 	     ,(when else-supplied-p
-		 `(progn
-		    (unless (= (peek-last-byte) #x60) ;;RTS
-		      (if (code-affects-flag 'S ,then-addr (1- *compiler-ptr*))
-			  (JMP :endif)
-			  (BMI :endif)))
-		    (label :else)
-		    (with-namespace namespace
-		      ,else)))
+		    `(progn
+		       ;;This optimisation omits the branch
+		       ;;if there is an RTS immediately preceeding
+		       ;;Also, uses a branch rather than a JMP
+		       ;;if it can prove the S flag was not affected
+		       
+		       (unless (= (peek-last-byte) #x60) ;;RTS
+			 (if (code-affects-flag 'S ,then-addr (1- *compiler-ptr*))
+			     (JMP :endif)
+			     (BMI :endif)))
+		       (label :else)
+		       (with-namespace namespace
+			 ,else)))
 	     (label :endif)))))))
 
 (defmacro nifbit (bit then &optional (else nil else-supplied-p))
@@ -88,6 +93,46 @@
 	       (with-namespace namespace
 		 ,then)
 	       (label :endif)))))))
+
+;;Note the style of the following if-then-else macro. Decomposing
+;;like this seems to make the code easier to read, i.e. minimising
+;;the amount of work explicitly inside the macro.
+
+(defun if-in-place-fn (fn object-name place)
+  (with-namespace :if-in-place
+    (LDA (place-id place) (format nil "~a" place))
+    (CMP.AB (object-place-address object-name) (format nil "Place of ~a" object-name))
+    (BNE :end-if)
+    (funcall fn)
+    (label :end-if)))
+
+(defun if-else-in-place-fn (fn else-fn object-name place)
+  (with-namespace :if-in-place
+    (LDA (place-id place) (format nil "~a" place))
+    (CMP.AB (object-place-address object-name) (format nil "Place of ~a" object-name))
+    (BNE :else)
+    (let ((then-addr *compiler-ptr*))
+      (funcall fn)
+      (unless (= (peek-last-byte) #x60) ;;RTS
+	;;Rather than checking for the Z flag (i.e. equal)
+	;;check for the carry- it will definitely be set before
+	;;the application of fn, so we can use it to make a short
+	;;branch. Z flag is also definitely set, but is changed
+	;;by almost every operation, so the optimisation would likely
+	;;never be applied
+	(if (code-affects-flag 'C then-addr (1- *compiler-ptr*))
+	    (JMP :end-if)
+	    (BCS :end-if))))
+    (label :else)
+    (funcall else-fn)
+    (label :end-if)))
+
+(defmacro if-in-place (object-name place then &optional (else nil else-supplied-p))
+  (if else-supplied-p
+      `(if-else-in-place-fn #'(lambda () ,then)
+			    #'(lambda () ,else)
+			    ,object-name ,place)
+      `(if-in-place-fn #'(lambda () ,then) ,object-name ,place)))
 
 (defun ends-with-punctuation (string)
   (let ((char (char string (1- (length string)))))
@@ -134,6 +179,7 @@
 	*current-location*)
       (label label *current-location*)))
   (funcall fn)
+  (label :rts)
   (RTS))
 
 (defmacro action (words &body body)
@@ -322,3 +368,75 @@
 		 (nifbit :bit
 			 (LDA 5)
 			 (LDA 6))))
+
+;; test if-in-place
+
+(defun test-if-in-place-fn (expected test-fn)
+
+  (reset-compiler)
+  (reset-object-model)
+
+  (defplace :crack)
+  (defplace :mountain)
+  
+  (defobject "KEY" "Some key or other" :initial-place :crack)
+  (defobject "HORSE" "Deer" :initial-place :mountain)
+
+  (flet ((src ()
+
+	   (zeropage)
+	   
+	   (org #x600)
+	      
+	   (label :start)
+
+	   (LDX 42)
+
+	   (funcall test-fn)
+	      
+	   (STX.AB :output)
+	      
+	   (BRK)
+	   
+	   (db :output 0)
+
+	   (object-table)
+	      
+	   (label :end)
+
+	   ))
+    (reset-compiler)
+    (src)
+    (setf *compiler-final-pass* t)
+    (src))
+
+  (monitor-reset #x600)
+  (monitor-run :print nil)
+
+  (let ((buf (monitor-buffer)))
+    (assert (= (aref buf (resolve :output)) expected))))
+
+(defmacro test-if-in-place (expected &body body)
+  `(test-if-in-place-fn ,expected (lambda () ,@body)))
+
+;;Relying on X not being modified by the executed code
+
+(test-if-in-place 1 (if-in-place "KEY" :crack (LDX 1)))
+(test-if-in-place 42 (if-in-place "KEY" :elsewhere (LDX 1)))
+(test-if-in-place 42 (if-in-place "KEY" :inventory (LDX 1)))
+(test-if-in-place 42 (if-in-place "KEY" :mountain (LDX 1)))
+
+(test-if-in-place 42 (if-in-place "HORSE" :crack (LDX 1)))
+(test-if-in-place 42 (if-in-place "HORSE" :elsewhere (LDX 1)))
+(test-if-in-place 42 (if-in-place "HORSE" :inventory (LDX 1)))
+(test-if-in-place 1 (if-in-place "HORSE" :mountain (LDX 1)))
+
+(test-if-in-place 1 (if-in-place "KEY" :crack (LDX 1) (LDX 2)))
+(test-if-in-place 2 (if-in-place "KEY" :elsewhere (LDX 1) (LDX 2)))
+(test-if-in-place 2 (if-in-place "KEY" :inventory (LDX 1) (LDX 2)))
+(test-if-in-place 2 (if-in-place "KEY" :mountain (LDX 1) (LDX 2)))
+
+(test-if-in-place 2 (if-in-place "HORSE" :crack (LDX 1) (LDX 2)))
+(test-if-in-place 2 (if-in-place "HORSE" :elsewhere (LDX 1) (LDX 2)))
+(test-if-in-place 2 (if-in-place "HORSE" :inventory (LDX 1) (LDX 2)))
+(test-if-in-place 1 (if-in-place "HORSE" :mountain (LDX 1) (LDX 2)))

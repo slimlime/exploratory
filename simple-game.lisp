@@ -18,9 +18,6 @@
   (defword :EXIT :OUT :GO)
   (defword :ATTACK :KILL :HIT :CLEAVE :PUNCH))
 
-(defun object-place-address (name)
-  (+ (object-id name) -1 (resolve '(:object-table . :places))))
-
 (defun dungeon-cell ()
   (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/exploratory/images/cell.bmp"
 	"You are in the dungeon prison of Wangband under the fortress of the Black Wizard, Beelzepops. Home to stench-rats, were-toads, sniveling goblins and you. Of the current denizens, you are currently the most wretched. A lime-green slime oozes out of the wall, making a rasping, wheezing sound. You must escape, but your cell has a door...")
@@ -36,7 +33,6 @@
     (defbits nil
 	:slime-examined
       :slime-licked
-      :crack-examined
       :door-open
       :slop-flung)
 
@@ -64,7 +60,7 @@
 			    (progn
 			      (respond "A glint of metal shines back at you..."
 				       "A key!")
-			      (setbit :crack-examined))
+			      (move-object "SHINY KEY" *current-location*))
 			    (respond "A crack in the floor, just like any other."
 				     "One might hide a small key-like object here."
 				     "Like, for example, a key.")))
@@ -97,10 +93,6 @@
 			  (setbit :slop-flung)
 			  (respond "He flings some inedible slop through the bars. You hear a key rattling in the lock."))
 			(respond "He tells you to keep the noise down using a stream of vowel-free goblin profanities. KRRPKCHK DRGKPK!")))))
-
-
-    ;; these two actions could be refactored to a new set of handlers
-    ;; VERB OBJECT- where the object can be in inventory or in the room
     
     (action '(EAT FOOD)
       (ifbit :slop-flung
@@ -124,7 +116,7 @@
 	       (respond "Wise guy, eh? The lock doesn't budge. Your finger is now sore.")
 	       (respond *snickering*))
 	     (respond "You put your finger in the keyhole of an unlocked door.")))
-
+    
     (action '((UNLOCK DOOR) (USE KEY DOOR))
       (ifbit :door-locked
 	     (if-in-place "SHINY KEY" :inventory

@@ -1,3 +1,49 @@
+## 7/1/2018
+
+## Object Model
+
+The SHINY KEY present in the crack in the test adventure was modelled using state. So there was a bit to see if the crack had been examined (and therefore available to take), a bit to see if the key was in the inventory etc. All that has been swept away and we now have a real object, whatever that means.
+
+So, we can define a key, and a place to put it. A place is somewhere an object can be, e.g. a location, the inventory or simply a convenient place to hide something from the adventurer, in this case a crack.
+
+~~~~
+    (defplace :crack)
+    
+    (defobject "SHINY KEY" "It's a key, man." :initial-place :crack)
+~~~~
+
+When we want to see if an object it in the crack we can do the following,
+
+~~~~
+    (action '(EXAMINE SLIME)
+        (respond "Millions of sad eyes peer out from the slime.")
+        (if-in-place "SHINY KEY" :crack
+	    (respond "They seem to be staring at the floor.")))
+~~~~
+
+`if-in-place` is a macro which emits a CMP and the necessary branches to execute the right bit of code.
+
+~~~~
+;ON EXAMINE SLIME 
+N-CELL:EXAMINE-SLIME 0B90 208A18  JSR $188A  ;PRINT-MESSAGE:2 
+                     0B93 CB..    DW $2BCB   ;Millions of sad eyes peer out from the
+slime.
+                     0B95 A903    LDA #$03   ;CRACK
+                     0B97 CDB31E  CMP $1EB3  ;OBJECT-TABLE:PLACES  ;Place of SHINY KEY
+                     0B9A D005    BNE $0BA1  ;$0B95:ENDIF 
+                     0B9C 20BF18  JSR $18BF  ;PRINT-MESSAGE:1 
+                     0B9F BA..    DW $2BBA   ;They seem to be staring at the floor.
+         $0B95:ENDIF 0BA1 60      RTS
+~~~~
+
+And that's that.
+
+The LISP code for `if-in-place` is very similar to the `if-bit` macro and could very well be refactored with it, which I shall probably do if there are any more if-like things to do which there probably will be. A generic if statement is well beyond the scope of this project- that is in the realm of compilation, something I have sworn to avoid. On the basis that a compiler is a framework rather than a library, it would be interesting to see how much effort it would be to write a function that *just* compiles if statements.
+
+Here is a screen-shot of the the adventurer having escaped from the room, thus proving that the object model in the game is sufficient to support a KEY that actually works.
+
+![Alt text](/blog/corridor.png)
+
 ## 30/12/2017
 
 ## And So It Begins Again

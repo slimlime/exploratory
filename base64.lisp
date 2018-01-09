@@ -1,4 +1,4 @@
-(defparameter *index->base64* "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrtstuvwxyz0123456789+/")
+(defparameter *index->base64* "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
 (defparameter *base64->index* (make-array 123 :element-type '(unsigned-byte 8)))
 
 (loop for i from 0 to 63 do
@@ -38,25 +38,26 @@
 		     (elt *index->base64* (logand b3 63)))
 	       (incf dst)
 	       (go :next))
-	     (if (= 2 (- len src))
-		 (progn
-		   (setf b1 (elt data src))
-		   (incf src)
-		   (setf b2 (elt data src))
-		   (setf (char str dst)
-			 (elt *index->base64* (ash b1 -2)))
-		   (incf dst)
-		   (setf (char str dst)
-			 (elt *index->base64*
-			      (logior (ash (logand b1 3) 4)
-				      (ash b2 -4))))
-		   (incf dst)
-		   (setf (char str dst)
-			 (elt *index->base64*
-			      (ash (logand b2 15) 2)))
-		   (incf dst)
-		   (setf (char str dst) #\=))
-		 (if (= 1 (- len src))
+	     (let ((remainder (- len src)))
+	       (unless (= 0 remainder)
+		 (if (= 2 (- len src))
+		     (progn
+		       (setf b1 (elt data src))
+		       (incf src)
+		       (setf b2 (elt data src))
+		       (setf (char str dst)
+			     (elt *index->base64* (ash b1 -2)))
+		       (incf dst)
+		       (setf (char str dst)
+			     (elt *index->base64*
+				  (logior (ash (logand b1 3) 4)
+					  (ash b2 -4))))
+		       (incf dst)
+		       (setf (char str dst)
+			     (elt *index->base64*
+				  (ash (logand b2 15) 2)))
+		       (incf dst)
+		       (setf (char str dst) #\=))
 		     (progn
 		       (setf b1 (elt data src))
 		       (setf (char str dst)
@@ -68,7 +69,7 @@
 		       (incf dst)
 		       (setf (char str dst) #\=)
 		       (incf dst)
-		       (setf (char str dst) #\=)))))
+		       (setf (char str dst) #\=))))))
 	  str))))
 
 
@@ -142,10 +143,32 @@
 (test-base64 #(97 98 99 100 101    ) "YWJjZGU=")
 (test-base64 #(97 98 99 100 101 102) "YWJjZGVm")
 
-(dotimes (i (* 256 256))
-  (let ((vec (make-array 3)))
-    (setf (elt vec 0) (ash i -16))
-    (setf (elt vec 1) (logior #xff (ash i -8)))
-    (setf (elt vec 2) (logior #xff i))
-    (let ((str (base64encode vec)))
-      (assert (equalp vec (base64decode str))))))
+(test-base64 #(0 0 44) "AAAs")
+(test-base64 #(87 138 231) "V4rn") 
+
+
+#|
+(time
+ (dotimes (i (1- (* 256)))
+   (let ((vec (make-array 1)))
+     (setf (elt vec 0) i)
+     (let ((str (base64encode vec)))
+       (assert (equalp vec (base64decode str)))))))))
+
+(time
+ (dotimes (i (1- (* 256 256)))
+   (let ((vec (make-array 2)))
+     (setf (elt vec 0) (ash i -8))
+     (setf (elt vec 1) (logand #xff i))
+     (let ((str (base64encode vec)))
+       (assert (equalp vec (base64decode str)))))))
+
+(time
+ (dotimes (i (1- (* 256 256 256)))
+   (let ((vec (make-array 3)))
+     (setf (elt vec 0) (ash i -16))
+     (setf (elt vec 1) (logand #xff (ash i -8)))
+     (setf (elt vec 2) (logand #xff i))
+     (let ((str (base64encode vec)))
+       (assert (equalp vec (base64decode str))))))))
+|#

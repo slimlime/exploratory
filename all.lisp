@@ -14,9 +14,10 @@
   (bload "monitor.lisp")
   (bload "asmutils.lisp")
   (bload "analysis.lisp")
-
+  
   ;; the game engine...
 
+  (bload "base64.lisp")  
   (bload "state.lisp")
   (bload "string.lisp")
   (bload "sharedmem.lisp")

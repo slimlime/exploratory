@@ -256,7 +256,7 @@
   (reset-bits)
   (reset-parser)
   (reset-object-model)
-  (reset-game-state)
+  (reset-game-state-ranges)
 
   ;;this (atm) must be called so the widths are initialised
   ;;todo, make a font-init function which just does the widths.
@@ -266,7 +266,7 @@
   (flet ((pass ()
 
 	   (reset-dispatcher)
-	   
+	   	   
 	   (zeropage)	     
 	   (org origin)
 	   (CLD)

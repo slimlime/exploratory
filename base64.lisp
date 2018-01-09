@@ -146,14 +146,13 @@
 (test-base64 #(0 0 44) "AAAs")
 (test-base64 #(87 138 231) "V4rn") 
 
-
 #|
 (time
  (dotimes (i (1- (* 256)))
    (let ((vec (make-array 1)))
      (setf (elt vec 0) i)
      (let ((str (base64encode vec)))
-       (assert (equalp vec (base64decode str)))))))))
+       (assert (equalp vec (base64decode str)))))))
 
 (time
  (dotimes (i (1- (* 256 256)))
@@ -170,5 +169,5 @@
      (setf (elt vec 1) (logand #xff (ash i -8)))
      (setf (elt vec 2) (logand #xff i))
      (let ((str (base64encode vec)))
-       (assert (equalp vec (base64decode str))))))))
+       (assert (equalp vec (base64decode str)))))))
 |#

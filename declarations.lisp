@@ -11,21 +11,21 @@
   (setf (gethash (cons namespace bit) *bits*) initially-set))
 
 (defun bit-table ()
-  (dc "Bit table")
   (let ((bits nil))
-  (maphash #'(lambda (bit initially-set)
-	       (push (list
-		      (format nil "~a" (if (consp (car bit)) ""))
-		      bit
-		      initially-set)
-		     bits))
-	   *bits*)
-  (let ((ns nil))
-    (dolist (bit (sort bits #'string< :key #'car))
-      (when (not (equal ns (first bit)))
-	(setf ns (first bit))
-	(dc (format nil "Bits for ~a" ns)))
-      (zp-b (second bit) (if (third bit) #xff #x00))))))
+    (maphash #'(lambda (bit initially-set)
+		 (push (list
+			(format nil "~a" (if (consp (car bit)) ""))
+			bit
+			initially-set)
+		       bits))
+	     *bits*)
+    (let ((ns nil))
+      (game-state "Bit Table"
+	(dolist (bit (sort bits #'string< :key #'car))
+	  (when (not (equal ns (first bit)))
+	    (setf ns (first bit))
+	    (dc (format nil "Bits for ~a" ns)))
+	  (zp-b (second bit) (if (third bit) #xff #x00)))))))
 
 (defun defbits (initially-set &rest bits)
   (dolist (bit bits)

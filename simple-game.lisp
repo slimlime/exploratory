@@ -256,6 +256,7 @@
   (reset-bits)
   (reset-parser)
   (reset-object-model)
+  (reset-game-state)
 
   ;;this (atm) must be called so the widths are initialised
   ;;todo, make a font-init function which just does the widths.

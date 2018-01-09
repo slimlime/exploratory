@@ -140,7 +140,8 @@
   ;;                C = Set if not unique
   ;;                Z = Set if not found
   (when *word-table-built*
-    (zp-b :current-place)
+    (game-state "Current Place"
+      (zp-b :current-place))
 
     (with-namespace :object-table
       (alias :noun :D0)
@@ -237,7 +238,8 @@
 	(let ((places (mapcar #'(lambda (o)
 				  (nil->0 (gethash (third o) *place->id*)))
 			      objects)))
-	  (apply #'db :places places)
+	  (game-state "Object Places"
+	    (apply #'db :places places))
 	  (apply #'db :initial-places places))
 
 	;; object names. seems a shame to have to have this, but meh

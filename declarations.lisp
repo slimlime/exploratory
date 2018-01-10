@@ -20,7 +20,7 @@
 		       bits))
 	     *bits*)
     (let ((ns nil))
-      (game-state "Bit Table"
+      (game-state-bits "Bit Table"
 	(dolist (bit (sort bits #'string< :key #'car))
 	  (when (not (equal ns (first bit)))
 	    (setf ns (first bit))

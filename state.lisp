@@ -3,7 +3,7 @@
 
 (defparameter *game-state-addresses* nil)
 
-;; TODO Monitor Poke! Which is missing..
+;; TODO monitor poke and peek
 
 (defun add-to-state-addresses (name is-bits start end)
   (when (> end start)
@@ -36,13 +36,20 @@
 
 (defun dump-state-ranges ()
   (maphash #'(lambda (name range)
-	       (format t "$~4,'0X-$~4,'0X ~a~%"
+	       (format t "$~4,'0X-$~4,'0X ~a ~a~%"
 		       (first range)
 		       (second range)
-		       name))
+		       name
+		       (if (third range) "As bits" "As bytes")))
 	   *game-state-addresses*))
 
-(defun dump-state-base64 (&optional (pack-bits t))
+(defun monitor-peek (address)
+  (peek-byte address))
+
+(defun monitor-poke (address byte)
+  (format t "Setting ~a to ~a~%" address byte))
+
+(defun dump-state-base64 (&key (pack-bits t) (peek-fn #'monitor-peek))
   (let ((data (make-array 0
 			  :adjustable t
 			  :fill-pointer 0
@@ -55,43 +62,105 @@
 		       ;;pack the bits
 		       (loop for address from (first range) to (second range) do
 			    (setf byte (logior (ash byte 1)
-					       (if (= 0 (peek-byte address))
+					       (if (/= 0 (funcall peek-fn address))
 						   1
 						   0)))
 			    (incf bit)
 			    (when (= 8 bit)
 			      (vector-push-extend byte data)
+			      (setf byte 0)
 			      (setf bit 0)))
 		       (when (/= 0 bit)
+			 (setf byte (ash byte (- 8 bit)))
 			 ;;push in the remaining bits
 			 (vector-push-extend byte data)))
 		     (loop for address from (first range) to (second range) do
-			  (vector-push-extend (peek-byte address) data))))
+			  (vector-push-extend (funcall peek-fn address) data))))
 		 *game-state-addresses*)
 	     (base64encode data)))
 
-(defun test-poke-fn (address byte)
-  (format t "Setting ~a to ~a~%" address byte))
-
-(defun restore-state-base64 (state &optional (packed-bits t) (poke-fn #'test-poke-fn))
+(defun restore-state-base64 (state &key (packed-bits t) (poke-fn #'monitor-poke))
   (let ((data (base64decode state))
-	(i 0))
+	(src 0))
     (maphash #'(lambda (name range)
 		 (declare (ignorable name))
 		 (if (and packed-bits (third range))
 		     (let ((byte 0)
 			   (bit 8))
 		       ;;unpack the bits and poke them in reverse order
-		       (loop for address from (second range) downto (first range) do
+		       (loop for address from (first range) to (second range) do
 			    (when (= 8 bit)
-			      (setf byte (elt data i)))
-			    (funcall poke-fn address (if (logand 1 byte) #x80 #x00))
+			      (setf byte (elt data src))
+			      (incf src)
+			      (setf bit 0))
+			    (funcall poke-fn address (if (= 0 (logand 128 byte)) #x00 #x80))
 			    (incf bit)
-			    (setf byte (ash byte -1))))
+			    (setf byte (ash byte 1))))
 		     (loop for address from (first range) to (second range) do
-			  (funcall poke-fn address address (elt data i))
-			  (incf i))))
+			  (funcall poke-fn address (elt data src))
+			  (incf src))))
 	     *game-state-addresses*)))
+
+;; test the saving and loading code
+
+
+(reset-game-state-ranges)
+
+(add-to-state-addresses "a" nil 0 3)
+(add-to-state-addresses "b" nil 4 6)
+
+(let* ((src #(97 98 99 0 97 98))
+       (dst (make-array 6))
+       (enc (dump-state-base64 :peek-fn #'(lambda (address)
+					    (elt src address)))))
+  (assert (string= enc "YWJjYWI="))
+  (restore-state-base64 enc :poke-fn #'(lambda (address byte)
+					 (setf (elt dst address) byte)))
+  (assert (equalp dst src)))
+
+;; couple of bit ranges, note that bit ranges aren't coalesced.
+
+(reset-game-state-ranges)
+
+(add-to-state-addresses "a" t 0 3)
+(add-to-state-addresses "b" t 4 6)
+
+(let* ((src #(128 0 128 0 128 128))
+       (dst (make-array 6))
+       (enc (dump-state-base64 :peek-fn #'(lambda (address)
+					    (elt src address)))))
+  (assert (string= enc "oMA="))
+  (restore-state-base64 enc :poke-fn #'(lambda (address byte)
+					 (setf (elt dst address) byte)))
+  (assert (equalp dst src)))
+
+;; 8 bits
+
+(reset-game-state-ranges)
+
+(add-to-state-addresses "b" t 0 8)
+
+(let* ((src #(128 128 0 128 0 0 128 128))
+       (dst (make-array (length src)))
+       (enc (dump-state-base64 :peek-fn #'(lambda (address)
+					    (elt src address)))))
+  (restore-state-base64 enc :poke-fn #'(lambda (address byte)
+					 (setf (elt dst address) byte)))
+  (assert (equalp dst src)))
+
+;; more than 8 bits
+
+(reset-game-state-ranges)
+
+(add-to-state-addresses "b" t 0 10)
+
+(let* ((src #(128 128 0 128 0 0 128 128 0 128))
+       (dst (make-array (length src)))
+       (enc (dump-state-base64 :peek-fn #'(lambda (address)
+					    (elt src address)))))
+  (restore-state-base64 enc :poke-fn #'(lambda (address byte)
+					 (setf (elt dst address) byte)))
+  (assert (equalp dst src)))
 
 ;; TODO Here we will generate some javascript to apply the save state
 ;;      from the uuencoded game state

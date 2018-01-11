@@ -216,3 +216,7 @@
   (setmem-copy (monitor-buffer))
   ;;(vicky)
   (values))
+
+(defun restore-game (str)
+  (restore-state-base64 str)
+  (enter-input "LOOK"))

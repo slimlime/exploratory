@@ -62,6 +62,8 @@
 
 (defun navigate (location)
   (JSR :navigate)
+  ;;note location here is the address of the location data
+  ;;not the place number
   (dw nil location))
 
 (defun navigator ()

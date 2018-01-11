@@ -13,6 +13,8 @@
 (defparameter *monitor-context-bytes* 8)
 (defparameter *monitor-watches* nil)
 (defparameter *monitor-buffer* nil)
+(defparameter *monitor-peek-fn* nil)
+(defparameter *monitor-poke-fn* nil)
 
 (defun hex (number)
   (format t "~4,'0X" number))
@@ -82,11 +84,21 @@
 (defun monitor-buffer ()
   (funcall *monitor-buffer*))
 
+(defun monitor-peek (address)
+  (funcall *monitor-peek-fn* address))
+
+(defun monitor-poke (address byte)
+  (funcall *monitor-poke-fn* address byte))
+
 (defun monitor-setup-for-cl-6502 (buffer org)
   ;temporary binding to cl-6502
   (setf *monitor-buffer* #'(lambda () (cl-6502:get-range 0)))
   (setf (cl-6502:get-range 0) buffer)
   (setf (6502:cpu-pc cl-6502:*cpu*) org)
+  (setf *monitor-peek-fn* #'(lambda (address)
+			      (cl-6502:get-byte address)))
+  (setf *monitor-poke-fn* #'(lambda (address byte)
+			      (setf (cl-6502:get-byte address) byte)))
   (setf *monitor-step*
 	#'(lambda ()
 	    (let ((byte (cl-6502:get-byte (6502:cpu-pc cl-6502:*cpu*))))

@@ -72,6 +72,9 @@
   (dc "Navigate to the restored location")
   (JSR :navigate)
   (game-state-bytes "Location"
+    ;;the location word here doubles as the parameter
+    ;;to the JSR above, and as the state which is
+    ;;saved.
     (dw :current-location 0))
   (BRK)
 

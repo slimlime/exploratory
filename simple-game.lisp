@@ -8,6 +8,7 @@
 (defparameter *snickering* "You hear the faint sound of snickering...")
 (defparameter *thegodslookaway* "The gods look away in shame.")
 (defparameter *far-out* "Far out!")
+(defparameter *whatyoutalkingabout* "I am sure YOU know what you are talking about.")
 
 ;;todo what happens e.g. EXAMINE DOOR WINDOW
 
@@ -52,19 +53,28 @@
       (respond "There is a crack in the floor.")
       (if-in-place "SHINY KEY" :crack
 		   (respond "Perhaps it bears further examination?")))
+
+    (defbit :maya nil)
     
     (action '(EXAMINE CRACK)
       (ifbit :slime-licked
+	     (if-in-place "SHINY KEY" :crack
+			  (progn
+			    (respond "A glint of metal shines back at you..."
+				     "A key!")
+			    (move-object "SHINY KEY" *current-location*))
+			  (respond "A crack in the floor, just like any other."
+				   "One might hide a small key-like object here."
+				   "Like, for example, a key."))
 	     (progn
-	       (if-in-place "SHINY KEY" :crack
-			    (progn
-			      (respond "A glint of metal shines back at you..."
-				       "A key!")
-			      (move-object "SHINY KEY" *current-location*))
-			    (respond "A crack in the floor, just like any other."
-				     "One might hide a small key-like object here."
-				     "Like, for example, a key.")))
-	     (respond "The Veil of Maya prevents you from seeing anything interesting.")))
+	       (respond "The Veil of Maya prevents you from seeing anything interesting.")
+	       (setbit :maya))))
+
+    (action '((EXAMINE VEIL) (EXAMINE MAYA))
+      (ifbit :maya
+	     (respond "Many believe Maya casts her net of illusion over the world
+preventing closed-minded mortals from seeing what is really there.")
+	     (respond *whatyoutalkingabout*)))
 
     ;; Figure out how to override the default handler to add the hilarious
     ;; responses below
@@ -79,7 +89,7 @@
 	  ;;   (respond "What key? Do you know something I don't?")))
     
     (action '(EXAMINE DOOR)
-      (respond "The door is a grim iron affair with a tiny barred window and a keyhole.") 
+      (respond "The door is solid wood with a tiny barred window and a keyhole.") 
       (ifbit :door-open
 	     (respond "The door is open.")
 	     (respond "The door is closed.")))
@@ -124,7 +134,7 @@
 			   (progn
 			     (clrbit :door-locked)
 			     (respond "The lock mechanism clicks..."))
-			   (respond "You rattle the key in the lock, but there is a key stuck in the other side."))
+			   (respond "You rattle the key in the lock, but there is something stuck in the other side."))
 		    (respond "With what? Your finger?"))
 	     (respond "The door is already unlocked.")))
     
@@ -155,7 +165,7 @@
 	      (progn
 		(setbit :slime-licked)
 		(respond *far-out*)
-		(respond "Myriad colours break in waves upon your ears. Maia's cosmic tears rain down on you in a shower of gold. The slime smiles."))
+		(respond "Myriad colours break in waves upon your ears. Maya's cosmic tears rain down on you in a shower of gold. The slime smiles."))
 	      (respond "Nothing happens. Your third eye is already open."
 		       "But... you do feel a strange urge to grow a beard and play the guitar.")))
 
@@ -175,9 +185,6 @@
 		      (respond "The door creaks open.")
 		      (setbit :door-open)))))))
 
-(defun test-exit-dungeon-cell ()
-  (mapc #'enter-input '("EXAMINE WINDOW" "LICK SLIME" "EXAMINE CRACK" "TAKE KEY" "UNLOCK DOOR" "OPEN DOOR" "USE DOOR")))	
-
 (defun corridor ()
   (dloc :corridor "CORRIDOR" "/home/dan/exploratory/images/corridor.bmp"
 	"A torch-lit corridor. You see a row of cell doors, identical to your own. Moans and pleas waft through the bars- sounds which you are not entirely certain are human in origin. At one end, a brick wall, at the other a green door, different than all the rest.")
@@ -196,7 +203,11 @@
 	     (respond "There are no Cheezows! It was a metaphor for your situation.")
 	     (respond "What a strange thing to say.")))
     (action '(EXAMINE METAPHOR)
-      (respond "That is really taking the biscuit."))
+      (respond "That really is taking the biscuit."))
+    (action '(EXAMINE BISCUIT)
+      (respond "There is no biscuit, man!"))
+    (action '(TAKE BISCUIT)
+      (respond "Fine. You take the biscuit. Happy now?")
     (action '(ENTER CELL)
       (respond "You enter your cell."))
     (action '(ENTER GREEN DOOR)
@@ -223,7 +234,7 @@
 	       (respond "You knock on the door and wait patiently.")
 	       (respond "Presently, it swings open. There appears to be some sort of lodging beyond the threshold."))))
     (action '(KNOCK DOOR)
-      (respond "Which one?"))))
+      (respond "Which one?")))))
 
 (defun frazbolgs-closet ()
   (dloc :frazbolgs-closet "FRAZBOLG'S CLOSET" "/home/dan/exploratory/images/porsche.bmp"
@@ -241,8 +252,9 @@
   ;;install the handlers common to all games
   (generic-generic-handlers)
   ;;then generic handlers for all the locations in this game
-
-  )
+  (with-location :generic 
+  (action '(? ? ?)
+    (respond "I don't know what that means."))))
 
 (defparameter origin #x600)
       

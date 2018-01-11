@@ -140,8 +140,10 @@
   ;;                C = Set if not unique
   ;;                Z = Set if not found
   (when *word-table-built*
-    (game-state-bytes "Current Place"
-      (zp-b :current-place))
+    ;;Current-place does not need to be saved as it will
+    ;;be set implicitly by a call to restore the game state
+    ;;when there is a call to navigate made.
+    (zp-b :current-place)
 
     (with-namespace :object-table
       (alias :noun :D0)

@@ -67,7 +67,16 @@
   (dw nil location))
 
 (defun navigator ()
+  
+  (label :restore-game)
+  (dc "Navigate to the restored location")
+  (JSR :navigate)
+  (game-state-bytes "Location"
+    (dw :current-location 0))
+  (BRK)
+
   (label :navigate)
+  
   (with-namespace :navigate
     (alias :loc :A4)
     ;;We could use the 'call' graph to figure out which things
@@ -81,8 +90,13 @@
     (alias :dest '(:decompress . :dest))
     (alias :data '(:decompress . :data))
     (JSR :deref-w)
+    (dc "Store the address of the current location")
+    (dc "In the zeropage so we can use it")
     (STX.ZP (lo-add :loc))
     (STA.ZP (hi-add :loc))
+    (dc "And in main memory so we can save it")
+    (STX.AB (lo-add :current-location))
+    (STA.AB (hi-add :current-location))
     (dc "Clear the top half of the screen")
     (call-memset 0 *screen-memory-address*
 		 (* (live-row 0) +screen-width-bytes+))

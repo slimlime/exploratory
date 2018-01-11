@@ -111,16 +111,8 @@
 	(BCS :duplicate-found)
 	(BEQ :not-found)
 	(dc "Now print the description")
-	;;The object description must be one line long
-	;;also the calling convention is poor. Should not need
-	;;self modifying code- TODO provide a run-time entry point
-	;;for the string
-	;;TODO support multi-line object descriptions.
-	;;Perhaps
-	;;could hook into the rendering routine to scroll the line
-	;;on each newline encountered OR, store the number of lines
-	;;in the object description, this will need an extra byte
-	;;or will need to scavenge some bits somewhere
+	;; TODO provide an entry point for print-message which
+	;; does not use self-modifying code
 	(LDA.ABY (1- (resolve '(:object-table . :description-hi))))
 	(STA.AB :description-hi)
 	(LDA.ABY (1- (resolve '(:object-table . :description-lo))))
@@ -219,4 +211,8 @@
 
 (defun restore-game (str)
   (restore-state-base64 str)
-  (enter-input "LOOK"))
+  (monitor-setpc :restore-game)
+  (monitor-run)
+  (setmem-copy (monitor-buffer))
+  (enter-input "LOOK")
+  (values))

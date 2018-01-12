@@ -19,9 +19,12 @@
   ;;if this throws and shouldn't has the handlers table been reset?
   (push (cons words handler-address)
 	(gethash location *handlers*)))
-	   
+
+(defun delegate-action ()
+  "Bail on an action and call the generic handler"
+  (JMP '(:dispatcher . :generic-only)))
+
 (defun dispatcher ()
-  (label :dispatch)
   ;;when we enter a location, this dispatch table should be set
   (zp-w :location-dispatch-table)
   (with-namespace :dispatcher
@@ -32,6 +35,10 @@
     ;;TODO Does it make sense for parse and dispatch to be
     ;;two separate functions? i.e. should we call parse
     ;;from here?
+    (label :generic-only)
+    (LDA 1)
+    (BNE :try-generic)
+    (label :dispatch nil)
     (LDA 2)
     (STA.ZP :tries)
     (dc "Choose the location based table")

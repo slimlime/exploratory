@@ -74,17 +74,10 @@
 preventing closed-minded mortals from seeing what is really there.")
 	     (respond *whatyoutalkingabout*)))
 
-    ;; Figure out how to override the default handler to add the hilarious
-    ;; responses below
-    ;;(action '(TAKE KEY)
-    ;;  (ifbit :crack-examined
-	;;     (ifbit :key-in-crack
-	;;	    (progn
-	;;	      (respond "You take the shiny key.")
-	;;	      (clrbit :key-in-crack))
-	;;	    (respond "It's in your pocket..."
-	;;		     "Perhaps the dungeon air is getting to you?"))
-	  ;;   (respond "What key? Do you know something I don't?")))
+    (action '(TAKE KEY)
+      (if-in-place "SHINY KEY" :crack
+		   (respond "What key? Do you know something I don't?")
+		   (delegate-action)))
     
     (action '(EXAMINE DOOR)
       (respond "The door is solid wood with a tiny barred window and a keyhole.") 

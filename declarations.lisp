@@ -7,8 +7,20 @@
 (defun reset-bits ()
   (setf *bits* (make-hash-table :test 'equal)))
 
-(defun defbit (bit initially-set &optional (namespace *current-location*))
-  (setf (gethash (cons namespace bit) *bits*) initially-set))
+(defun defbit (bit &key (initially-set :not-specified initially-set-supplied-p)
+		     (namespace *current-location*))
+  (let* ((key (cons namespace bit))
+	 (previous-state (gethash key *bits*)))
+    ;; It's ok to do defbit multiple times, but we
+    ;; fail if we supply an 'initially-set' paramater
+    ;; which differs.
+    (if previous-state
+	(when initially-set-supplied-p
+	  (unless (eq previous-state :not-specified)
+	    (assert (eq initially-set previous-state)
+		    nil
+		    (format nil "Bit ~a was previously defined to be initially ~a, redefined to be ~a" bit previous-state initially-set))))
+	(setf (gethash (cons namespace bit) *bits*) initially-set))))
 
 (defun bit-table ()
   (let ((bits nil))
@@ -16,7 +28,7 @@
 		 (push (list
 			(format nil "~a" (if (consp (car bit)) ""))
 			bit
-			initially-set)
+			(if (eq initially-set :not-specified) nil initially-set))
 		       bits))
 	     *bits*)
     (let ((ns nil))
@@ -29,9 +41,10 @@
 
 (defun defbits (initially-set &rest bits)
   (dolist (bit bits)
-    (defbit bit initially-set)))
+    (defbit bit :initially-set initially-set)))
 
 (defun setbit (bit &optional (set t))
+  (defbit bit)
   (if set
       (progn
 	(SEC) ;;set bit 7
@@ -51,80 +64,77 @@
        (with-namespace *current-location*
 	 ,@body))))
 
+(defun ifbit-fn (bit then else)
+  (defbit bit)
+  (let ((namespace *compiler-label-namespace*))
+    (with-local-namespace 
+      (dc (format nil "~a ~a" (if then "IF" "IF NOT") bit) t)
+      (BIT.* bit)
+      (if then
+	(progn
+	  (BPL (if else :else :endif))
+	  (with-namespace namespace
+	    (funcall then))
+	  (when else
+	    (JMP :endif)
+	    (label :else)))
+	(progn
+	  (assert else nil "At least one clause must be specified")
+	  (BMI :endif)))
+      (when else
+	(with-namespace namespace
+	  (funcall else)))
+      (label :endif))))
+
 (defmacro ifbit (bit then &optional (else nil else-supplied-p))
-  (let ((bitsym (gensym))
-	(then-addr (gensym)))
-    `(let ((namespace *compiler-label-namespace*))
-       (let ((,bitsym ,bit))
-	 (with-local-namespace
-	   (dc (format nil "IF ~a" ,bitsym) t)
-	   (BIT.* ,bitsym)
-	   (BPL ,(if else-supplied-p :else :endif))
-	   (let ((,then-addr *compiler-ptr*))
-	     (declare (ignorable ,then-addr))
-	     (with-namespace namespace
-	       ,then)
-	     ,(when else-supplied-p
-		    `(progn
-		       ;;This optimisation omits the branch
-		       ;;if there is an RTS immediately preceeding
-		       ;;Also, uses a branch rather than a JMP
-		       ;;if it can prove the S flag was not affected
-		       (unless (= (peek-last-byte) #x60) ;;RTS
-			 (if (code-affects-flag 'S ,then-addr (1- *compiler-ptr*))
-			     (JMP :endif)
-			     (BMI :endif)))
-		       (label :else)
-		       (with-namespace namespace
-			 ,else)))
-	     (label :endif)))))))
+  `(ifbit-fn ,bit
+	     #'(lambda () ,then)
+	     (if ,else-supplied-p #'(lambda () ,else) nil)))
 
 (defmacro nifbit (bit then &optional (else nil else-supplied-p))
-  (if else-supplied-p
-      `(ifbit ,bit ,else ,then)
-      (let ((bitsym (gensym)))
-	`(let ((namespace *compiler-label-namespace*))
-	   (let ((,bitsym ,bit))
-	     (with-local-namespace
-	       (format nil "NIF ~a" ,bitsym)
-	       (BIT.* ,bitsym)
-	       (BMI :endif)
-	       (with-namespace namespace
-		 ,then)
-	       (label :endif)))))))
+  `(ifbit-fn ,bit
+	     (if ,else-supplied-p #'(lambda () ,else) nil)
+	     #'(lambda () ,then)))
 
 ;;Note the style of the following if-then-else macro. Decomposing
 ;;like this seems to make the code easier to read, i.e. minimising
 ;;the amount of work explicitly inside the macro.
 
 (defun if-in-place-fn (fn object-name place)
-  (with-local-namespace
-    (LDA (place-id place) (format nil "~a" place))
-    (CMP.AB (object-place-address object-name) (format nil "Place of ~a" object-name))
-    (BNE :endif)
-    (funcall fn)
-    (label :endif)))
+  (defplace place)
+  (let ((namespace *compiler-label-namespace*))
+    (with-local-namespace
+      (LDA (place-id place) (format nil "~a" place))
+      (CMP.AB (object-place-address object-name) (format nil "Place of ~a" object-name))
+      (BNE :endif)
+      (with-namespace namespace
+	(funcall fn))
+      (label :endif))))
 
 (defun if-else-in-place-fn (fn else-fn object-name place)
-  (with-local-namespace
-    (LDA (place-id place) (format nil "~a" place))
-    (CMP.AB (object-place-address object-name) (format nil "Place of ~a" object-name))
-    (BNE :else)
-    (let ((then-addr *compiler-ptr*))
-      (funcall fn)
-      (unless (= (peek-last-byte) #x60) ;;RTS
-	;;Rather than checking for the Z flag (i.e. equal)
-	;;check for the carry- it will definitely be set before
-	;;the application of fn, so we can use it to make a short
-	;;branch. Z flag is also definitely set, but is changed
-	;;by almost every operation, so the optimisation would likely
-	;;never be applied
-	(if (code-affects-flag 'C then-addr (1- *compiler-ptr*))
-	    (JMP :endif)
-	    (BCS :endif))))
-    (label :else)
-    (funcall else-fn)
-    (label :endif)))
+  (defplace place)
+  (let ((namespace *compiler-label-namespace*))
+    (with-local-namespace
+      (LDA (place-id place) (format nil "~a" place))
+      (CMP.AB (object-place-address object-name) (format nil "Place of ~a" object-name))
+      (BNE :else)
+      (let ((then-addr *compiler-ptr*))
+	(with-namespace namespace
+	  (funcall fn))
+	(unless (= (peek-last-byte) #x60) ;;RTS
+	  ;;Rather than checking for the Z flag (i.e. equal)
+	  ;;check for the carry- it will definitely be set before
+	  ;;the application of fn, so we can use it to make a short
+	  ;;branch. Z flag is also definitely set, but is changed
+	  ;;by almost every operation, so the optimisation would likely
+	  ;;never be applied
+	  (if (code-affects-flag 'C then-addr (1- *compiler-ptr*))
+	      (JMP :endif)
+	      (BCS :endif))))
+      (label :else)
+      (with-namespace namespace
+	(funcall else-fn))
+      (label :endif))))
 
 (defmacro if-in-place (object-name place then &optional (else nil else-supplied-p))
   (if else-supplied-p
@@ -187,6 +197,8 @@
 (defun test-ifbit-fn (is-set expected test-fn)
 
   (reset-compiler)
+
+  (reset-bits)
      
   (flet ((src ()
 	   (org #x600)

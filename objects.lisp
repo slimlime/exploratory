@@ -17,12 +17,16 @@
 (defparameter *place->id* nil)
 (defparameter *next-place-id* nil)
 
+;; Define a new place, probably not necessary to call from game
+;; code as the call which actually use the place will call this
+;; indirectly.
 (defun defplace (place)
   (aif (gethash place *place->id*)  
        it
        (progn
 	 (setf (gethash place *place->id*) *next-place-id*)
 	 (1- (incf *next-place-id*)))))
+
 ;;ELSEWHERE = 0
 ;;INVENTORY = 1
 (defun reset-object-model ()
@@ -58,6 +62,8 @@
 (defun defobject (name description
 		  &key (initial-place *current-location*)
 		    (name-override nil name-override-p))
+  ;;firstly ensure the place exists
+  (defplace initial-place)
   ;;Ok, so we're going to take the name and split it
   ;;if there are two words then the first word is the
   ;;adjective, which is not normally required unless
@@ -287,6 +293,7 @@
 
 (defun move-object (name place)
   "Set the place of the object to be a new place"
+  (defplace place)
   (LDA (place-id place) (format nil "~a" place))
   (STA.AB (object-place-address name) (format nil "~a" name)))
 

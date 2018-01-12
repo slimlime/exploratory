@@ -11,6 +11,7 @@
 (defparameter *whatyoutalkingabout* "I am sure YOU know what you are talking about.")
 
 ;;todo what happens e.g. EXAMINE DOOR WINDOW
+;;TODO CHECK THAT ALL STATEBITS HAVE BOTH A READ AND A WRITE
 
 (defun synonyms ()
   (defword :TAKE :GET :PICK :GRAB)
@@ -24,38 +25,35 @@
 	"You are in the dungeon prison of Wangband under the fortress of the Black Wizard, Beelzepops. Home to stench-rats, were-toads, sniveling goblins and you. Of the current denizens, you are currently the most wretched. A lime-green slime oozes out of the wall, making a rasping, wheezing sound. You must escape, but your cell has a door...")
   (with-location :dungeon-cell
 
-    (defplace :crack)
-    
+    (defbits t :door-locked)
+
     (defobject "SHINY KEY" "It's a key, man." :initial-place :crack)
     ;;(defobject "GOBLIN SLOP" "A balanced soup of entrails, small amphibians and mandibles. Ooh! Garlic croutons!" :initial-place :elsewhere)
 
-    (defbits t :door-locked)
-
-    (defbits nil
-	:slime-examined
-      :slime-licked
-      :door-open
-      :slop-flung)
-
+    (if-in-place "SHINY KEY" :crack
+		 (respond "They seem to be staring at the floor."))
+    
     (action '(EXAMINE SLIME)
-      (respond "Millions of sad eyes peer out from the slime.")
+      (setbit :slime-examined)
+      (respond "Millions of eyes peer out from the slime.")
       (if-in-place "SHINY KEY" :crack
-		   (respond "They seem to be staring at the floor.")))
+		 (respond "They seem to be staring at the floor.")))
+    
+    (action '(EXAMINE EYES)
+      (ifbit :slime-examined
+	     
+	       (respond "The eyes are deep and sorrowful. Eyes that have seen things best left unseen.")
+	       (respond "Your eyes are fine... though you are pretty sure someone, or something is looking at you.")))
 
     (action '(EXAMINE WALL)
-      (respond "The wall oozes with a repellant green slime.")
-      (nifbit :slime-examined
-	      (progn
-		(setbit :slime-examined)
-		(respond "Eugh! The slime is looking at you!"))))
+      (respond "The wall oozes with a repellant green slime."
+	       "Eugh! The slime is looking at you!"))
     
     (action '(EXAMINE FLOOR)
       (respond "There is a crack in the floor.")
       (if-in-place "SHINY KEY" :crack
 		   (respond "Perhaps it bears further examination?")))
 
-    (defbit :maya nil)
-    
     (action '(EXAMINE CRACK)
       (ifbit :slime-licked
 	     (if-in-place "SHINY KEY" :crack
@@ -102,7 +100,7 @@ preventing closed-minded mortals from seeing what is really there.")
 			(progn
 			  (setbit :slop-flung)
 			  (respond "He flings some inedible slop through the bars. You hear a key rattling in the lock."))
-			(respond "He tells you to keep the noise down using a stream of vowel-free goblin profanities. KRRPKCHK DRGKPK!")))))
+			(respond "He tells you to keep the noise down using a stream of vowel-free goblin profanities. KRRPP KRRPP FNRGL!")))))
     
     (action '(EAT FOOD)
       (ifbit :slop-flung

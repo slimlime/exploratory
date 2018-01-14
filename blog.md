@@ -1,3 +1,25 @@
+## 14/1/2018
+
+## Second Systems Travelling Back In Time To Mess You Up
+
+So, we have some `INEDIBLE SLOP` and we want the ability to eat it. As you can tell I am a fan of the oxymoron. This leads to the following code
+
+~~~~
+    (action '(EAT SLOP)
+      (ifbit :slop-flung
+	     (respond *thegodslookaway*)))
+~~~~
+
+This is clearly not going to work outside the location where this action is defined. In any case `SLOP` is now a proper object,
+
+~~~~
+(defobject "INEDIBLE SLOP" "A balanced soup of entrails, small amphibians and mandibles. Ooh! Garlic croutons!" :name-override "Some inedible slop." :initial-place :nowhere)
+~~~~
+
+So we need some way of defining an action that can be performed against an object. We already have a generic `EXAMINE` function which does something similar, it searches for the specified object either in the location or in the inventory.
+
+I am not a fan of object-oriented programming so imagine my surprise when I caught myself thinging, "Hang on a minute, this game is full of objects, perhaps I need an object model like we have in C# or C++. Composition, polymorphism, blah, blah. If I were to [write this game again in the future](https://en.wikipedia.org/wiki/Second-system_effect), I would do this, that and the other. It would be beautiful and elegant." At that moment I slapped myself back to my sense. I am sure that more advanced games do have this, but I have no idea how these games work (and am preventing myself from looking, this is an exercise after all). What I will do is write out the functionality I need long-hand and then, and only then, refactor it. After all, if I knew everything about how this game should work I would just write it out Linus Torvalds style over a single weekend. Check back for the next post to see how I handle eating the `INEDIBLE SLOP`. Exciting times.
+
 ## 7/1/2018
 
 ## Object Model

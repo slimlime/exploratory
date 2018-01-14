@@ -202,7 +202,7 @@ preventing closed-minded mortals from seeing what is really there.")
 		    (progn
 		      (respond *far-out*)
 		      (respond "The door creaks open.")
-		      (setbit :door-open)))))))
+		      (setbit :door-open))))))
 
 (defun corridor ()
   (dloc :corridor "CORRIDOR" "/home/dan/exploratory/images/corridor.bmp"

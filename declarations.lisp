@@ -64,20 +64,18 @@
        (with-namespace *current-location*
 	 ,@body))))
 
-(defun if-generator (condition comment then-branch else-branch then else)
+(defun generic-if (condition then-branch else-branch then else)
   (let ((namespace *compiler-label-namespace*))
+    (funcall condition)
     (with-local-namespace
-      (dc comment)
-      (funcall condition)
       (if then
 	  (progn
 	    (funcall then-branch (if else :else :endif))
 	    (with-namespace namespace
 	      (funcall then))
 	    (when else
-	      (unless (= (peek-last-byte) #x60)
-		(JMP :endif))
-	      (label :else)))
+		(JMP :endif)
+		(label :else)))
 	  (progn
 	    (assert else nil "At least one clause must be specified")
 	    (funcall else-branch :endif)))
@@ -88,25 +86,16 @@
 
 (defun if-bit-fn (bit then else)
   (defbit bit)
-  (let ((namespace *compiler-label-namespace*))
-    (with-local-namespace 
-      (dc (format nil "~a ~a" (if then "IF" "IF NOT") bit) t)
-      (BIT.* bit)
-      (if then
-	  (progn
-	    (BPL (if else :else :endif))
-	    (with-namespace namespace
-	      (funcall then))
-	    (when else
-	      (JMP :endif)
-	      (label :else)))
-	  (progn
-	    (assert else nil "At least one clause must be specified")
-	    (BMI :endif)))
-      (when else
-	(with-namespace namespace
-	  (funcall else)))
-      (label :endif))))
+  (dc (format nil "~a ~a" (if then "IF" "IF NOT") bit) t)
+  (generic-if #'(lambda () (BIT.* bit)) #'BPL #'BMI then else))
+
+(defun if-in-place-fn (object-name place then else)
+  (defplace place)
+  (dc (format nil "~a ~a IN ~a" (if then "IF" "IF NOT") object-name place) t)
+  (generic-if #'(lambda ()
+		  (LDA.AB (object-place-address object-name) (format nil "~a place" object-name))
+		  (CMP (place-id place) (format nil "~a" place)))
+	      #'BNE #'BEQ then else))
 
 (defmacro if-bit (bit then &optional (else nil else-supplied-p))
   `(if-bit-fn ,bit
@@ -122,28 +111,6 @@
   `(if-bit-fn ,bit
 	     (if ,else-supplied-p #'(lambda () ,else) nil)
 	     #'(lambda () ,then)))
-
-(defun if-in-place-fn (object-name place then else)
-  (defplace place)
-  (let ((namespace *compiler-label-namespace*))
-    (with-local-namespace
-      (LDA.AB (object-place-address object-name) (format nil "Place of ~a" object-name))
-      (CMP (place-id place) (format nil "~a" place))
-      (if then
-	  (progn
-	    (BNE (if else :else :endif))
-	    (with-namespace namespace
-	      (funcall then))
-	    (when else
-	      (JMP :endif)
-	      (label :else)))
-	  (progn
-	    (assert else nil "At least one clause must be specified")
-	    (BEQ :endif)))
-      (when else
-	(with-namespace namespace
-	  (funcall else)))
-      (label :endif))))
 
 (defmacro if-in-place (object-name place then &optional (else nil else-supplied-p))
   `(if-in-place-fn ,object-name ,place

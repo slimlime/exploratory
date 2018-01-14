@@ -64,6 +64,28 @@
        (with-namespace *current-location*
 	 ,@body))))
 
+(defun if-generator (condition comment then-branch else-branch then else)
+  (let ((namespace *compiler-label-namespace*))
+    (with-local-namespace
+      (dc comment)
+      (funcall condition)
+      (if then
+	  (progn
+	    (funcall then-branch (if else :else :endif))
+	    (with-namespace namespace
+	      (funcall then))
+	    (when else
+	      (unless (= (peek-last-byte) #x60)
+		(JMP :endif))
+	      (label :else)))
+	  (progn
+	    (assert else nil "At least one clause must be specified")
+	    (funcall else-branch :endif)))
+      (when else
+	(with-namespace namespace
+	  (funcall else)))
+      (label :endif))))
+
 (defun if-bit-fn (bit then else)
   (defbit bit)
   (let ((namespace *compiler-label-namespace*))
@@ -71,16 +93,16 @@
       (dc (format nil "~a ~a" (if then "IF" "IF NOT") bit) t)
       (BIT.* bit)
       (if then
-	(progn
-	  (BPL (if else :else :endif))
-	  (with-namespace namespace
-	    (funcall then))
-	  (when else
-	    (JMP :endif)
-	    (label :else)))
-	(progn
-	  (assert else nil "At least one clause must be specified")
-	  (BMI :endif)))
+	  (progn
+	    (BPL (if else :else :endif))
+	    (with-namespace namespace
+	      (funcall then))
+	    (when else
+	      (JMP :endif)
+	      (label :else)))
+	  (progn
+	    (assert else nil "At least one clause must be specified")
+	    (BMI :endif)))
       (when else
 	(with-namespace namespace
 	  (funcall else)))
@@ -91,58 +113,47 @@
 	     #'(lambda () ,then)
 	     (if ,else-supplied-p #'(lambda () ,else) nil)))
 
+(defmacro when-bit (bit &body then)
+  `(if-bit-fn ,bit
+	      #'(lambda () ,@then)
+	      nil))
+
 (defmacro if-not-bit (bit then &optional (else nil else-supplied-p))
   `(if-bit-fn ,bit
 	     (if ,else-supplied-p #'(lambda () ,else) nil)
 	     #'(lambda () ,then)))
 
-;;Note the style of the following if-then-else macro. Decomposing
-;;like this seems to make the code easier to read, i.e. minimising
-;;the amount of work explicitly inside the macro.
-
-(defun if-in-place-fn (fn object-name place)
-  (defplace place)
-  (let ((namespace *compiler-label-namespace*))
-    (with-local-namespace
-      (LDA (place-id place) (format nil "~a" place))
-      (CMP.AB (object-place-address object-name) (format nil "Place of ~a" object-name))
-      (BNE :endif)
-      (with-namespace namespace
-	(funcall fn))
-      (label :endif))))
-
-(defun if-else-in-place-fn (fn else-fn object-name place)
+(defun if-in-place-fn (object-name place then else)
   (defplace place)
   (let ((namespace *compiler-label-namespace*))
     (with-local-namespace
       (LDA.AB (object-place-address object-name) (format nil "Place of ~a" object-name))
       (CMP (place-id place) (format nil "~a" place))
-      (BNE :else)
-      (let ((then-addr *compiler-ptr*))
-	(with-namespace namespace
-	  (funcall fn))
-	(unless (= (peek-last-byte) #x60) ;;RTS
-	  ;;Rather than checking for the Z flag (i.e. equal)
-	  ;;check for the carry- it will definitely be set before
-	  ;;the application of fn, so we can use it to make a short
-	  ;;branch. Z flag is also definitely set, but is changed
-	  ;;by almost every operation, so the optimisation would likely
-	  ;;never be applied
-	  (if (code-affects-flag 'C then-addr (1- *compiler-ptr*))
+      (if then
+	  (progn
+	    (BNE (if else :else :endif))
+	    (with-namespace namespace
+	      (funcall then))
+	    (when else
 	      (JMP :endif)
-	      (BCS :endif))))
-      (label :else)
-      (with-namespace namespace
-	(funcall else-fn))
+	      (label :else)))
+	  (progn
+	    (assert else nil "At least one clause must be specified")
+	    (BEQ :endif)))
+      (when else
+	(with-namespace namespace
+	  (funcall else)))
       (label :endif))))
 
 (defmacro if-in-place (object-name place then &optional (else nil else-supplied-p))
-  (if else-supplied-p
-      `(if-else-in-place-fn #'(lambda () ,then)
-			    #'(lambda () ,else)
-			    ,object-name ,place)
-      `(if-in-place-fn #'(lambda () ,then) ,object-name ,place)))
+  `(if-in-place-fn ,object-name ,place
+		   #'(lambda () ,then)
+		   (if ,else-supplied-p #'(lambda () ,else) nil)))
 
+(defmacro if-not-in-place (object-name place then &optional (else nil else-supplied-p))
+  `(if-in-place-fn ,object-name ,place
+		   (if ,else-supplied-p #'(lambda () ,else) nil)
+		   #'(lambda () ,then)))
 
 ;;todo make justification work with the - at the beginning without actually
 ;;puting it into the string table
@@ -370,7 +381,9 @@
 
 ;; Dual clause
 
-(assert (= #xB0 (peek-byte (resolve :then-end)))) ;;BCS optimization
+;; This optimization disabled					;
+;; (assert (= #xB0 (peek-byte (resolve :then-end)))) ;;BCS optimization
+
 
 (test-if-in-place 2 (if-in-place "KEY" :nowhere (LDX 1) (LDX 2)))
 (test-if-in-place 2 (if-in-place "KEY" :inventory (LDX 1) (LDX 2)))
@@ -385,7 +398,7 @@
 		      (progn (CLC) (LDX 1) (label :then-end nil))
 		      (LDX 2)))
 
-(assert (= #x4C (peek-byte (resolve :then-end)))) ;;Uses JMP
+;;(assert (= #x4C (peek-byte (resolve :then-end)))) ;;Uses JMP
 
 (test-if-in-place 2 (if-in-place "HORSE" :nowhere (progn (CLC) (LDX 1)) (LDX 2)))
 (test-if-in-place 2 (if-in-place "HORSE" :inventory (progn (CLC) (LDX 1)) (LDX 2)))
@@ -397,10 +410,12 @@
 		      (progn (LDX 1) (RTS) (label :then-end nil))
 		      (LDX 2)))
 
-(assert (= #xA2 (peek-byte (resolve :then-end)))) ;;Goes straight to LDX- no jump
+;; All branching optimizations disabled due to incorrect assumptions.
+
+;;(assert (= #xA2 (peek-byte (resolve :then-end)))) ;;Goes straight to LDX- no jump
 
 (test-if-in-place 1 (if-in-place "HORSE" :mountain
 		      (progn (LDX 1) (RTS) (label :then-end nil))
 		      (LDX 2)))
 
-(assert (= #xA2 (peek-byte (resolve :then-end)))) ;;Goes straight to LDX- no jump
+;;(assert (= #xA2 (peek-byte (resolve :then-end)))) ;;Goes straight to LDX- no jump

@@ -35,9 +35,9 @@
 (defun game-state-fn (name is-bits body-fn)
   (let ((start *compiler-ptr*)
 	(zp-start *compiler-zp-free-slot*))
-    (dc (format nil "+ ~a" name))
+    (dc (format nil "+ State  '~a'" name))
     (funcall body-fn)
-    (dc (format nil "- ~a" name))
+    (dc (format nil "- State '~a'" name))
     (add-to-state-addresses name is-bits zp-start *compiler-zp-free-slot*)
     (add-to-state-addresses name is-bits start *compiler-ptr*)))
 

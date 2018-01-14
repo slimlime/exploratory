@@ -35,7 +35,7 @@
   (setf *place->id* (make-hash-table :test 'equal))
   (setf *next-place-id* 0)
   
-  (defplace :elsewhere)
+  (defplace :nowhere)
   (defplace :inventory))
 
 ;;TODO justify-with-prompt, here and in (respond)
@@ -48,16 +48,27 @@
 	      (subseq name (1+ pos)))
 	(cons name nil))))
 
+(defun ends-with-punctuation (string)
+  (let ((char (char string (1- (length string)))))
+    (or (char= char #\.)
+	(char= char #\!)
+	(char= char #\?))))
+
+(defun warn-if-not-punctuated (s)
+  (when *compiler-final-pass*
+    (unless (ends-with-punctuation s)
+      (format t "WARNING string '~a' does not end with punctuation.~%" s))))
+
 (defun name-with-indefinite-article (name)
   (let ((name (string-downcase name)))
-    (format nil "~a ~a"
+    (format nil "~a ~a."
 	    (if (find (elt name 0) "aeiou")
 		"An"
 		"A")
 	    name)))
 
-(assert (string= "An apple" (name-with-indefinite-article "APPLE")))
-(assert (string= "A telephone" (name-with-indefinite-article "TELEPHONE")))
+(assert (string= "An apple." (name-with-indefinite-article "APPLE")))
+(assert (string= "A telephone." (name-with-indefinite-article "TELEPHONE")))
 
 (defun defobject (name description
 		  &key (initial-place *current-location*)
@@ -86,7 +97,9 @@
 	      (assert (< lines 4) nil (format nil "Object description must be 1-3 lines, was ~a ~a" lines text))
 	      (list noun initial-place (dstr text)
 		    (dstr (if name-override-p
-			      name-override
+			      (progn
+				(warn-if-not-punctuated name-override)
+				name-override)
 			      (name-with-indefinite-article name)))
 		    lines
 		    name))))))
@@ -374,7 +387,7 @@
 (defobject "GINGER BISCUIT" "A tasty snack" :initial-place :ur)
 (defobject "ENTRAILS" "Animal guts" :initial-place :nippur)
 (defobject "POCKET FLUFF" "Lovely pocket fluff" :initial-place :inventory)
-(defobject "OBSIDIAN CUBE" "Black cube" :initial-place :elsewhere)
+(defobject "OBSIDIAN CUBE" "Black cube" :initial-place :nowhere)
 (defobject "CAT FLUFF" "Cat fluff" :initial-place :babylon)
 
 (assert (= 1 (object-id "MARDUK STATUE")))

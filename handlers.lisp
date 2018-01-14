@@ -4,10 +4,9 @@
 ;; Test-game stuff also in here
 
 (defparameter *be-more-specific* "You'll have to be more specific...")
-
+  
 (defun generic-generic-handlers ()
   (with-location :generic
-
     (action '(TAKE)
       (with-namespace :take
 	(JSR :find-object-index-from-input)
@@ -32,7 +31,7 @@
 	(RTS)
 	(label :not-found)
 	(respond "Take what?")))
-
+    
     (action '(DROP)
       (with-namespace :drop
 	(JSR :find-object-index-from-input)
@@ -127,8 +126,8 @@
 	(RTS)
 	(label :not-found)
 	(respond "Examine what?")))
-
-    ))
+    
+))
 
 (defun test-render-input ()
   (label :test-render-input)
@@ -206,8 +205,7 @@
   (monitor-setpc :test-input)
   (monitor-run :break-on break-on)
   (setmem-copy (monitor-buffer))
-  ;;(vicky)
-  (values))
+  (dump-state-base64))
 
 (defun restore-game (str)
   (restore-state-base64 str)

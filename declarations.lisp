@@ -64,7 +64,7 @@
        (with-namespace *current-location*
 	 ,@body))))
 
-(defun ifbit-fn (bit then else)
+(defun if-bit-fn (bit then else)
   (defbit bit)
   (let ((namespace *compiler-label-namespace*))
     (with-local-namespace 
@@ -86,13 +86,13 @@
 	  (funcall else)))
       (label :endif))))
 
-(defmacro ifbit (bit then &optional (else nil else-supplied-p))
-  `(ifbit-fn ,bit
+(defmacro if-bit (bit then &optional (else nil else-supplied-p))
+  `(if-bit-fn ,bit
 	     #'(lambda () ,then)
 	     (if ,else-supplied-p #'(lambda () ,else) nil)))
 
-(defmacro nifbit (bit then &optional (else nil else-supplied-p))
-  `(ifbit-fn ,bit
+(defmacro if-not-bit (bit then &optional (else nil else-supplied-p))
+  `(if-bit-fn ,bit
 	     (if ,else-supplied-p #'(lambda () ,else) nil)
 	     #'(lambda () ,then)))
 
@@ -115,8 +115,8 @@
   (defplace place)
   (let ((namespace *compiler-label-namespace*))
     (with-local-namespace
-      (LDA (place-id place) (format nil "~a" place))
-      (CMP.AB (object-place-address object-name) (format nil "Place of ~a" object-name))
+      (LDA.AB (object-place-address object-name) (format nil "Place of ~a" object-name))
+      (CMP (place-id place) (format nil "~a" place))
       (BNE :else)
       (let ((then-addr *compiler-ptr*))
 	(with-namespace namespace
@@ -143,20 +143,13 @@
 			    ,object-name ,place)
       `(if-in-place-fn #'(lambda () ,then) ,object-name ,place)))
 
-(defun ends-with-punctuation (string)
-  (let ((char (char string (1- (length string)))))
-    (or (char= char #\.)
-	(char= char #\!)
-	(char= char #\?))))
 
 ;;todo make justification work with the - at the beginning without actually
 ;;puting it into the string table
 (defun respond (message &rest messages)
   (when *compiler-final-pass*
     (dolist (s (cons message messages))
-      (unless (ends-with-punctuation s)
-	(format t "WARNING string '~a' does not end with punctuation~%" s))))
-  
+      (warn-if-not-punctuated s)))
   (let* ((text
 	  ;;TODO this is an abuse of the justify function, which
 	  ;;     is to account for the prompt
@@ -194,12 +187,12 @@
 (defmacro action (words &body body)
   `(action-fn ,words #'(lambda () ,@body)))
 
-(defun test-ifbit-fn (is-set expected test-fn)
+(defun test-if-bit-fn (is-set expected test-fn)
 
   (reset-compiler)
 
   (reset-bits)
-     
+  
   (flet ((src ()
 	   (org #x600)
 
@@ -213,16 +206,16 @@
 	   (funcall test-fn)
 
 	   (label :finish)
-	      
+	   
 	   (STA.AB :output)
-	      
+	   
 	   (BRK)
-	      
+	   
 	   (db :bit (if is-set #xff 0))
 	   (db :output 0)
-	      
+	   
 	   (label :end)
-	      
+	   
 	   ))
     (reset-compiler)
     (src)
@@ -237,58 +230,58 @@
   (let ((buf (monitor-buffer)))
     (assert (= (aref buf (resolve :output)) expected))))
 
-(defmacro test-ifbit (is-set expected &body body)
-  `(test-ifbit-fn ,is-set ,expected #'(lambda () ,@body)))
+(defmacro test-if-bit (is-set expected &body body)
+  `(test-if-bit-fn ,is-set ,expected #'(lambda () ,@body)))
 
-(test-ifbit t 5 (ifbit :bit (LDA 5) (LDA 6)))
-(test-ifbit nil 6 (ifbit :bit (LDA 5) (LDA 6)))
-(test-ifbit t 5	(ifbit :bit (LDA 5)))
-(test-ifbit nil 42 (ifbit :bit (LDA 5)))
+(test-if-bit t 5 (if-bit :bit (LDA 5) (LDA 6)))
+(test-if-bit nil 6 (if-bit :bit (LDA 5) (LDA 6)))
+(test-if-bit t 5	(if-bit :bit (LDA 5)))
+(test-if-bit nil 42 (if-bit :bit (LDA 5)))
 
 ;;true, has return
 
-(test-ifbit t 5	(ifbit :bit
-		       (progn (LDA 5)
-			      (RTS))
-		       (progn (LDA 6)
-			      (RTS))))
+(test-if-bit t 5	(if-bit :bit
+				(progn (LDA 5)
+				       (RTS))
+				(progn (LDA 6)
+				       (RTS))))
 
 ;;false, has return
 
-(test-ifbit nil 6 (ifbit :bit
-			 (progn (LDA 5)
-				(RTS))
-			 (progn (LDA 6)
-				(RTS))))
+(test-if-bit nil 6 (if-bit :bit
+			   (progn (LDA 5)
+				  (RTS))
+			   (progn (LDA 6)
+				  (RTS))))
 
 ;;test zpg true / false, note override of parameter zpgbit
 
-(test-ifbit nil 5
-		(zp-b :zpgbit)
-		(LDA #xFF)
-		(STA.ZP :zpgbit)
-		(ifbit :zpgbit
-		       (progn
-			 (LDA 4)
-			 (CLC)
-			 (ADC 1))
-		       (LDA 55)))
+(test-if-bit nil 5
+  (zp-b :zpgbit)
+  (LDA #xFF)
+  (STA.ZP :zpgbit)
+  (if-bit :zpgbit
+	  (progn
+	    (LDA 4)
+	    (CLC)
+	    (ADC 1))
+	  (LDA 55)))
 
-(test-ifbit nil 55
-		(zp-b :zpgbit)
-		(LDA.ZP #x00)
-		(STA.ZP :zpgbit)
-		(ifbit :zpgbit
-		       (progn
-			 (LDA 4)
-			 (CLC)
-			 (ADC 1))
-		       (LDA 55)))
+(test-if-bit nil 55
+  (zp-b :zpgbit)
+  (LDA.ZP #x00)
+  (STA.ZP :zpgbit)
+  (if-bit :zpgbit
+	  (progn
+	    (LDA 4)
+	    (CLC)
+	    (ADC 1))
+	  (LDA 55)))
 
-(test-ifbit nil 5 (nifbit :bit (LDA 5)))
-(test-ifbit t 42 (nifbit :bit (LDA 5)))
-(test-ifbit nil 5 (nifbit :bit (LDA 5) (LDA 6)))
-(test-ifbit t 6 (nifbit :bit (LDA 5) (LDA 6)))
+(test-if-bit nil 5 (if-not-bit :bit (LDA 5)))
+(test-if-bit t 42 (if-not-bit :bit (LDA 5)))
+(test-if-bit nil 5 (if-not-bit :bit (LDA 5) (LDA 6)))
+(test-if-bit t 6 (if-not-bit :bit (LDA 5) (LDA 6)))
 
 ;; test if-in-place
 
@@ -362,12 +355,12 @@
 ;; Single clause
 
 (test-if-in-place 1 (if-in-place "KEY" :crack (LDX 1)))
-(test-if-in-place 42 (if-in-place "KEY" :elsewhere (LDX 1)))
+(test-if-in-place 42 (if-in-place "KEY" :nowhere (LDX 1)))
 (test-if-in-place 42 (if-in-place "KEY" :inventory (LDX 1)))
 (test-if-in-place 42 (if-in-place "KEY" :mountain (LDX 1)))
 
 (test-if-in-place 42 (if-in-place "HORSE" :crack (LDX 1)))
-(test-if-in-place 42 (if-in-place "HORSE" :elsewhere (LDX 1)))
+(test-if-in-place 42 (if-in-place "HORSE" :nowhere (LDX 1)))
 (test-if-in-place 42 (if-in-place "HORSE" :inventory (LDX 1)))
 (test-if-in-place 1 (if-in-place "HORSE" :mountain (LDX 1)))
 
@@ -379,12 +372,12 @@
 
 (assert (= #xB0 (peek-byte (resolve :then-end)))) ;;BCS optimization
 
-(test-if-in-place 2 (if-in-place "KEY" :elsewhere (LDX 1) (LDX 2)))
+(test-if-in-place 2 (if-in-place "KEY" :nowhere (LDX 1) (LDX 2)))
 (test-if-in-place 2 (if-in-place "KEY" :inventory (LDX 1) (LDX 2)))
 (test-if-in-place 2 (if-in-place "KEY" :mountain (LDX 1) (LDX 2)))
 
 (test-if-in-place 2 (if-in-place "HORSE" :crack (LDX 1) (LDX 2)))
-(test-if-in-place 2 (if-in-place "HORSE" :elsewhere (LDX 1) (LDX 2)))
+(test-if-in-place 2 (if-in-place "HORSE" :nowhere (LDX 1) (LDX 2)))
 (test-if-in-place 2 (if-in-place "HORSE" :inventory (LDX 1) (LDX 2)))
 (test-if-in-place 1 (if-in-place "HORSE" :mountain (LDX 1) (LDX 2)))
 
@@ -394,7 +387,7 @@
 
 (assert (= #x4C (peek-byte (resolve :then-end)))) ;;Uses JMP
 
-(test-if-in-place 2 (if-in-place "HORSE" :elsewhere (progn (CLC) (LDX 1)) (LDX 2)))
+(test-if-in-place 2 (if-in-place "HORSE" :nowhere (progn (CLC) (LDX 1)) (LDX 2)))
 (test-if-in-place 2 (if-in-place "HORSE" :inventory (progn (CLC) (LDX 1)) (LDX 2)))
 (test-if-in-place 1 (if-in-place "HORSE" :mountain (progn (CLC) (LDX 1)) (LDX 2)))
 

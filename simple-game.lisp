@@ -12,13 +12,14 @@
 
 ;;todo what happens e.g. EXAMINE DOOR WINDOW
 ;;TODO CHECK THAT ALL STATEBITS HAVE BOTH A READ AND A WRITE
+;;TODO CHECK THAT PLACES HAVE BOTH A SET-USE AND AN IF-USE
 
 (defun synonyms ()
   (defword :TAKE :GET :PICK :GRAB)
   (defword :LICK :EAT :TASTE)
   (defword :SLIME :OOZE)
   (defword :EXIT :OUT :GO)
-  (defword :ATTACK :KILL :HIT :CLEAVE :PUNCH))
+  (defword :ATTACK :KILL :HIT :CLEAVE :PUNCH :BANG))
 
 (defun dungeon-cell ()
   (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/exploratory/images/cell.bmp"
@@ -27,23 +28,22 @@
 
     (defbits t :door-locked)
 
-    (defobject "SHINY KEY" "It's a key, man." :initial-place :crack)
-    ;;(defobject "GOBLIN SLOP" "A balanced soup of entrails, small amphibians and mandibles. Ooh! Garlic croutons!" :initial-place :elsewhere)
+    (defobject "SHINY KEY" "It's a key, man." :initial-place :nowhere)
+    (defobject "INEDIBLE SLOP" "A balanced soup of entrails, small amphibians and mandibles. Ooh! Garlic croutons!" :name-override "Some inedible slop." :initial-place :nowhere)
 
-    (if-in-place "SHINY KEY" :crack
+    (if-in-place "SHINY KEY" :nowhere
 		 (respond "They seem to be staring at the floor."))
     
     (action '(EXAMINE SLIME)
       (setbit :slime-examined)
       (respond "Millions of eyes peer out from the slime.")
-      (if-in-place "SHINY KEY" :crack
-		 (respond "They seem to be staring at the floor.")))
+      (if-in-place "SHINY KEY" :nowhere
+		   (respond "They seem to be staring at the floor.")))
     
     (action '(EXAMINE EYES)
-      (ifbit :slime-examined
-	     
-	       (respond "The eyes are deep and sorrowful. Eyes that have seen things best left unseen.")
-	       (respond "Your eyes are fine... though you are pretty sure someone, or something is looking at you.")))
+      (if-bit :slime-examined
+	     (respond "The eyes are deep and sorrowful. Eyes that have seen things best left unseen.")
+	     (respond "Your eyes are fine... though you are pretty sure someone, or something is looking at you.")))
 
     (action '(EXAMINE WALL)
       (respond "The wall oozes with a repellant green slime."
@@ -51,12 +51,12 @@
     
     (action '(EXAMINE FLOOR)
       (respond "There is a crack in the floor.")
-      (if-in-place "SHINY KEY" :crack
+      (if-in-place "SHINY KEY" :nowhere
 		   (respond "Perhaps it bears further examination?")))
 
     (action '(EXAMINE CRACK)
-      (ifbit :slime-licked
-	     (if-in-place "SHINY KEY" :crack
+      (if-bit :slime-licked
+	     (if-in-place "SHINY KEY" :nowhere
 			  (progn
 			    (respond "A glint of metal shines back at you..."
 				     "A key!")
@@ -69,40 +69,51 @@
 	       (setbit :maya))))
 
     (action '((EXAMINE VEIL) (EXAMINE MAYA))
-      (ifbit :maya
+      (if-bit :maya
 	     (respond "Many believe Maya casts her net of illusion over the world
 preventing closed-minded mortals from seeing what is really there.")
 	     (respond *whatyoutalkingabout*)))
 
     (action '(TAKE KEY)
-      (if-in-place "SHINY KEY" :crack
+      (if-in-place "SHINY KEY" :nowhere
 		   (respond "What key? Do you know something I don't?")
 		   (delegate-action)))
     
     (action '(EXAMINE DOOR)
       (respond "The door is solid wood with a tiny barred window and a keyhole.") 
-      (ifbit :door-open
+      (if-bit :door-open
 	     (respond "The door is open.")
 	     (respond "The door is closed.")))
     
-    (action '(EXAMINE WINDOW)
-      (nifbit :door-open
-	      (progn
-		(respond "A goblin appears at the window.")
-		(nifbit :slop-flung
-			(progn
-			  (setbit :slop-flung)
-			  (respond "He flings some inedible slop through the bars. You hear a key rattling in the lock."))
-			(respond "He tells you to keep the noise down using a stream of vowel-free goblin profanities. KRRPP KRRPP FNRGL!")))))
+    (action '((EXAMINE WINDOW) (BANG DOOR) (BANG WINDOW))
+      (if-not-bit :door-open
+		  (progn
+		    (respond "A goblin appears at the window.")
+		    (if-in-place "INEDIBLE SLOP" :nowhere
+				 (progn
+				   (move-object "INEDIBLE SLOP" *current-location*)
+				   (respond "He flings some inedible slop through the bars. You hear a key rattling in the lock."))
+				 (respond "He tells you to keep the noise down using a stream of vowel-free goblin profanities. KRRPP KRRPP FNRGL!")))))
     
-    (action '(EAT FOOD)
-      (ifbit :slop-flung
-	     (respond "I would hardly call the goblin's slop food.")))
+    ;;put object verbs in the generic section
+    ;;unless the action can only occur in a particular place
+    (with-location :generic
+      (action '(EAT SLOP)
+	(JSR :find-object-index-from-input)
+	(BCS :duplicate-found)
+	(BEQ :not-found)
+	
+	(respond *thegodslookaway*)
 
-    (action '(EAT SLOP)
-      (ifbit :slop-flung
-	     (respond *thegodslookaway*)))
-
+	(move-object "INEDIBLE SLOP" :nowhere)
+	
+	(RTS)
+	(label :not-found)
+	(respond "I don't see that.")
+	(RTS)
+	(label :duplicate-found)
+	(respond *be-more-specific*)))
+    
     (action '(EXAMINE KEYHOLE) (respond "It's a keyhole, man."))
 
     (action '(TAKE CRACK) (respond "Inadvisable."))
@@ -112,32 +123,32 @@ preventing closed-minded mortals from seeing what is really there.")
     (action '(ATTACK SLIME) (respond "Your hand is stayed by the slime's gaze of infinite sadness."))
 
     (action '(UNLOCK DOOR FINGER)
-      (ifbit :door-locked
+      (if-bit :door-locked
 	     (progn
 	       (respond "Wise guy, eh? The lock doesn't budge. Your finger is now sore.")
 	       (respond *snickering*))
 	     (respond "You put your finger in the keyhole of an unlocked door.")))
     
     (action '((UNLOCK DOOR) (USE KEY DOOR))
-      (ifbit :door-locked
+      (if-bit :door-locked
 	     (if-in-place "SHINY KEY" :inventory
-		    (ifbit :slop-flung
-			   (progn
-			     (clrbit :door-locked)
-			     (respond "The lock mechanism clicks..."))
-			   (respond "You rattle the key in the lock, but there is something stuck in the other side."))
-		    (respond "With what? Your finger?"))
+			  (if-bit :slop-flung
+				 (progn
+				   (clrbit :door-locked)
+				   (respond "The lock mechanism clicks..."))
+				 (respond "You rattle the key in the lock, but there is something stuck in the other side."))
+			  (respond "With what? Your finger?"))
 	     (respond "The door is already unlocked.")))
     
     (action '(CLOSE DOOR)
-      (ifbit :door-open
+      (if-bit :door-open
 	     (progn
 	       (clrbit :door-open)
 	       (respond "The door closes.")
 	       (respond *thegodslookaway*))))
 
     (action '(LOCK DOOR)
-      (ifbit :door-locked
+      (if-bit :door-locked
 	     (respond "The door is already locked.")
 	     (progn
 	       (setbit :door-locked)
@@ -145,32 +156,32 @@ preventing closed-minded mortals from seeing what is really there.")
 	       (respond "The lock mechanism clicks shut. You really have got it in for yourself haven't you?"))))
     
     (action '((EXIT) (USE DOOR))
-      (ifbit :door-open
+      (if-bit :door-open
 	     (navigate :corridor)
 	     (progn
 	       (respond "Ouch! You walk into the closed door.")
 	       (respond *snickering*))))
 
     (action '(LICK SLIME)
-      (nifbit :slime-licked
-	      (progn
-		(setbit :slime-licked)
-		(respond *far-out*)
-		(respond "Myriad colours break in waves upon your ears. Maya's cosmic tears rain down on you in a shower of gold. The slime smiles."))
-	      (respond "Nothing happens. Your third eye is already open."
-		       "But... you do feel a strange urge to grow a beard and play the guitar.")))
+      (if-not-bit :slime-licked
+		  (progn
+		    (setbit :slime-licked)
+		    (respond *far-out*)
+		    (respond "Myriad colours break in waves upon your ears. Maya's cosmic tears rain down on you in a shower of gold. The slime smiles."))
+		  (respond "Nothing happens. Your third eye is already open."
+			   "But... you do feel a strange urge to grow a beard and play the guitar.")))
 
     (action '(OPEN DOOR)
-      (ifbit :door-open
+      (if-bit :door-open
 	     (respond "The door is already open.")
-	     (ifbit :door-locked
-		    (if-in-place "SHINY KEY" :crack
+	     (if-bit :door-locked
+		    (if-in-place "SHINY KEY" :nowhere
 				 ;;give them a clue, if they haven't already
 				 ;;found the key
 				 (respond
-			     "Have you been licking the slime? It's hallucinogenic."
-			     "The door, not unusually for a dungeon, is locked.")
-			    (respond "The door is locked."))
+				  "Have you been licking the slime? It's hallucinogenic."
+				  "The door, not unusually for a dungeon, is locked.")
+				 (respond "The door is locked."))
 		    (progn
 		      (respond *far-out*)
 		      (respond "The door creaks open.")
@@ -190,7 +201,7 @@ preventing closed-minded mortals from seeing what is really there.")
 	(setbit :torch-carried)
 	(respond "You take one of the torches.")))
     (action '((CHEEZOWS) (PACKET))
-      (ifbit :torches-examined
+      (if-bit :torches-examined
 	     (respond "There are no Cheezows! It was a metaphor for your situation.")
 	     (respond "What a strange thing to say.")))
     (action '(EXAMINE METAPHOR)
@@ -202,13 +213,13 @@ preventing closed-minded mortals from seeing what is really there.")
     (action '(ENTER CELL)
       (respond "You enter your cell."))
     (action '(ENTER GREEN DOOR)
-      (ifbit :green-door-open
+      (if-bit :green-door-open
 	     (navigate :frazbolgs-closet)
 	     (respond "The green door is closed.")))
     (action '(ENTER CELL DOOR)
       (navigate :dungeon-cell))
     (action '(EXAMINE WALL)
-      (ifbit :torch-carried
+      (if-bit :torch-carried
 	     (progn
 	       (respond *far-out*)
 	       (respond "Etched on the wall is a diagram. A triangle sits inside a circle, surrounded by flames. A spell perhaps?"))
@@ -218,7 +229,7 @@ preventing closed-minded mortals from seeing what is really there.")
     (action '(EXAMINE GREEN DOOR)
       (respond "You hear mumbling and sighing from behind the door."))
     (action '(KNOCK GREEN DOOR)
-      (ifbit :green-door-open
+      (if-bit :green-door-open
 	     (respond "Politely, you knock on the already open green door, but there is no answer.")
 	     (progn
 	       (setbit :green-door-open)

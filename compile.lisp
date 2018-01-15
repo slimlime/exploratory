@@ -437,7 +437,7 @@
 (defun dump-aliases ()
   (maphash #'(lambda (k v) (format t "~a -> ~a~%" (fmt-label k t) v)) *compiler-aliases*))
 
-(defun dump-labels (&key (namespace nil namespace-p))  
+(defun dump-labels (&optional (namespace nil namespace-p))  
   (maphash #'(lambda (k v)
 	       (when (or (not namespace-p)
 			 (equal (label-namespace k)

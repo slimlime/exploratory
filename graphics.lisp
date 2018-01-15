@@ -262,10 +262,21 @@
 (defun live-row (i)
   (+ 3 (* (+ i 13) *line-height*)))
 
+
+;;; TODO
+;;; The control flow and size of the code here is a bit rubbish
+;;; the memcpy, memset and sta16 could be worked out from a table
+;;; rather than the entire function being instantiated 3 times
+
 (defun inline-scroll (lines)
   (label (cons :print-message lines))
-  ;;this expands into a lot of boring code
-  ;;which should be in a subroutine!
+
+  (JSR :deref-w)
+  (STX.ZP (lo-add '(:typeset-cs . :str)))
+  (STA.ZP (hi-add '(:typeset-cs . :str)))
+
+  (label (cons :print-message-no-deref lines))
+  
   (call-memcpy (scradd (live-row lines) 0)
 	       (scradd (live-row 0) 0)
 	       (* (- 4 lines) +screen-width-bytes+ *line-height*))
@@ -288,24 +299,21 @@
   (inline-scroll 1)
 
   ;; this entry point expects the number of lines, 1, 2 or 3
-  ;; to be in A
+  ;; to be in A. The address of the string to be printed should
+  ;; be in '(:typeset-cs . :str)
   
   (label :print-message)
+  
   (CMP 2)
-  (BEQ '(:print-message . 2))
+  (BEQ '(:print-message-no-deref . 2))
   (CMP 1)
-  (BEQ '(:print-message . 1))
+  (BEQ '(:print-message-no-deref . 1))
   (dc "Must be a three line message")
-  (JMP '(:print-message . 3))
+  (JMP '(:print-message-no-deref . 3))
   
   (with-namespace :print-message
     (label :print)
     (alias :str '(:typeset-cs . :str))
-
-    (JSR :deref-w)
-    (STX.ZP (lo-add :str))
-    (STA.ZP (hi-add :str))
-
     (sta16.zp :prompt '(:typeset . :char))
     (cpy16.zp '(:typeset . :raster) '(:typeset-cs . :tmp-raster))
     (LDA 0)

@@ -116,25 +116,6 @@ preventing closed-minded mortals from seeing what is really there.")
 				   (respond "He flings some inedible slop through the bars. You hear a key rattling in the lock."))
 				 (respond "He tells you to keep the noise down using a stream of vowel-free goblin profanities. KRRPP KRRPP FNRGL!")))))
     
-    ;;put object verbs in the generic section
-    ;;unless the action can only occur in a particular place
-    (with-location :generic
-      (action '(EAT SLOP)
-	(JSR :find-object-index-from-input)
-	(BCS :duplicate-found)
-	(BEQ :not-found)
-	
-	(respond *thegodslookaway*)
-
-	(move-object "INEDIBLE SLOP" :nowhere)
-	
-	(RTS)
-	(label :not-found)
-	(respond "I don't see that.")
-	(RTS)
-	(label :duplicate-found)
-	(respond *be-more-specific*)))
-    
     (action '(EXAMINE KEYHOLE) (respond "It's a keyhole, man."))
 
     (action '(TAKE CRACK) (respond "Inadvisable."))

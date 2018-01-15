@@ -118,9 +118,8 @@
 					   id))
 				     words)
 			     ;;rts jump requires address offset by one
-			     (let ((rts-jmp-handler (1- (resolve handler))))
-			       (list (hi rts-jmp-handler)
-				     (lo rts-jmp-handler)))))))
+			     (list (rts-jmp-hi handler)
+				   (rts-jmp-lo handler))))))
 	 (dc (format nil "Terminating byte for ~a" location))
 	 (db nil 0))
     *handlers*)))

@@ -338,6 +338,18 @@
     (dc (format nil "LO : ~a" (fmt-label addr t)) t))
   (logand #xFF (resolve addr)))
 
+(defun rts-jmp-hi (addr)
+  "Return the high byte of an address"
+  (unless (numberp addr)
+    (dc (format nil "RTS-JMP-HI : ~a" (fmt-label addr t)) t))
+  (ash (1- (resolve addr)) -8))
+
+(defun rts-jmp-lo (addr)
+  "Return the lo byte of an address"
+  (unless (numberp addr)
+    (dc (format nil "RTS-JMP-LO : ~a" (fmt-label addr t)) t))
+  (logand #xFF (1- (resolve addr))))
+
 (defun lo-add (addr)
   "Return the address of the lo byte, aka the address itself"
   (unless (numberp addr)

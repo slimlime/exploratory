@@ -29,7 +29,7 @@
 
 (defun inc16.zp (label)
   "Increment a zero-page word"
-  (with-local-namespace "inc16.zp"
+  (with-local-namespace
     (INC.ZP (lo-add label))
     (BNE :inc16-done)
     (INC.ZP (hi-add label))
@@ -44,8 +44,6 @@
   (LDA.ZP (hi-add zp))
   (SBC (hi value))
   (STA.ZP (hi-add zp)))
-
-
 
 (defun sbc16.zp (value zp)
   "Subtract a 16 bit value from a zero-page word without setting the carry first"
@@ -65,6 +63,16 @@
   (ADC (hi value))
   (STA.ZP (hi-add zp)))
 
+(defun add16a.zp (zp)
+  "16 bit add accumulator to zero page"
+  (with-local-namespace
+    (CLC)
+    (ADC.ZP (lo-add zp))
+    (STA.ZP (lo-add zp))
+    (BCC :no-carry)
+    (INC.ZP (hi-add zp))
+    (label :no-carry)))
+  
 (defun cpy16.zp (from to)
   "Copy a zero page word to another using A"
   (LDA.ZP (lo-add from))
@@ -314,7 +322,32 @@
   (let ((buf (monitor-buffer)))
     (assert (= (+ (aref buf (lo-add :word))
 		 (* 256 (aref buf (hi-add :word))))
-	    (1+ v)))))
+	       (1+ v)))))
+
+(defun test-add16a (v a)
+  (reset-compiler)
+
+  (flet ((src ()
+	   (org #x600)
+	   (zp-w :word)
+	   (label :start)
+	   (sta16.zp v :word)
+	   (LDA a)
+	   (add16a.zp :word)
+	   (label :end)
+	   (BRK)))
+    (reset-compiler)
+    (src)
+    (setf *compiler-final-pass* t)
+    (src))
+  
+  (monitor-reset #x600)
+  (monitor-run :print nil)
+
+  (let ((buf (monitor-buffer)))
+    (assert (= (+ (aref buf (lo-add :word))
+		 (* 256 (aref buf (hi-add :word))))
+	    (+ v a)))))
 
 (defun test-nested-namespace ()
   ;; this should just not generate a failed to
@@ -335,4 +368,17 @@
     (src)))
 
 (test-nested-namespace)
+
+(test-add16a 255 1)
+(test-add16a 255 255)
+(test-add16a 255 0)
+(test-add16a 256 0)
+(test-add16a 256 1)
+(test-add16a 256 255)
+(test-add16a 1 255)
+
+(test-inc16 255)
+(test-inc16 0)
+(test-inc16 1)
+
 

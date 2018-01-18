@@ -1,10 +1,8 @@
-;; Here are the functions which will be used to declare the game data
-;; TODO the S flag optimization in the bit check doesn't really work
-;; as almost everything affects the S flag.
-
 (defparameter *bits* nil)
+(defparameter *bit->index* nil)
 
 (defun reset-bits ()
+  (setf *bit->index* (make-hash-table :test 'equal))
   (setf *bits* (make-hash-table :test 'equal)))
 
 (defun defbit (bit &key (initially-set :not-specified initially-set-supplied-p)
@@ -22,23 +20,56 @@
 		    (format nil "Bit ~a was previously defined to be initially ~a, redefined to be ~a" bit previous-state initially-set))))
 	(setf (gethash (cons namespace bit) *bits*) initially-set))))
 
+(defun dump-bits ()
+  (maphash #'(lambda (k v)
+	       (if (consp k)
+		   (format t "~a ~a:~a~%" v (car k) (cdr k))
+		   (format t "~a ~a~%" v k)))
+	   *bit->index*))
+
+(defun bit-index (bit)
+  (unless (consp bit)
+    (setf bit (cons *current-location* bit)))
+  (aif (gethash bit *bit->index*)
+       it
+       (progn
+	 (when *compiler-final-pass*
+	   (assert it nil "Bit ~a was not found in bit table" bit))
+	 0)))
+
+;;Bit packed table
 (defun bit-table ()
   (let ((bits nil))
     (maphash #'(lambda (bit initially-set)
 		 (push (list
-			(format nil "~a" (if (consp (car bit)) ""))
 			bit
-			(if (eq initially-set :not-specified) nil initially-set))
+			(if (eq initially-set :not-specified) nil initially-set)
+			(format nil "~a:~a" (car bit) (cdr bit)))
 		       bits))
 	     *bits*)
-    (let ((ns nil))
-      (game-state-bits "Bit Table"
-	(dolist (bit (sort bits #'string< :key #'car))
-	  (when (not (equal ns (first bit)))
-	    (setf ns (first bit))
-	    (dc (format nil "Bits for ~a" ns)))
-	  (zp-b (second bit) (if (third bit) #xff #x00)))))))
-
+    (let ((count 0)
+	  (mask 1)
+	  (byte 0)
+	  (comment nil))
+      (game-state-bytes "Bit Table" 
+	(label :bit-table)
+	(dolist (bit (sort bits #'string< :key #'third))
+	  (when (second bit)
+	    (setf byte (logior mask byte)))
+	  (push (format nil "~a=~a" count (first bit)) comment)
+	  (setf (gethash (first bit) *bit->index*) count)
+	  (incf count)
+	  (setf mask (* 2 mask))
+	  (when (= mask 256)
+	    (dc (format nil "~a" comment) t)
+	    (db nil byte)
+	    (setf byte 0)
+	    (setf mask 1)
+	    (setf comment nil)))
+	(when (/= mask 0)
+	  (dc (format nil "~a" comment) t)
+	  (db nil byte))))))
+	  
 (defun defbits (initially-set &rest bits)
   (dolist (bit bits)
     (defbit bit :initially-set initially-set)))
@@ -46,13 +77,17 @@
 (defun setbit (bit &optional (set t))
   (defbit bit)
   (if set
-      (progn
-	(SEC) ;;set bit 7
-	(ROR.* bit))
-      (LSR.* bit))) ;;clear bit 7
+      (vm-set bit)
+      (vm-clr bit)))
 
 (defun clrbit (bit)
-  (setbit bit nil))
+  (defbit bit)
+  (vm-clr bit))
+
+(defun move-object (object place)
+  "Set the place of the object to be a new place"
+  (defplace place)
+  (vm-mov object place))
 
 (defun set-act (font colour)
   (setf *act-font* font)
@@ -64,38 +99,25 @@
        (with-namespace *current-location*
 	 ,@body))))
 
-(defun generic-if (condition then-branch else-branch then else)
+(defun if-bit-fn (bit then else)
+  (defbit bit)
   (let ((namespace *compiler-label-namespace*))
-    (funcall condition)
     (with-local-namespace
       (if then
 	  (progn
-	    (funcall then-branch (if else :else :endif))
+	    (vm-bclr bit (if else :else :end-if))
 	    (with-namespace namespace
 	      (funcall then))
 	    (when else
-		(JMP :endif)
-		(label :else)))
+	      (vm-bra :end-if)))
 	  (progn
-	    (assert else nil "At least one clause must be specified")
-	    (funcall else-branch :endif)))
+	    (assert else nil "Must have at least one clause")
+	    (vm-bset bit :end-if)))
       (when else
+	(when then (label :else))
 	(with-namespace namespace
 	  (funcall else)))
-      (label :endif))))
-
-(defun if-bit-fn (bit then else)
-  (defbit bit)
-  (dc (format nil "~a ~a" (if then "IF" "IF NOT") bit) t)
-  (generic-if #'(lambda () (BIT.* bit)) #'BPL #'BMI then else))
-
-(defun if-in-place-fn (object-name place then else)
-  (defplace place)
-  (dc (format nil "~a ~a IN ~a" (if then "IF" "IF NOT") object-name place) t)
-  (generic-if #'(lambda ()
-		  (LDA.AB (object-place-address object-name) (format nil "~a place" object-name))
-		  (CMP (place-id place) (format nil "~a" place)))
-	      #'BNE #'BEQ then else))
+      (label :end-if))))
 
 (defmacro if-bit (bit then &optional (else nil else-supplied-p))
   `(if-bit-fn ,bit
@@ -107,10 +129,33 @@
 	      #'(lambda () ,@then)
 	      nil))
 
+(defmacro unless-bit (bit &body then)
+  `(if-bit-fn ,bit
+	      nil
+	      #'(lambda () ,@then)))
+
 (defmacro if-not-bit (bit then &optional (else nil else-supplied-p))
   `(if-bit-fn ,bit
 	     (if ,else-supplied-p #'(lambda () ,else) nil)
 	     #'(lambda () ,then)))
+
+;;; Can be refactored with the if bit- the difference is the vm-ops
+(defun if-in-place-fn (object place then else)
+  (let ((namespace *compiler-label-namespace*))
+    (with-local-namespace
+      (if then
+	  (progn
+	    (vm-boop object place (if else :else :end-if))
+	    (with-namespace namespace
+	      (funcall then)))
+	  (progn
+	    (assert else nil "Must have at least one clause")
+	    (vm-boip object place :end-if)))
+      (when else
+	(when then (label :else))
+	(with-namespace namespace
+	  (funcall else)))
+      (label :end-if))))
 
 (defmacro if-in-place (object-name place then &optional (else nil else-supplied-p))
   `(if-in-place-fn ,object-name ,place
@@ -134,13 +179,18 @@
 	  (justify-with-image (format nil "~a~{~%~a~}" message messages)
 			      5 4 *act-font*))
 	 (lines (1+ (count #\Newline text))))
+
     (assert (<= lines 3) nil
-	    (format nil "Response would have more than 3 lines~%~a"
-		    text))
-    
-    (JSR (cons :print-message lines))
-    (dc (format nil "~a" text) t)
-    (dw nil (dstr text))))
+	    (format nil "Response would have more than 3 lines~%~a" text))
+
+    (let ((str (dstr text)))
+	  (case lines
+	    (1 (vm-pr1 str))
+	    (2 (vm-pr2 str))
+	    (3 (vm-pr3 str))))))
+
+(defun navigate (location)
+  (vm-nav location))
 
 ;;define a action handler for a sentence
 (defun words2label (words)
@@ -160,229 +210,7 @@
       (label label *current-location*)))
   (funcall fn)
   (label :rts)
-  (RTS))
+  (vm-rts))
 
 (defmacro action (words &body body)
   `(action-fn ,words #'(lambda () ,@body)))
-
-(defun test-if-bit-fn (is-set expected test-fn)
-
-  (reset-compiler)
-
-  (reset-bits)
-  
-  (flet ((src ()
-	   (org #x600)
-
-	   (JSR :start)
-	   (JMP :finish)
-	   
-	   (label :start)	   
-
-	   (LDA 42)
-
-	   (funcall test-fn)
-
-	   (label :finish)
-	   
-	   (STA.AB :output)
-	   
-	   (BRK)
-	   
-	   (db :bit (if is-set #xff 0))
-	   (db :output 0)
-	   
-	   (label :end)
-	   
-	   ))
-    (reset-compiler)
-    (src)
-    (setf *compiler-final-pass* t)
-    (src))
-
-  ;;(disassemble-6502 :start :end)
-  
-  (monitor-reset #x600)
-  (monitor-run :print nil)
-
-  (let ((buf (monitor-buffer)))
-    (assert (= (aref buf (resolve :output)) expected))))
-
-(defmacro test-if-bit (is-set expected &body body)
-  `(test-if-bit-fn ,is-set ,expected #'(lambda () ,@body)))
-
-(test-if-bit t 5 (if-bit :bit (LDA 5) (LDA 6)))
-(test-if-bit nil 6 (if-bit :bit (LDA 5) (LDA 6)))
-(test-if-bit t 5	(if-bit :bit (LDA 5)))
-(test-if-bit nil 42 (if-bit :bit (LDA 5)))
-
-;;true, has return
-
-(test-if-bit t 5	(if-bit :bit
-				(progn (LDA 5)
-				       (RTS))
-				(progn (LDA 6)
-				       (RTS))))
-
-;;false, has return
-
-(test-if-bit nil 6 (if-bit :bit
-			   (progn (LDA 5)
-				  (RTS))
-			   (progn (LDA 6)
-				  (RTS))))
-
-;;test zpg true / false, note override of parameter zpgbit
-
-(test-if-bit nil 5
-  (zp-b :zpgbit)
-  (LDA #xFF)
-  (STA.ZP :zpgbit)
-  (if-bit :zpgbit
-	  (progn
-	    (LDA 4)
-	    (CLC)
-	    (ADC 1))
-	  (LDA 55)))
-
-(test-if-bit nil 55
-  (zp-b :zpgbit)
-  (LDA.ZP #x00)
-  (STA.ZP :zpgbit)
-  (if-bit :zpgbit
-	  (progn
-	    (LDA 4)
-	    (CLC)
-	    (ADC 1))
-	  (LDA 55)))
-
-(test-if-bit nil 5 (if-not-bit :bit (LDA 5)))
-(test-if-bit t 42 (if-not-bit :bit (LDA 5)))
-(test-if-bit nil 5 (if-not-bit :bit (LDA 5) (LDA 6)))
-(test-if-bit t 6 (if-not-bit :bit (LDA 5) (LDA 6)))
-
-;; test if-in-place
-
-(defun reset-test-data ()
-
-  (reset-compiler)
-  (reset-symbol-table)
-  (reset-bits)
-  (reset-parser)
-  (reset-object-model)
-
-  (defplace :crack)
-  (defplace :mountain)
-  
-  (defobject "KEY" "Some key or other" :initial-place :crack)
-  (defobject "HORSE" "Deer" :initial-place :mountain))
-
-(defun test-if-in-place-fn (expected test-fn)
-
-  (reset-test-data)
-  
-  (flet ((src ()
-
-	   (zeropage)
-	   
-	   (org #x600)
-
-	   (JSR :start)   
-	   (JMP :finish)   ;;clause can terminate with RTS, and
-	    ;;will go through same path as if it hadn't
-	      
-	   (label :start)
-
-	   (LDX 42)
-
-	   (funcall test-fn)
-
-	   (label :finish)
-	   (STX.AB :output)
-	      
-	   (BRK)
-	   
-	   (db :output 0)
-
-	   (object-table)
-	   (string-table)
-	   
-	   (label :end)))
-    (reset-compiler)
-    (src)
-    (build-symbol-table)
-    ;;TODO This is BORING
-    (setf *word-table-built* t)
-    (src)
-    (setf *compiler-final-pass* t)
-    (src))
-
-  (monitor-reset #x600)
-  (monitor-run :print nil)
-
-  (let ((buf (monitor-buffer)))
-    (assert (= (aref buf (resolve :output)) expected))))
-
-(defmacro test-if-in-place (expected &body body)
-  `(test-if-in-place-fn ,expected (lambda () ,@body)))
-
-(reset-test-data)
-
-;;Relying on X not being modified by the executed code
-
-;; Single clause
-
-(test-if-in-place 1 (if-in-place "KEY" :crack (LDX 1)))
-(test-if-in-place 42 (if-in-place "KEY" :nowhere (LDX 1)))
-(test-if-in-place 42 (if-in-place "KEY" :inventory (LDX 1)))
-(test-if-in-place 42 (if-in-place "KEY" :mountain (LDX 1)))
-
-(test-if-in-place 42 (if-in-place "HORSE" :crack (LDX 1)))
-(test-if-in-place 42 (if-in-place "HORSE" :nowhere (LDX 1)))
-(test-if-in-place 42 (if-in-place "HORSE" :inventory (LDX 1)))
-(test-if-in-place 1 (if-in-place "HORSE" :mountain (LDX 1)))
-
-(test-if-in-place 1 (if-in-place "KEY" :crack
-				 (progn (LDX 1) (label :then-end nil))
-				 (LDX 2)))
-
-;; Dual clause
-
-;; This optimization disabled					;
-;; (assert (= #xB0 (peek-byte (resolve :then-end)))) ;;BCS optimization
-
-
-(test-if-in-place 2 (if-in-place "KEY" :nowhere (LDX 1) (LDX 2)))
-(test-if-in-place 2 (if-in-place "KEY" :inventory (LDX 1) (LDX 2)))
-(test-if-in-place 2 (if-in-place "KEY" :mountain (LDX 1) (LDX 2)))
-
-(test-if-in-place 2 (if-in-place "HORSE" :crack (LDX 1) (LDX 2)))
-(test-if-in-place 2 (if-in-place "HORSE" :nowhere (LDX 1) (LDX 2)))
-(test-if-in-place 2 (if-in-place "HORSE" :inventory (LDX 1) (LDX 2)))
-(test-if-in-place 1 (if-in-place "HORSE" :mountain (LDX 1) (LDX 2)))
-
-(test-if-in-place 2 (if-in-place "HORSE" :crack
-		      (progn (CLC) (LDX 1) (label :then-end nil))
-		      (LDX 2)))
-
-;;(assert (= #x4C (peek-byte (resolve :then-end)))) ;;Uses JMP
-
-(test-if-in-place 2 (if-in-place "HORSE" :nowhere (progn (CLC) (LDX 1)) (LDX 2)))
-(test-if-in-place 2 (if-in-place "HORSE" :inventory (progn (CLC) (LDX 1)) (LDX 2)))
-(test-if-in-place 1 (if-in-place "HORSE" :mountain (progn (CLC) (LDX 1)) (LDX 2)))
-
-;; Return in true clause
-
-(test-if-in-place 2 (if-in-place "HORSE" :crack
-		      (progn (LDX 1) (RTS) (label :then-end nil))
-		      (LDX 2)))
-
-;; All branching optimizations disabled due to incorrect assumptions.
-
-;;(assert (= #xA2 (peek-byte (resolve :then-end)))) ;;Goes straight to LDX- no jump
-
-(test-if-in-place 1 (if-in-place "HORSE" :mountain
-		      (progn (LDX 1) (RTS) (label :then-end nil))
-		      (LDX 2)))
-
-;;(assert (= #xA2 (peek-byte (resolve :then-end)))) ;;Goes straight to LDX- no jump

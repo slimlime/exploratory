@@ -44,6 +44,7 @@
 (defmacro game-state-bytes (name &body body)
   `(game-state-fn ,name nil #'(lambda () ,@body)))
 
+;; NOT CLEAR IF THIS IS NECESSARY!!
 (defmacro game-state-bits (name &body body)
   `(game-state-fn ,name t #'(lambda () ,@body)))
 

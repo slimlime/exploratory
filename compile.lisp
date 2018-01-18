@@ -171,11 +171,14 @@
 	   (terpri)))
   (values)))
 
-(defun add-hint (size str)
+(defun add-hint-at (addr size str)
   (when *compiler-final-pass*
-    (setf (gethash *compiler-ptr*
+    (setf (gethash addr
 		   *compiler-disassembler-hints*)
 	  (cons size str))))
+
+(defun add-hint (size str)
+  (add-hint-at *compiler-ptr* size str))
 
 (defun assert-byte (byte)
   (assert (>= byte 0))
@@ -599,11 +602,26 @@
 		     i (aref buffer i))
 	     (if (and hint (numberp (car hint)))
 		 (progn
-					;render hint
-		   (incf i (1- (car hint)))
-		   ;;todo for smaller hints, whynot just dump the bytes rather
-		   ;;than just the first one
-		   (format t "..    ~a" (cdr hint)))
+		   ;;render hint
+		   (case (car hint)
+		     (1 (format t "       ~a" (cdr hint)))
+		     (2 (format t "~2,'0X     ~a"
+				(aref buffer i)
+				(cdr hint)))
+		     (3 (format t "~2,'0X~2,'0X   ~a"
+				(aref buffer i)
+				(aref buffer (+ i 1))
+				(cdr hint)))
+		     (4 (format t "~2,'0X~2,'0X~2,'0X ~a"
+				(aref buffer i)
+				(aref buffer (+ i 2))
+				(aref buffer (+ i 3))
+				(cdr hint)))
+		     (otherwise (format t "~2,'0X~2,'0X.. ~a"
+				(aref buffer i)
+				(aref buffer (+ i 2))
+				(cdr hint))))
+		   (incf i (1- (car hint))))
 					;else render opcodes
 		 (labels ((format-label (addr)
 			    (let ((label (gethash addr lab)))
@@ -618,21 +636,21 @@
 				    (format-cur-label)
 				    (incf i 2)))
 		   (case mode
-		     (:imm (format-1 "~2,'0X    ~a #$~2,'0X"))
+		     (:imm (format-1 "~2,'0X     ~a #$~2,'0X"))
 		     (:rel (let ((addr (rel-addr arg1 i)))
-			     (format t "~2,'0X    ~a $~4,'0X" arg1 op addr)
+			     (format t "~2,'0X     ~a $~4,'0X" arg1 op addr)
 			     (format-label addr))
 			   (incf i))
-		     (:imp (format t "      ~a" op))
-		     (:ab (format-2 "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X"))
-		     (:zp (format-1 "~2,'0X    ~a $~2,'0X"))
-		     (:ind (format-2 "~2,'0X~2,'0X  ~a ($~2,'0X~2,'0X)"))
-		     (:izx (format-1 "~2,'0X    ~a ($~2,'0X,X)"))
-		     (:izy (format-1 "~2,'0X    ~a ($~2,'0X),Y"))
-		     (:zpx (format-1 "~2,'0X    ~a $~2,'0X,X"))
-		     (:zpy (format-1 "~2,'0X    ~a $~2,'0X,Y"))
-		     (:aby (format-2 "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X,Y"))
-		     (:abx (format-2 "~2,'0X~2,'0X  ~a $~2,'0X~2,'0X,X")))))
+		     (:imp (format t "       ~a" op))
+		     (:ab (format-2 "~2,'0X~2,'0X   ~a $~2,'0X~2,'0X"))
+		     (:zp (format-1 "~2,'0X     ~a $~2,'0X"))
+		     (:ind (format-2 "~2,'0X~2,'0X   ~a ($~2,'0X~2,'0X)"))
+		     (:izx (format-1 "~2,'0X     ~a ($~2,'0X,X)"))
+		     (:izy (format-1 "~2,'0X     ~a ($~2,'0X),Y"))
+		     (:zpx (format-1 "~2,'0X     ~a $~2,'0X,X"))
+		     (:zpy (format-1 "~2,'0X     ~a $~2,'0X,Y"))
+		     (:aby (format-2 "~2,'0X~2,'0X   ~a $~2,'0X~2,'0X,Y"))
+		     (:abx (format-2 "~2,'0X~2,'0X   ~a $~2,'0X~2,'0X,X")))))
 	     (dolist (comment (reverse postfix-comments))
 	       (format t "~45,1T;~a" comment))
 	     (terpri))

@@ -1,3 +1,5 @@
+;;TODO rationalise the tests and make an automated build which calls them
+
 (defun zeropage ()
 
   ;; Scratch Area
@@ -63,6 +65,15 @@
   (ADC (hi value))
   (STA.ZP (hi-add zp)))
 
+(defun adc16a.zp (zp)
+  "16 bit add accumulator to zero page"
+  (with-local-namespace
+    (ADC.ZP (lo-add zp))
+    (STA.ZP (lo-add zp))
+    (BCC :no-carry)
+    (INC.ZP (hi-add zp))
+    (label :no-carry)))
+  
 (defun add16a.zp (zp)
   "16 bit add accumulator to zero page"
   (with-local-namespace
@@ -349,6 +360,34 @@
 		 (* 256 (aref buf (hi-add :word))))
 	    (+ v a)))))
 
+(defun test-adc16a (v a c)
+  (reset-compiler)
+
+  (flet ((src ()
+	   (org #x600)
+	   (zp-w :word)
+	   (label :start)
+	   (sta16.zp v :word)
+	   (LDA a)
+	   (if (= 1 c)
+	       (SEC)
+	       (CLC))
+	   (adc16a.zp :word)
+	   (label :end)
+	   (BRK)))
+    (reset-compiler)
+    (src)
+    (setf *compiler-final-pass* t)
+    (src))
+  
+  (monitor-reset #x600)
+  (monitor-run :print nil)
+
+  (let ((buf (monitor-buffer)))
+    (assert (= (+ (aref buf (lo-add :word))
+		 (* 256 (aref buf (hi-add :word))))
+	    (+ v a c)))))
+
 (defun test-nested-namespace ()
   ;; this should just not generate a failed to
   ;; resolve exception
@@ -376,6 +415,30 @@
 (test-add16a 256 1)
 (test-add16a 256 255)
 (test-add16a 1 255)
+
+(test-adc16a 255 1 0)
+(test-adc16a 255 255 0)
+(test-adc16a 255 0 0)
+(test-adc16a 256 0 0)
+(test-adc16a 256 1 0)
+(test-adc16a 256 255 0)
+(test-adc16a 1 255 0)
+
+(test-adc16a 255 1 1)
+(test-adc16a 255 255 1)
+(test-adc16a 255 0 1)
+(test-adc16a 256 0 1)
+(test-adc16a 256 1 1)
+(test-adc16a 256 255 1)
+(test-adc16a 1 255 1)
+
+(test-adc16a 254 1 1)
+(test-adc16a 254 255 1)
+(test-adc16a 254 0 1)
+(test-adc16a 256 0 1)
+(test-adc16a 256 1 1)
+(test-adc16a 256 254 1)
+(test-adc16a 1 254 1)
 
 (test-inc16 255)
 (test-inc16 0)

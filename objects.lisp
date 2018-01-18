@@ -304,12 +304,6 @@
   "Get the object place address"
   (+ -1 (resolve '(:object-table . :places)) (object-id name)))
 
-(defun move-object (name place)
-  "Set the place of the object to be a new place"
-  (defplace place)
-  (LDA (place-id place) (format nil "~a" place))
-  (STA.AB (object-place-address name) (format nil "~a" name)))
-
 ;;test finding object id
 
 (defun object-tester (name-id adj-id current-place)

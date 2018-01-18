@@ -60,12 +60,6 @@
 			 font)
 	       -3))))
 
-(defun navigate (location)
-  (JSR :navigate)
-  ;;note location here is the address of the location data
-  ;;not the place number
-  (dw nil location))
-
 (defun navigator ()
   
   (label :restore-game)
@@ -95,6 +89,7 @@
     (JSR :deref-w)
     (dc "Store the address of the current location")
     (dc "In the zeropage so we can use it")
+    (label :navigate-no-deref)
     (STX.ZP (lo-add :loc))
     (STA.ZP (hi-add :loc))
     (dc "And in main memory so we can save it")

@@ -7,7 +7,7 @@
   
 (defun generic-generic-handlers ()
   (with-location :generic
-    (action '(TAKE)
+    (custom-action '(TAKE)
       (with-namespace :take
 	(JSR :find-object-index-from-input)
 	(BCS :duplicate-found)
@@ -32,7 +32,7 @@
 	(label :not-found)
 	(respond "Take what?")))
     
-    (action '(DROP)
+    (custom-action '(DROP)
       (with-namespace :drop
 	(JSR :find-object-index-from-input)
 	(BCS :duplicate-found)
@@ -55,13 +55,13 @@
 
     (defword :INVENTORY :I)
 
-    (action '(LOOK)
+    (custom-action '(LOOK)
       (with-namespace :look
 	(respond "You take a look around and see...")
 	(LDA.ZP :current-place)
 	(JMP '(:inventory . :scan-objects))))
 
-    (action '(INVENTORY)
+    (custom-action '(INVENTORY)
       (with-namespace :inventory
 	(respond "You have...")
 	(LDA 1 "Inventory is Place 1")
@@ -103,7 +103,7 @@
 	(dc "Temporary counter when scanning objects")
 	(db :object-count 0)))
 
-    (action '(EXAMINE)
+    (custom-action '(EXAMINE)
       (with-namespace :examine
 	(JSR :find-object-index-from-input)
 	(BCS :duplicate-found)
@@ -122,9 +122,7 @@
 	(respond *be-more-specific*)
 	(RTS)
 	(label :not-found)
-	(respond "Examine what?")))
-    
-))
+	(respond "Examine what?")))))
 
 (defun test-render-input ()
   (label :test-render-input)

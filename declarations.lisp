@@ -179,10 +179,9 @@
 	  (justify-with-image (format nil "~a~{~%~a~}" message messages)
 			      5 4 *act-font*))
 	 (lines (1+ (count #\Newline text))))
-
     (assert (<= lines 3) nil
 	    (format nil "Response would have more than 3 lines~%~a" text))
-
+    (dc text t)
     (let ((str (dstr text)))
 	  (case lines
 	    (1 (vm-pr1 str))
@@ -196,11 +195,10 @@
 (defun words2label (words)
   (string-right-trim "-" (format nil "~{~a-~}" words)))
 
-(defun action-fn (words fn)
+(defun action-fn (vm words fn)
   ;;Accept a single list of words, or lists of words
   (unless (listp (car words))
     (setf words (list words)))
-
   (dolist (sentence words)
     (dc (format nil "ON ~{~a ~}" sentence))
     (let ((label (words2label sentence)))
@@ -208,9 +206,16 @@
 	  (cons *current-location* label)
 	*current-location*)
       (label label *current-location*)))
+  (unless vm
+    (vm-exe))
   (funcall fn)
   (label :rts)
-  (vm-rts))
+  (if vm (vm-done) (rts)))
 
 (defmacro action (words &body body)
-  `(action-fn ,words #'(lambda () ,@body)))
+  "An action which is executed by the VM"
+  `(action-fn t ,words #'(lambda () ,@body)))
+
+(defmacro custom-action (words &body body)
+  "An action which drops directly into 6502"
+  `(action-fn nil ,words #'(lambda () ,@body)))

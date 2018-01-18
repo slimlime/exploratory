@@ -539,8 +539,8 @@
 
 ; default addressing modes
 
-(defun JMP (addr) (JMP.AB addr))
-(defun JSR (addr) (JSR.AB addr))
+(defun JMP (addr &optional comment) (JMP.AB addr comment))
+(defun JSR (addr &optional comment) (JSR.AB addr comment))
 
 ;; page agnostic addressing, provide an instruction of the form OP.* which
 ;; resolves to either zero page or absoulte depending on how the address resolves

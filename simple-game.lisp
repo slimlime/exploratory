@@ -286,17 +286,17 @@ preventing closed-minded mortals from seeing what is really there.")
 	   (zeropage)	     
 	   (org origin)
 	   (CLD)
-
 	   (label :start)
 	   (cls #x10)
 	   (sta16.zp (cons :font :present) :font)
-	      
+	   
+	   (JSR :vm-enter)
 	   (navigate :dungeon-cell)
 
-	   (label :test)
-	   (label :test2)
-	   (sta16.zp (cons :dispatcher :dungeon-cell)
-		     :location-dispatch-table)
+	   ;;TODO does NAVIGATE
+	   
+	   ;(sta16.zp (cons :dispatcher :dungeon-cell)
+	;	     :location-dispatch-table)
 
 	   (BRK)
 
@@ -326,7 +326,8 @@ preventing closed-minded mortals from seeing what is really there.")
 	   (typeset)
 	   (fleuron)
 	   (navigator)
-
+	   (vm)
+	   
 	   ;;testing functions
 
 	   (test-render-input)

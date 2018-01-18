@@ -83,16 +83,16 @@
     (dc "Assume the carry is clear after long add")
     (BCC :dispatch)
     (label :matched-sentence)
+    
     (dc "We are assuming Y is 3 here, which is the")
     (dc "offset to the the dispatch address")
-    (dc "Push the dispatch address on the stack")
+    (dc "Call the VM with the address of the handler")
     (LDA.IZY :dispatch-table)
-    (PHA)
+    (STA.ZP (lo-add :vm-pc))
     (INY)
     (LDA.IZY :dispatch-table)
-    (PHA)
-    (dc "Call the handler, which will return to the top-level caller")
-    (RTS)
+    (STA.ZP (hi-add :vm-pc))
+    (JMP :vm-go "Execute VM code and return to caller")
     
     ;;now build the tables
 
@@ -118,8 +118,8 @@
 					   id))
 				     words)
 			     ;;rts jump requires address offset by one
-			     (list (rts-jmp-hi handler)
-				   (rts-jmp-lo handler))))))
+			     (list (hi handler)
+				   (lo handler))))))
 	 (dc (format nil "Terminating byte for ~a" location))
 	 (db nil 0))
     *handlers*)))
@@ -132,86 +132,3 @@
 			 (car entry)
 			 (cdr entry))))
 	   *handlers*))
-
-(defun dispatch-tester (input location expected-handler)
-  (reset-compiler)
-  (reset-symbol-table)
-  (format t "Testing ~a in ~a -> ~a~%" input location expected-handler)
-  (flet ((pass ()
-	   (zeropage)	     
-	   (org #x600)
-	   (CLD)
-	   (label :start)
-	   ;;Set the room handler
-	   (sta16.zp (cons :dispatcher location) :location-dispatch-table)
-	   (JSR :parse)
-	   (JSR :dispatch)
-	   (BRK)
-	   (dispatcher)
-	   
-	   ;; install all the handlers, with the expected
-	   ;; one setting the output byte to a 1
-	   
-	   (maphash #'(lambda (loc entries)
-			(declare (ignorable loc))
-			(dolist (entry entries)
-			  (label (cdr entry))
-			  (when (equal (cdr entry) expected-handler)
-			    (LDA 1)
-			    (STA.AB :output))
-			  (RTS)))
-		    *handlers*)
-
-	   (db :output 0)
-
-	   (label :end)
-	   
-	   (parser)))
-    ;;todo use build function specific to this
-    (build-parse-word-test #'pass))
-
-  ;; install the string into the input buffer
-
-  (loop for c across input
-        for i from 0 to *max-input-length* do       
-       (setf (aref *compiler-buffer* (+ i (resolve '(:parser . :input))))
-	     (to-alphabet-pos c)))
-  
-  (monitor-reset #x600)
-  (monitor-run :print nil)
-
-  ;; return the output byte which will have been set
-  ;; if the correct handler is called.
-  
-  (if (= 1 (aref (monitor-buffer) (resolve :output)))
-	 1
-	 nil))
-
-(reset-dispatcher)
-
-(defsentence '(OPEN DOOR) :open-door :room)
-(defsentence '(CLOSE DOOR) :close-door :room)
-(defsentence '(TAKE CHEEZOWS) :take-cheezows :room) ;i.e. specialization
-(defsentence '(INVENTORY) :inventory)
-(defsentence '(TAKE ?) :take)
-(defsentence '(DROP ?) :drop)
-;;existential angst
-(defsentence nil :nihil :void)
-
-(assert (dispatch-tester "OPEN DOOR" :room :open-door))
-(assert (dispatch-tester "CLOSE DOOR" :room :close-door))
-(assert (not (dispatch-tester "CLOSE DOOR" :room :open-door)))
-(assert (dispatch-tester "TAKE CHEEZOWS" :room :take-cheezows))
-(assert (dispatch-tester "TAKE ELEPHANT" :room :take))
-(assert (dispatch-tester "GET CHEEZOWS" :room :take-cheezows))
-(assert (dispatch-tester "DROP MONKEY" :room :drop))
-;;generic handlers should be called here only
-(assert (not (dispatch-tester "OPEN DOOR" :void :open-door)))
-(assert (not (dispatch-tester "CLOSE DOOR" :void :close-door)))
-(assert (not (dispatch-tester "TAKE CHEEZOWS" :void :take-cheezows)))
-(assert (dispatch-tester "TAKE CHEEZOWS" :void :take))
-(assert (dispatch-tester "TAKE ELEPHANT" :void :take))
-(assert (not (dispatch-tester "GET CHEEZOWS" :void :take-cheezows)))
-(assert (dispatch-tester "GET CHEEZOWS" :void :take))
-(assert (dispatch-tester "DROP MONKEY" :void :drop))
-

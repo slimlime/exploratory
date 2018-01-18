@@ -19,12 +19,12 @@
 
     (JSR :vm-go)
     ;;now we resume normal execution after the vm-done
-    (LDA.ZP (lo-add :vm-pc))
-    (PHA)
     (LDA.ZP (hi-add :vm-pc))
     (PHA)
+    (LDA.ZP (lo-add :vm-pc))
+    (PHA)
     (RTS)
-    
+
     (label :go)
     (JSR :execute-op)
     (label :vm-go nil)
@@ -39,7 +39,7 @@
     (LDA.ABX (resolve :op-hi))
     (PHA)
     (LDA.ABX (resolve :op-lo))
-    (PHA)    
+    (PHA)
     (label :done)
     (RTS)
 
@@ -215,7 +215,7 @@
 	 ((vm-fetch)
 	  (TAX)
 	  (vm-fetch)
-	  (JSR '(:navigate . :navigate-no-deref))))
+	  (JMP '(:navigate . :navigate-no-deref))))
 
 (defvmop vm-pr1 (format nil "VM-PR1 ~a" (fmt-addr str)) (str)
 	 ((dw nil str))

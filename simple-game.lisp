@@ -291,8 +291,9 @@ preventing closed-minded mortals from seeing what is really there.")
 	   (sta16.zp (cons :font :present) :font)
 	   
 	   (JSR :vm-enter)
-	   (navigate :dungeon-cell)
-
+	   (vm-nav :dungeon-cell)
+	   (vm-done)
+	   (label :XXX)
 	   ;;TODO does NAVIGATE
 	   
 	   ;(sta16.zp (cons :dispatcher :dungeon-cell)

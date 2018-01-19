@@ -1,7 +1,5 @@
-;;;; VM WIP
-;;;; These are the common operations. Once we know everything
-;;;; we need, we can implement the game logic using byte-code
-;;;; for massive gainz in compactness.
+;;; Virtual Machine
+;;; Aim, compactness of generated code
 
 (defparameter *vmops* nil)
 
@@ -133,19 +131,29 @@
       (format nil "$~4,'0X" addr)
       (format nil "$~4,'0X (~a)" (resolve addr) addr)))
 
+
+;;
+;; Finish the VM code and return to where we came from
+;;
 (defvmop vm-done "VM-DONE" ()
 	 ()
 	 ())
 
+;;
 ;; Drop out here to 6502
+;;
+;; TODO Check what happens if we use :vm-go-here to
+;; enter something that does this.
 (defvmop vm-exe "VM-EXE" ()
 	 ()
 	 ((JMP.IND :vm-pc)))
 
+;;
 ;; Delegate to generic handler
+;;
 (defvmop vm-del (format nil "VM-DEL") ()
 	 ()
-	 ())
+	 ((JMP '(:dispatcher . :generic-only))))
 
 (defun forward-branch-offset (label)
   (if *compiler-final-pass*

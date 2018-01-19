@@ -1,7 +1,8 @@
-
-; A simple game to test all the bits work
+;; A simple game to test all the bits work
 
 ;; No assembly in here...
+
+;; ...TODO separate out the build process
 
 ;; catchphrases
 
@@ -259,6 +260,7 @@ preventing closed-minded mortals from seeing what is really there.")
   (with-location :generic 
   (action '(? ? ?)
     (respond "I don't know what that means."))))
+
 
 (defparameter origin #x600)
       

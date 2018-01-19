@@ -606,19 +606,19 @@
 		   (case (car hint)
 		     (1 (format t "       ~a" (cdr hint)))
 		     (2 (format t "~2,'0X     ~a"
-				(aref buffer i)
-				(cdr hint)))
-		     (3 (format t "~2,'0X~2,'0X   ~a"
-				(aref buffer i)
 				(aref buffer (+ i 1))
 				(cdr hint)))
+		     (3 (format t "~2,'0X~2,'0X   ~a"
+				(aref buffer (+ i 1))
+				(aref buffer (+ i 2))
+				(cdr hint)))
 		     (4 (format t "~2,'0X~2,'0X~2,'0X ~a"
-				(aref buffer i)
+				(aref buffer (+ i 1))
 				(aref buffer (+ i 2))
 				(aref buffer (+ i 3))
 				(cdr hint)))
 		     (otherwise (format t "~2,'0X~2,'0X.. ~a"
-				(aref buffer i)
+				(aref buffer (+ i 1))
 				(aref buffer (+ i 2))
 				(cdr hint))))
 		   (incf i (1- (car hint))))

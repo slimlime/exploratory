@@ -20,10 +20,6 @@
   (push (cons words handler-address)
 	(gethash location *handlers*)))
 
-(defun delegate-action ()
-  "Bail on an action and call the generic handler"
-  (JMP '(:dispatcher . :generic-only)))
-
 (defun dispatcher ()
   ;;when we enter a location, this dispatch table should be set
   (zp-w :location-dispatch-table)

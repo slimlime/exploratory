@@ -32,9 +32,6 @@
     (defobject "SHINY KEY" "It's a key, man." :initial-place :nowhere)
     (defobject "INEDIBLE SLOP" "A balanced soup of entrails, small amphibians and mandibles. Ooh! Garlic croutons!" :name-override "Some inedible slop." :initial-place :nowhere)
 
-    (if-in-place "SHINY KEY" :nowhere
-		 (respond "They seem to be staring at the floor."))
-    
     (action '(EXAMINE SLIME)
       (setbit :slime-examined)
       (respond "Millions of eyes peer out from the slime.")
@@ -295,12 +292,7 @@ preventing closed-minded mortals from seeing what is really there.")
 	   (JSR :vm-enter)
 	   (vm-nav :dungeon-cell)
 	   (vm-done)
-	   (label :XXX)
-	   ;;TODO does NAVIGATE
 	   
-	   ;(sta16.zp (cons :dispatcher :dungeon-cell)
-	;	     :location-dispatch-table)
-
 	   (BRK)
 
 	   (label :test-input)
@@ -311,15 +303,17 @@ preventing closed-minded mortals from seeing what is really there.")
 	   (BRK)
 
 	   ;;game state
-
+	   (label :game-code-start)
 	   (synonyms)
 	   (dungeon-cell)
 	   (corridor)
 	   (frazbolgs-closet)	   
 	   (generic-handlers)
-	   
+	   	   
 	   (bit-table)
-	   
+
+	   (label :game-code-end)
+
 	   ;;inline functions we will need
 
 	   (deref-w)

@@ -198,7 +198,9 @@
 	       (to-alphabet-pos c)))
     (setf (cl-6502:get-range 0) buffer))
   (monitor-setpc :test-input)
-  (monitor-run :break-on break-on)
+  (monitor-run :break-on break-on :print (eq break-on 'brk))
+  (unless (eq break-on 'brk)
+    (monitor-go))
   (setmem-copy (monitor-buffer))
   (dump-state-base64))
 

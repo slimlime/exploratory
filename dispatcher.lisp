@@ -114,8 +114,8 @@
 					   id))
 				     words)
 			     ;;rts jump requires address offset by one
-			     (list (hi handler)
-				   (lo handler))))))
+			     (list (lo handler)
+				   (hi handler))))))
 	 (dc (format nil "Terminating byte for ~a" location))
 	 (db nil 0))
     *handlers*)))

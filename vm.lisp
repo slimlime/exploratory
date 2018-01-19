@@ -7,6 +7,8 @@
   (zp-w :vm-pc)
   (with-namespace :vm
 
+    (dc "Begin executing VM code at the callsite")
+    (dc "After VM-DONE, resume 6502 execution")
     (label :vm-enter nil)
     (PLA)
     (TAY)
@@ -16,7 +18,7 @@
     (STA.ZP (hi-add :vm-pc))
 
     (JSR :vm-go)
-    ;;now we resume normal execution after the vm-done
+    (dc "Resume 6502 execution immediately after the virual code")
     (LDA.ZP (hi-add :vm-pc))
     (PHA)
     (LDA.ZP (lo-add :vm-pc))
@@ -25,6 +27,8 @@
 
     (label :go)
     (JSR :execute-op)
+    (dc "Execute VM code at :VM-PC. Return when VM-DONE is encountered")
+    (dc "This is the normal entry point for an action handler") 
     (label :vm-go nil)
     (LDY 0)
     (LDA.IZY :vm-pc)
@@ -77,7 +81,6 @@
     (zp-b :bit-6 64)
     (zp-b :bit-7 128)
 
-
     (label :get-bit-mask)
     (dc "Get the address of the bit and leave it in Y")
     (dc "then get the single-bit mask for that bit and")
@@ -92,7 +95,7 @@
     (TAY)
     (TXA)
     (dc "Get bit number")
-    (AND 7)
+    (AND.IMM 7)
     (TAX)
     (LDA.ZPX :bit-0)
     (RTS)))
@@ -133,14 +136,14 @@
 
 
 ;;
-;; Finish the VM code and return to where we came from
+;; VM-DONE Finish the VM code and return to where we came from
 ;;
 (defvmop vm-done "VM-DONE" ()
 	 ()
 	 ())
 
 ;;
-;; Drop out here to 6502
+;; VM-EXE Execute 6502 here
 ;;
 ;; TODO Check what happens if we use :vm-go-here to
 ;; enter something that does this.
@@ -149,7 +152,7 @@
 	 ((JMP.IND :vm-pc)))
 
 ;;
-;; Delegate to generic handler
+;; VM-DEL Delegate to generic handler, if one applies
 ;;
 (defvmop vm-del (format nil "VM-DEL") ()
 	 ()
@@ -161,7 +164,7 @@
       0))
 
 ;;
-;;BRA - Branch always
+;;VM-BRA - Branch always
 ;;
 (defvmop vm-bra (format nil "VM-BRA -> ~a" (fmt-addr addr)) (addr)
 	 ((push-byte (forward-branch-offset addr)))
@@ -169,7 +172,7 @@
 	  (BEQ '(:vm-branch . :branch))))
 
 ;;
-;;BSET - Branch on bit set
+;;VM-BSET - Branch on bit set
 ;;
 (defvmop vm-bset (format nil "VM-BSET ~a -> ~a" bit (fmt-addr addr)) (bit addr)
 	 ((push-byte (bit-index bit))
@@ -180,7 +183,7 @@
 	  (BEQ '(:vm-branch . :dont-branch))))
 
 ;;
-;;BCLR - Branch on bit not set
+;;VM-BCLR - Branch on bit not set
 ;;
 (defvmop vm-bclr (format nil "VM-BCLR ~a -> ~a" bit (fmt-addr addr)) (bit addr)
 	 ((push-byte (bit-index bit))
@@ -191,7 +194,7 @@
 	  (BNE '(:vm-branch . :dont-branch))))
 
 ;;;
-;;;BOIP - Branch on object in place
+;;;VM-BOIP - Branch on object in place
 ;;;
 (defvmop vm-boip (format nil "VM-BOIP ~a ~a -> ~a" object place (fmt-addr addr)) (object place addr)
 	 ((push-byte (object-id object))
@@ -205,7 +208,7 @@
 	  (BNE '(:vm-branch . :dont-branch))))
 
 ;;;
-;;;BOOP - Branch on object not in place
+;;;VM-BOOP - Branch on object not in place
 ;;;
 (defvmop vm-boop (format nil "VM-BOOP ~a ~a -> ~a" object place (fmt-addr addr)) (object place addr)
 	 ((push-byte (object-id object))
@@ -218,61 +221,74 @@
 	  (BNE '(:vm-branch . :branch))
 	  (BEQ '(:vm-branch . :dont-branch))))
 
+;;;
+;;; VM-NAV - Navigate to a new location
+;;;
 (defvmop vm-nav (format nil "VM-NAV ~a" location) (location)
 	 ((dw nil location))
 	 ((vm-fetch)
 	  (TAX)
 	  (vm-fetch)
 	  (JMP '(:navigate . :navigate-no-deref))))
-
+;;;
+;;; VM-PR1 - Print one line string
+;;;
 (defvmop vm-pr1 (format nil "VM-PR1 ~a" (fmt-addr str)) (str)
 	 ((dw nil str))
 	 ((vm-fetch)
-	  (STA.ZP (hi-add '(:typeset-cs . :str)))
-	  (vm-fetch)
 	  (STA.ZP (lo-add '(:typeset-cs . :str)))
+	  (vm-fetch)
+	  (STA.ZP (hi-add '(:typeset-cs . :str)))
 	  (LDA 1)
 	  (JMP :print-message)))
 
+;;;
+;;; VM-PR2 - Print two line string
+;;;
 (defvmop vm-pr2 (format nil "VM-PR2 ~a" (fmt-addr str)) (str)
 	 ((dw nil str))
 	 ((vm-fetch)
-	  (STA.ZP (hi-add '(:typeset-cs . :str)))
-	  (vm-fetch)
 	  (STA.ZP (lo-add '(:typeset-cs . :str)))
+	  (vm-fetch)
+	  (STA.ZP (hi-add '(:typeset-cs . :str)))
 	  (LDA 1)
 	  (JMP :print-message)))
 
+;;;
+;;; VM-PR3 - Print three line string
+;;;
 (defvmop vm-pr3 (format nil "VM-PR3 ~a" (fmt-addr str)) (str)
 	 ((dw nil str))
 	 ((vm-fetch)
-	  (STA.ZP (hi-add '(:typeset-cs . :str)))
-	  (vm-fetch)
 	  (STA.ZP (lo-add '(:typeset-cs . :str)))
+	  (vm-fetch)
+	  (STA.ZP (hi-add '(:typeset-cs . :str)))
 	  (LDA 1)
 	  (JMP :print-message)))
 	 
 ;;
-;;CLR - Clear bit
+;;VM-CLR - Clear bit
 ;;
 (defvmop vm-clr (format nil "VM-CLR ~a" bit) (bit)
 	 ((push-byte (bit-index bit)))
 	 ((JSR :get-bit-mask)
 	  (EOR #xff)
 	  (AND.ABY :bit-table)
-	  (STA.ABY :bit-table)))
+	  (STA.ABY :bit-table)
+	  (RTS)))
 
 ;;
-;;SET - Set bit
+;;VM-SET - Set bit
 ;;
 (defvmop vm-set (format nil "VM-SET ~a" bit) (bit)
 	 ((push-byte (bit-index bit)))
 	 ((JSR :get-bit-mask)
 	  (ORA.ABY :bit-table)
-	  (STA.ABY :bit-table)))
+	  (STA.ABY :bit-table)
+	  (RTS)))
 
 ;;;
-;;;MOV - Move object to place
+;;;VM-MOV - Move object to place
 ;;;
 (defvmop vm-mov (format nil "VM-MOV ~a ~a " object place) (object place)
 	 ((push-byte (object-id object))
@@ -280,7 +296,8 @@
 	 ((vm-fetch)
 	  (TAX)
 	  (vm-fetch)
-	  (STA.ABX (1- (resolve '(:object-table . :places))))))
+	  (STA.ABX (1- (resolve '(:object-table . :places))))
+	  (RTS)))
 
 ;; reverse the order of the ops since they were pushed in
 

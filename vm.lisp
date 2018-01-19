@@ -144,11 +144,12 @@
 ;;
 ;; VM-EXE Execute 6502 here
 ;;
-;; TODO Check what happens if we use :vm-go-here to
-;; enter something that does this.
 (defvmop vm-exe "VM-EXE" ()
 	 ()
-	 ((JMP.IND :vm-pc)))
+	 ((dc "Pop so we return to caller of VM- we're done after this")
+	  (PLA)
+	  (PLA)
+	  (JMP.IND :vm-pc)))
 
 ;;
 ;; VM-DEL Delegate to generic handler, if one applies

@@ -204,10 +204,10 @@
   (setmem-copy (monitor-buffer))
   (dump-state-base64))
 
-(defun restore-game (str)
+(defun restore-game (str &key (break-on 'brk))
   (restore-state-base64 str)
   (monitor-setpc :restore-game)
-  (monitor-run)
+  (monitor-run :break-on break-on)
   (setmem-copy (monitor-buffer))
   (enter-input "LOOK")
   (values))

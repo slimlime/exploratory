@@ -300,7 +300,7 @@ preventing closed-minded mortals from seeing what is really there.")
 	   (JSR :parse)
 	   (JSR :dispatch)
 
-	   (BRK)
+	   (BRK "<-- The correct end point after input")
 
 	   ;;game state
 	   (label :game-code-start)

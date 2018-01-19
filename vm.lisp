@@ -134,7 +134,6 @@
       (format nil "$~4,'0X" addr)
       (format nil "$~4,'0X (~a)" (resolve addr) addr)))
 
-
 ;;
 ;; VM-DONE Finish the VM code and return to where we came from
 ;;
@@ -160,7 +159,7 @@
 
 (defun forward-branch-offset (label)
   (if *compiler-final-pass*
-      (- (resolve label) *compiler-ptr*)
+      (- (resolve label) *compiler-ptr* 1)
       0))
 
 ;;
@@ -251,7 +250,7 @@
 	  (STA.ZP (lo-add '(:typeset-cs . :str)))
 	  (vm-fetch)
 	  (STA.ZP (hi-add '(:typeset-cs . :str)))
-	  (LDA 1)
+	  (LDA 2)
 	  (JMP :print-message)))
 
 ;;;
@@ -263,7 +262,7 @@
 	  (STA.ZP (lo-add '(:typeset-cs . :str)))
 	  (vm-fetch)
 	  (STA.ZP (hi-add '(:typeset-cs . :str)))
-	  (LDA 1)
+	  (LDA 3)
 	  (JMP :print-message)))
 	 
 ;;

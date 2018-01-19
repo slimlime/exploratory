@@ -1,6 +1,8 @@
 ;; Functions to define an actual game
 ;; Ideally the game would *only* see the functions defined here
 
+;; TODO get rid of extra vm-done at the end of custom actions
+
 (defun defbits (initially-set &rest bits)
   (dolist (bit bits)
     (defbit bit :initially-set initially-set)))
@@ -98,12 +100,13 @@
 		   (if ,else-supplied-p #'(lambda () ,else) nil)
 		   #'(lambda () ,then)))
 
+
 ;;todo make justification work with the - at the beginning without actually
 ;;puting it into the string table
-(defun respond (message &rest messages)
+(defun justify-response (message messages)
   (when *compiler-final-pass*
-    (dolist (s (cons message messages))
-      (warn-if-not-punctuated s)))
+    (dolist (str messages)
+      (warn-if-not-punctuated str)))
   (let* ((text
 	  ;;TODO this is an abuse of the justify function, which
 	  ;;     is to account for the prompt
@@ -111,19 +114,33 @@
 			      5 4 *act-font*))
 	 (lines (1+ (count #\Newline text))))
     (assert (<= lines 3) nil
-	    (format nil "Response would have more than 3 lines~%~a" text))
+	    (format nil "Response would have more than 3 lines~%~a"
+		    text))
+    (values text lines)))
+
+(defun respond (message &rest messages)
+  (multiple-value-bind (text lines)
+      (justify-response message messages)
     (dc text t)
     (let ((str (dstr text)))
-	  (case lines
-	    (1 (vm-pr1 str))
-	    (2 (vm-pr2 str))
-	    (3 (vm-pr3 str))))))
+      (case lines
+	(1 (vm-pr1 str))
+	(2 (vm-pr2 str))
+	(3 (vm-pr3 str))))))
+
+(defun respond-raw (message &rest messages)
+  "Raw code response function"
+  (multiple-value-bind (text lines)
+      (justify-response message messages)
+    (JSR (cons :print-message lines))
+    (dc (format nil "~a" text) t)
+    (dw nil (dstr text))))
 
 (defun navigate (location)
   (vm-nav location))
 
 (defun delegate-action ()
-  "Bail on an action and call the generic handler"
+  "Call the generic handler for the current action, if it exists"
   (vm-del))
 
 ;;define a action handler for a sentence
@@ -144,7 +161,6 @@
   (unless vm
     (vm-exe))
   (funcall fn)
-  (label :rts)
   (if vm (vm-done) (rts)))
 
 (defmacro action (words &body body)
@@ -152,5 +168,5 @@
   `(action-fn t ,words #'(lambda () ,@body)))
 
 (defmacro custom-action (words &body body)
-  "An action which drops directly into 6502"
+  "An action which drops into 6502"
   `(action-fn nil ,words #'(lambda () ,@body)))

@@ -40,8 +40,8 @@
     
     (action '(EXAMINE EYES)
       (if-bit :slime-examined
-	      (respond "The eyes are deep and sorrowful. Eyes that have seen things best left unseen.")
-	      (respond "Your eyes are fine... though you are pretty sure someone, or something is looking at you.")))
+	      (respond "The eyes are deep and sorrowful. Eyes that have seen things better left unseen.")
+	      (respond "Funny you should mention eyes, you have a strange feeling someone or something is staring at you.")))
 
     (action '(EXAMINE WALL)
       (respond "The wall oozes with a repellant green slime."

@@ -16,21 +16,21 @@
 	(LDA 1)
 	(CMP.ABY (1- (resolve '(:object-table . :places))))
 	(BNE :take-it)
-	(respond "You already have that.")
+	(respond-raw "You already have that.")
 	(RTS)
 	(label :take-it)
 	(STA.ABY (1- (resolve '(:object-table . :places))))
-	(respond "You took it!")
+	(respond-raw "You took it!")
 	(RTS)
 	(label :duplicate-found)
 	;;There is an 'edge' case here where you are already
 	;;carrying the RED SWORD and you try to TAKE the BLUE SWORD
 	;;by typing TAKE SWORD. The computer is going to earn
 	;;it's reputation as a pedant here.
-	(respond *be-more-specific*)
+	(respond-raw *be-more-specific*)
 	(RTS)
 	(label :not-found)
-	(respond "Take what?")))
+	(respond-raw "Take what?")))
     
     (custom-action '(DROP)
       (with-namespace :drop
@@ -45,25 +45,25 @@
 	(dc "Now set its place to the current place")
 	(LDA.ZP :current-place)
 	(STA.ABY (1- (resolve '(:object-table . :places))))
-	(respond "You dropped it!")
+	(respond-raw "You dropped it!")
 	(RTS)
 	(label :duplicate-found)
-	(respond *be-more-specific*)
+	(respond-raw *be-more-specific*)
 	(RTS)
 	(label :not-found)
-	(respond "Drop what?")))
+	(respond-raw "Drop what?")))
 
     (defword :INVENTORY :I)
 
     (custom-action '(LOOK)
       (with-namespace :look
-	(respond "You take a look around and see...")
+	(respond-raw "You take a look around and see...")
 	(LDA.ZP :current-place)
 	(JMP '(:inventory . :scan-objects))))
 
     (custom-action '(INVENTORY)
       (with-namespace :inventory
-	(respond "You have...")
+	(respond-raw "You have...")
 	(LDA 1 "Inventory is Place 1")
 	(label :scan-objects)
 	(dc "Reset matching object count to 0")
@@ -97,7 +97,7 @@
 	(BNE :next-object)
 	(LDX.AB :object-count)
 	(BNE :not-empty)
-	(respond "Nothing.")
+	(respond-raw "Nothing.")
 	(label :not-empty)
 	(RTS)
 	(dc "Temporary counter when scanning objects")
@@ -119,10 +119,10 @@
 	(JSR :print-message)
 	(RTS)
 	(label :duplicate-found)
-	(respond *be-more-specific*)
+	(respond-raw *be-more-specific*)
 	(RTS)
 	(label :not-found)
-	(respond "Examine what?")))))
+	(respond-raw "Examine what?")))))
 
 (defun test-render-input ()
   (label :test-render-input)

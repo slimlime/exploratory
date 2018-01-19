@@ -1,3 +1,64 @@
+## 18/1/2018
+
+## Virtual Reality
+
+The reality is, I needed a problem to solve while I tried to figure out what to do about object dispatch, and that problem presented itself in the fact that the `DUNGEON-CELL` test location was weighing in at over 500 bytes. This is unacceptable, the actual game will have 24 locations and they will be more complex. The solution is virtualization. I believe that Inform is a byte code specification and so is the classic SCUMM used in the Monkey Island style games. Armed with little more than a vague idea about how to do it and that it would be 'fun', I set about ripping the code-base apart.
+
+There was already good separation of concerns, so the simple-game.lisp file hasn't changed- the game logic specification is done in terms of lisp like functions which emit machine code. These have now been changed to emit byte-code. I wrote a very simple virtual machine and a set of macros to define the functions. Here are the initial functions,
+
+- `VM-DONE` - exit the VM and return to normal execution.
+- `VM-EXE` - execute 6502 code here.
+- `VM-NAV location` - navigate the user to a location.
+- `VM-BSET bit` - set a bit.
+- `VM-BCLR bit` - clear a bit.
+- `VM-BRA address` - always branch to an address (6502 strangely omitted this instruction...).
+- `VM-BOOP object place address` - branch if an object is not in a place.
+- `VM-BOIP object place address` - branch if an object is in a place.
+- `VM-MOV object place` - move an object to a place.
+- `VM-PR1-3 string` - print a string of 1, 2 or 3 lines.
+
+Game definition code
+
+~~~~
+    (action '(TAKE KEY)
+      (if-in-place "SHINY KEY" :nowhere
+		   (respond "What key? Do you know something I don't?")
+		   (delegate-action)))
+    
+    (action '(EXAMINE DOOR)
+      (respond "The door is solid wood with a tiny barred window and a keyhole.") 
+      (if-bit :door-open
+	      (respond "The door is open.")
+	      (respond "The door is closed.")))
+~~~~
+
+Byte-code compiled code (as you can see there are still some problems- the hints added to the disassembler haven't quite worked out as they are duplicating the op-code byte, and there is still an old dispatch function of raw 6502)
+
+~~~~
+         ;ON TAKE KEY 
+UNGEON-CELL:TAKE-KEY 0B61 07070004 VM-BOOP SHINY KEY NOWHERE -> $0B68 (ELSE)
+                     0B65 090906   VM-PR1 $2C06 ;What key? Do you know something I don't?
+          $0B61:ELSE 0B68 4C7624   JMP $2476 ;DISPATCHER:GENERIC-ONLY 
+        $0B61:END-IF 0B6B 00       VM-DONE
+                     ;ON EXAMINE DOOR 
+ON-CELL:EXAMINE-DOOR 0B6C 0A0AE4   VM-PR2 $2BE4 ;The door is solid wood with a tiny barred
+window and a keyhole.
+                     0B6F 050504   VM-BCLR DOOR-OPEN -> $0B77 (ELSE)
+                     0B72 0909DD   VM-PR1 $2BDD ;The door is open.
+                     0B75 0303     VM-BRA -> $0B7A (END-IF)
+          $0B6F:ELSE 0B77 0909D4   VM-PR1 $2BD4 ;The door is closed.
+        $0B6F:END-IF 0B7A 00       VM-DONE
+~~~~
+
+Interestingly, the code in the declarations file, which defines the functions to be used in constructing the actual game logic, has become simpler. This is because of separation of concerns; the high-level declaration language now maps onto the intermediate level byte-code, which maps onto low-level 6502. Before, the low-level implementation was mixed freely into the high-level definitions.
+
+Anyway, the upshot is that the dungeon now takes 322 bytes rather than 550 and that is before any optimizations.
+
+Optimization ideas
+
+- Branch to VM-DONE seems common, it's also unnecessary
+- Interning strings at the call site would free-up two bytes per string (may cause problems with branching)
+
 ## 14/1/2018
 
 ## Second Systems Travelling Back In Time To Mess You Up

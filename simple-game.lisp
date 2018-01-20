@@ -41,7 +41,7 @@
     
     (action '(EXAMINE EYES)
       (if-bit :slime-examined
-	      (respond "The eyes are deep and sorrowful. Eyes that have seen things better left unseen.")
+	      (respond "The eyes are deep and sorrowful. Eyes that have seen things best left unseen.")
 	      (respond "Funny you should mention eyes, you have a strange feeling someone or something is staring at you.")))
 
     (action '(EXAMINE WALL)
@@ -284,7 +284,7 @@ preventing closed-minded mortals from seeing what is really there.")
 
 	   (reset-dispatcher)
 	   	   
-	   (zeropage)	     
+	   (zeropage)
 	   (org origin)
 	   (CLD)
 	   (label :start)

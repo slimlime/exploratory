@@ -17,6 +17,7 @@
 (defparameter *compiler-namespace-depth* 0)
 (defparameter *compiler-namespace-stack* nil)
 (defparameter *compiler-namespace-sizes* nil)
+(defparameter *compiler-local-namespace-count* 0)
 
 ; todo A way of providing a 'spare byte/word' to the compile
 ; which can then be used later e.g.
@@ -43,6 +44,7 @@
   (setf *compiler-namespace-depth* 0)
   (setf *compiler-namespace-stack* nil)
   (setf *compiler-namespace-sizes* (make-hash-table :test 'equal))
+  (setf *compiler-local-namespace-count* 0)
 
   (values))
 
@@ -230,9 +232,10 @@
 
 ;; assembler instructions
 
- (defun org (add)
-   (assert-address add)
-   (setf *compiler-ptr* add))
+(defun org (add)
+  (assert-address add)
+  (setf *compiler-local-namespace-count* 0)
+  (setf *compiler-ptr* add))
 
 (defun label (label &optional (namespace nil namespace-p))
   (assert (not (numberp label)))
@@ -421,7 +424,7 @@
 (defmacro with-local-namespace (&body body)
   "All labels in this scope will resolve to the instantation
    at the current location"
-  `(with-namespace (format nil "$~4,'0X" *compiler-ptr*)
+  `(with-namespace (format nil "L~a" (incf *compiler-local-namespace-count*))
      ,@body))
 
 (defmacro measure-size (name &body body)

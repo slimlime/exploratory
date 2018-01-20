@@ -1,3 +1,98 @@
+## 20/1/2018
+
+## Virtually Indistinguishable from the Real Thing
+
+The simple game has now been fully ported over to the VM, which was relatively straightforward to implement except for some tricky endianness mixups and the usual off-by-one errors. The old rule for calculating offsets was
+
+- Agonise for ages, with brain and pen and paper trying to work out what was subtracted from what and whether the carry should be clear or set, and if I should add or subtract one for good measure at compile time.
+- Test it
+- Off by one
+- Tweak it with hindsight
+
+Now it is this
+
+- Guess
+- Test it
+- Off by one
+- Tweak it with hindsight
+
+Thankfully off by *two* errors are scarce.
+
+Here is some more byte-code.
+
+~~~~
+
+                     ;ON EXAMINE FLOOR 
+N-CELL:EXAMINE-FLOOR 0BA7 07010007 VM-BOOP SHINY KEY NOWHERE -> $0BB2 (ELSE)
+                     0BAB 0AF82D   VM-PR2 $2DF8 ;There is a crack in the floor. Perhaps it
+bears further examination?
+                     0BAE 0D05     VM-SET FLOOR-EXAMINED
+                     0BB0 030F     VM-BRA -> $0BC1 (END-IF)
+          $0BA7:ELSE 0BB2 050607   VM-BCLR GORILLA-SEEN -> $0BBC (ELSE)
+                     0BB5 0AE22D   VM-PR2 $2DE2 ;Apart from the crack, there is nothing
+there.
+                     0BB8 0D0B     VM-SET SOUGHT-GORILLA
+                     0BBA 0305     VM-BRA -> $0BC1 (END-IF)
+          $0BB2:ELSE 0BBC 0AB82D   VM-PR2 $2DB8 ;The sad face of a gorilla peers out from
+the random pattern of a floor-brick.
+                     0BBF 0D06     VM-SET GORILLA-SEEN
+        $0BB2:END-IF
+        $0BA7:END-IF 0BC1 00       VM-DONE
+
+~~~~
+
+We can enter byte-code execution in two ways. The first way is to set the `:vm-pc` zeropage address then `JSR :vm-go`. This is the strategy used by the action dispatcher, which pulls the address of the byte code out of the dispatch table. If you look closely you can see the address of the code above in the dispatch table.
+
+~~~~
+;EXAMINE FLOOR ?  -> DUNGEON-CELL:EXAMINE-FLOOR
+    252A 0A0D00.. DB $0A, $0D, $00, $A7, $0B ;LO : DUNGEON-CELL:EXAMINE-FLOOR 
+    ;HI : DUNGEON-CELL:EXAMINE-FLOOR                
+
+    (dc "Call the VM with the address of the handler")
+    (LDA.IZY :dispatch-table)
+    (STA.ZP (lo-add :vm-pc))
+    (INY)
+    (LDA.IZY :dispatch-table)
+    (STA.ZP (hi-add :vm-pc))
+    (JMP :vm-go "Execute VM code and return to caller")
+~~~~
+
+The second way is to enter byte-code execution immediately at the current location of the 6502 PC. This is pretty cool- it's an idea from Wozniak's SWEET16 virtual machine implementation. The next most coolest thing is that `VM-DONE` jumps back out into 6502. Seamless mixing of bytecode and native is now possible, though it is not used much. This code snippet is from the game start up where we navigate to the first location.
+
+~~~~
+	   (JSR :vm-enter)
+	   (vm-nav :dungeon-cell)
+	   (vm-done)
+	   
+	   (BRK)
+~~~~
+
+## Code size
+
+So now we have the following sizes for the VM build,
+
+~~~~
+DUNGEON-CELL size 327
+CORRIDOR size 100
+FRAZBOLGS-CLOSET size 8
+GENERIC size 193
+GENERIC size 4
+Build size 13162
+~~~~
+
+Old native build sizes were,
+
+~~~~
+DUNGEON-CELL size 511
+CORRIDOR size 151
+FRAZBOLGS-CLOSET size 12
+GENERIC size 188
+GENERIC size 6
+Build size 13059
+~~~~
+
+So in summary, we have implemented a virtual-machine with the express aim of reducing code bloat and we have come in 121 bytes heavier. On that note, I am going to drink some elderflower cordial and go to bed.
+
 ## 18/1/2018
 
 ## Virtual Reality

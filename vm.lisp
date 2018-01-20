@@ -156,7 +156,9 @@
 ;;
 (defvmop vm-del (format nil "VM-DEL") ()
 	 ()
-	 ((JMP '(:dispatcher . :generic-only))))
+	 ((PLA)
+	  (PLA)	  
+	  (JMP '(:dispatcher . :generic-only))))
 
 (defun forward-branch-offset (label)
   (if *compiler-final-pass*

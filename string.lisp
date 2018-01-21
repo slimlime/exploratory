@@ -141,7 +141,6 @@
 
 (defun dcs (label str)
   "Define compressed string and inline it here"
-  (let ((address *compiler-ptr*))
     (if *symbol-table*
 	;;if the string table is built, emit the string and supply
 	;;the label
@@ -155,34 +154,35 @@
 	    (when *compiler-final-pass*
 	      (push (cons *compiler-ptr* str) *compiled-strings*))
 	    (add-hint len (format nil "DCS '~a' (~a->~a)" str (length str) len))
+	    (setf (gethash str *string-table*) *compiler-ptr*)
 	    (encode-string str #'(lambda (i word)
 				   (declare (ignore word))
-				   (push-byte i)))
-	    ;;set the actual address of the string in the string table
-	    (setf (gethash str *string-table*) address)))
+				   (push-byte i)))))
 	;;in the first pass, add the string to the table
-	(process-string str))
-    (values)))
+	(progn
+	  (process-string str)
+	  ;;also add to the table so later usages know it is inlined
+	  ;;somewhere earlier
+	  (setf (gethash str *string-table*) 0)))
+    (values))
 
-(defun dstr (str)
-  "Define a compressed string and inline it later"
-  (if *symbol-table*
-      (let ((address (gethash str *string-table*)))
-	(if address
-	    ;;we know the address of the string, so
-	    ;;return it.
-	    address
-	    (progn
-	      ;;add the string to the table, and also
-	      ;;to a list of strings which will be generated later
-	      (setf (gethash str *deferred-strings*) t)
-	      (setf (gethash str *string-table*) 0)
-	      0)))
-      (progn
-	;;just process the string so we can generate the
-	;;compression table
-	(process-string str)
-	0)))
+;; This function will return
+;; nil - this means the string has been inlined (only occurs if deferred = nil)
+;; address - this means the string has been (or will be) inlined elsewhere. This
+;; can occur whether deferred is t or nil.
+;; deferring means the string will be inlined later, by the string table.
+;; if you call the damn thing that is.
+(defun dstr (str &optional (defer t))  
+  (aif (gethash str *string-table*)
+       it
+      (if defer
+	  (progn
+	    (setf (gethash str *deferred-strings*) t)
+	    (setf (gethash str *string-table*) 0)
+	    0)
+	  (progn
+	    (dcs nil str)
+	    nil))))
 
 (defun string-table ()
   (let ((strings nil))

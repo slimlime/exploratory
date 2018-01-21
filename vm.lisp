@@ -196,7 +196,6 @@
   ((if (can-omit-branch addr optimize)
        (progn
 	 (decf *compiler-ptr*)
-	 (dc "Dead branch" t)
 	 (push-byte 0)
 	 (register-vm-done))
        (push-byte (forward-branch-offset addr))))
@@ -281,25 +280,25 @@
   (LDA lines)
   (JSR :print-message)
   (dc "Now advance the vm-pc to after the string")
-  (cpy16.zp :vm-pc '(:typeset-cs . :str))
+  (cpy16.zp '(:typeset-cs . :str) :vm-pc )
   (inc16.zp :vm-pc)
   (RTS))
 
 ;;;
-;;; VM-PRI1 - Print one line string, inlined
+;;; VM-PRI1 - Print one line string, inlined after the op
 ;;;
 (defvmop vm-pri1 (format nil "VM-PRI1 '~a'" str) (str)
-	 ((dcs nil str))
+	 ()
 	 ((vm-print-inline-fn 1)))
 ;;;
-;;; VM-PRI2 - Print two line string, inlined
+;;; VM-PRI2 - Print two line string, inlined after the op
 ;;;
 (defvmop vm-pri2 (format nil "VM-PRI2 '~a'" str) (str)
 	 ((dcs nil str))
 	 ((vm-print-inline-fn 2)))
 
 ;;;
-;;; VM-PRI3 - Print three line string, inlined
+;;; VM-PRI3 - Print three line string, inlined after the op
 ;;;
 (defvmop vm-pri3 (format nil "VM-PRI3 '~a'" str) (str)
 	 ((dcs nil str))
@@ -317,21 +316,21 @@
 ;;;
 ;;; VM-PR1 - Print one line string
 ;;;
-(defvmop vm-pr1 (format nil "VM-PR1 '~a'" str) (str)
-	 ((dcs nil str))
+(defvmop vm-pr1 (format nil "VM-PR1 '~a'" str) (addr str)
+	 ((dw nil addr))
 	 ((vm-print-string-fn 1)))
 ;;;
 ;;; VM-PR2 - Print two line string
 ;;;
-(defvmop vm-pr2 (format nil "VM-PR2 '~a'" str) (str)
-	 ((dcs nil str))
+(defvmop vm-pr2 (format nil "VM-PR2 '~a'" str) (addr str)
+	 ((dw nil addr))
 	 ((vm-print-string-fn 2)))
 
 ;;;
 ;;; VM-PR3 - Print three line string
 ;;;
-(defvmop vm-pr3 (format nil "VM-PR3 '~a'" str) (str)
-	 ((dcs nil str))
+(defvmop vm-pr3 (format nil "VM-PR3 '~a'" str) (addr str)
+	 ((dw nil addr))
 	 ((vm-print-string-fn 3)))
 
 ;;

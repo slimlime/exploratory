@@ -18,6 +18,7 @@
 (defparameter *compiler-namespace-stack* nil)
 (defparameter *compiler-namespace-sizes* nil)
 (defparameter *compiler-local-namespace-count* 0)
+(defparameter *compiler-address-labels* 0)
 
 ; todo A way of providing a 'spare byte/word' to the compile
 ; which can then be used later e.g.
@@ -28,6 +29,13 @@
 
 ; WIBNI
 					; Assert if final page jump bug
+
+;;TODO. Pretty sure that the model for the labels is wrong
+;;      in other words, should it be reset between passes?
+;;      can it be reset. This requires some thought.
+;;      The reverse look-up definitely needs to be regenerated
+;;      For now I am using org as the thing to reset between
+;;      passes, but maybe this should be split into org and reset
 
 (defun reset-compiler (&optional (buffer-size 65536))
   (setf *compiler-ptr* 0)
@@ -45,7 +53,7 @@
   (setf *compiler-namespace-stack* nil)
   (setf *compiler-namespace-sizes* (make-hash-table :test 'equal))
   (setf *compiler-local-namespace-count* 0)
-
+  
   (values))
 
 (defmacro defop (byte opcode &optional (mode :imp))
@@ -235,6 +243,7 @@
 (defun org (add)
   (assert-address add)
   (setf *compiler-local-namespace-count* 0)
+  (setf *compiler-address-labels* (make-hash-table))
   (setf *compiler-ptr* add))
 
 (defun label (label &optional (namespace nil namespace-p))
@@ -245,6 +254,7 @@
   (when namespace
     ; combine the label and namespace if one is present
     (setf label (cons namespace label)))
+  (push (gethash *compiler-ptr* *compiler-address-labels*) label)
   (setf (gethash label *compiler-labels*) *compiler-ptr*))
 
 (defun alias (alias label)
@@ -577,87 +587,82 @@
   (let ((*compiler-final-pass* t))
     (setf start (resolve start))
     (setf end (resolve end)))
-  (let ((lab (make-hash-table)))		
-    ;;invert the label table i.e. lookup label by address
-    ;;todo, additional labels at the same address are currently hidden
-    (maphash #'(lambda (label addr) (push label (gethash addr lab)))
-	     *compiler-labels*)
-    (loop for i from start to end do
-	 (let* ((opcode (gethash (aref buffer i) *reverse-opcodes*))
-		(mode (cdr opcode))
-		(op (car opcode))
-		(arg1 (aref buffer (+ 1 i)))
-		(arg2 (aref buffer (+ 2 i))))
-	   (let* ((label (gethash i lab))
-		  (hint (gethash i *compiler-disassembler-hints*))
-		  (comments (gethash i *compiler-comments*))
-		  (postfix-comments (gethash i *compiler-postfix-comments*)))
-	     (when comments
-	       (dolist (comment (reverse comments))
-		 (format t "                     ;~a~%" comment)))
-	     (when label
-	       (dolist (l (cdr label))
-		 (format t "~a~%" (right-justify (fmt-label l t)))))
-	     (format t "~a ~4,'0X ~2,'0X"
-		     (if label
-			 (right-justify (fmt-label (car label) t))
-			 "                    ")
-		     i (aref buffer i))
-	     (if (and hint (numberp (car hint)))
-		 (progn
-		   ;;render hint
-		   (case (car hint)
-		     (1 (format t "       ~a" (cdr hint)))
-		     (2 (format t "~2,'0X     ~a"
-				(aref buffer (+ i 1))
-				(cdr hint)))
-		     (3 (format t "~2,'0X~2,'0X   ~a"
-				(aref buffer (+ i 1))
-				(aref buffer (+ i 2))
-				(cdr hint)))
-		     (4 (format t "~2,'0X~2,'0X~2,'0X ~a"
-				(aref buffer (+ i 1))
-				(aref buffer (+ i 2))
-				(aref buffer (+ i 3))
-				(cdr hint)))
-		     (otherwise (format t "~2,'0X~2,'0X.. ~a"
-				(aref buffer (+ i 1))
-				(aref buffer (+ i 2))
-				(cdr hint))))
-		   (incf i (1- (car hint))))
+  (loop for i from start to end do
+       (let* ((opcode (gethash (aref buffer i) *reverse-opcodes*))
+	      (mode (cdr opcode))
+	      (op (car opcode))
+	      (arg1 (aref buffer (+ 1 i)))
+	      (arg2 (aref buffer (+ 2 i))))
+	 (let* ((label (gethash i *compiler-address-labels*))
+		(hint (gethash i *compiler-disassembler-hints*))
+		(comments (gethash i *compiler-comments*))
+		(postfix-comments (gethash i *compiler-postfix-comments*)))
+	   (when comments
+	     (dolist (comment (reverse comments))
+	       (format t "                     ;~a~%" comment)))
+	   (when label
+	     (dolist (l (cdr label))
+	       (format t "~a~%" (right-justify (fmt-label l t)))))
+	   (format t "~a ~4,'0X ~2,'0X"
+		   (if label
+		       (right-justify (fmt-label (car label) t))
+		       "                    ")
+		   i (aref buffer i))
+	   (if (and hint (numberp (car hint)))
+	       (progn
+		 ;;render hint
+		 (case (car hint)
+		   (1 (format t "       ~a" (cdr hint)))
+		   (2 (format t "~2,'0X     ~a"
+			      (aref buffer (+ i 1))
+			      (cdr hint)))
+		   (3 (format t "~2,'0X~2,'0X   ~a"
+			      (aref buffer (+ i 1))
+			      (aref buffer (+ i 2))
+			      (cdr hint)))
+		   (4 (format t "~2,'0X~2,'0X~2,'0X ~a"
+			      (aref buffer (+ i 1))
+			      (aref buffer (+ i 2))
+			      (aref buffer (+ i 3))
+			      (cdr hint)))
+		   (otherwise (format t "~2,'0X~2,'0X.. ~a"
+				      (aref buffer (+ i 1))
+				      (aref buffer (+ i 2))
+				      (cdr hint))))
+		 (incf i (1- (car hint))))
 					;else render opcodes
-		 (labels ((format-label (addr)
-			    (let ((label (gethash addr lab)))
-			      (when label
-				(format t "~45,1T;~{~a ~}"
-					(mapcar #'(lambda (l) (fmt-label l t)) label)))))
-			  (format-cur-label ()
-			    (format-label (logior arg1 (ash arg2 8))))
-			  (format-1 (fmt) (format t fmt arg1 op arg1)
-				    (incf i))
-			  (format-2 (fmt) (format t fmt arg1 arg2 op arg2 arg1)
-				    (format-cur-label)
-				    (incf i 2)))
-		   (case mode
-		     (:imm (format-1 "~2,'0X     ~a #$~2,'0X"))
-		     (:rel (let ((addr (rel-addr arg1 i)))
-			     (format t "~2,'0X     ~a $~4,'0X" arg1 op addr)
-			     (format-label addr))
-			   (incf i))
-		     (:imp (format t "       ~a" op))
-		     (:ab (format-2 "~2,'0X~2,'0X   ~a $~2,'0X~2,'0X"))
-		     (:zp (format-1 "~2,'0X     ~a $~2,'0X"))
-		     (:ind (format-2 "~2,'0X~2,'0X   ~a ($~2,'0X~2,'0X)"))
-		     (:izx (format-1 "~2,'0X     ~a ($~2,'0X,X)"))
-		     (:izy (format-1 "~2,'0X     ~a ($~2,'0X),Y"))
-		     (:zpx (format-1 "~2,'0X     ~a $~2,'0X,X"))
-		     (:zpy (format-1 "~2,'0X     ~a $~2,'0X,Y"))
-		     (:aby (format-2 "~2,'0X~2,'0X   ~a $~2,'0X~2,'0X,Y"))
-		     (:abx (format-2 "~2,'0X~2,'0X   ~a $~2,'0X~2,'0X,X")))))
-	     (dolist (comment (reverse postfix-comments))
-	       (format t "~45,1T;~a" comment))
-	     (terpri))
-	   (values)))))
+	       (labels ((format-label (addr)
+			  (let ((label (gethash addr *compiler-address-labels*)))
+			    (when label
+			      (format t "~45,1T;~{~a ~}"
+				      (mapcar #'(lambda (l) (fmt-label l t)) label)))))
+			(format-cur-label ()
+			  (format-label (logior arg1 (ash arg2 8))))
+			(format-1 (fmt) (format t fmt arg1 op arg1)
+				  (incf i))
+			(format-2 (fmt) (format t fmt arg1 arg2 op arg2 arg1)
+				  (format-cur-label)
+				  (incf i 2)))
+		 (case mode
+		   (:imm (format-1 "~2,'0X     ~a #$~2,'0X"))
+		   (:rel (let ((addr (rel-addr arg1 i)))
+			   (format t "~2,'0X     ~a $~4,'0X" arg1 op addr)
+			   (format-label addr))
+			 (incf i))
+		   (:imp (format t "       ~a" op))
+		   (:ab (format-2 "~2,'0X~2,'0X   ~a $~2,'0X~2,'0X"))
+		   (:zp (format-1 "~2,'0X     ~a $~2,'0X"))
+		   (:ind (format-2 "~2,'0X~2,'0X   ~a ($~2,'0X~2,'0X)"))
+		   (:izx (format-1 "~2,'0X     ~a ($~2,'0X,X)"))
+		   (:izy (format-1 "~2,'0X     ~a ($~2,'0X),Y"))
+		   (:zpx (format-1 "~2,'0X     ~a $~2,'0X,X"))
+		   (:zpy (format-1 "~2,'0X     ~a $~2,'0X,Y"))
+		   (:aby (format-2 "~2,'0X~2,'0X   ~a $~2,'0X~2,'0X,Y"))
+		   (:abx (format-2 "~2,'0X~2,'0X   ~a $~2,'0X~2,'0X,X")))))
+	   (dolist (comment (reverse postfix-comments))
+	     (format t "~45,1T;~a" comment))
+	   (terpri))
+	 (values))))
 
 ;;e.g. CL-USER> (disassemble-6502-to-list #x600 #x610)
 ;; ((LDA :IMM 1) (STA :ZP 0) (LDA :IMM 0) (STA :ZP 1) (INC :ZP 0) (BNE :REL 2)

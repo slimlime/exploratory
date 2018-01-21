@@ -81,7 +81,7 @@
 	    (vm-boop object place (if else :else :end-if))
 	    (with-namespace namespace
 	      (funcall then))
-	    (when else
+	    (when else    
 	      (vm-bra :end-if)))
 	  (progn
 	    (assert else nil "Must have at least one clause")

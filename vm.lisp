@@ -129,21 +129,25 @@
   (LDA.IZY :vm-pc)
   (inc16.zp :vm-pc))
 
-(defun fmt-addr (addr)
-  (if (numberp addr)
-      (format nil "$~4,'0X" addr)
-      (format nil "$~4,'0X (~a)" (resolve addr) addr)))
 
 (defparameter *vm-done-optimizations* (make-hash-table :test 'equal))
 
 (defun reset-vm ()
   (setf *vm-done-optimizations* (make-hash-table :test 'equal)))
 
+;;
 ;;TODO this is only going to work for branches within the calling namespace
+;;hopefully fmt-addr will crap out if so, so we can fix it.
 (defun qualify-label-enclosing-namespace (addr)
   (if (or (consp addr) (numberp addr))
       addr
       (cons (second *compiler-namespace-stack*) addr)))
+
+(defun fmt-addr (addr)
+  (if (numberp addr)
+      (format nil "$~4,'0X" addr)
+      (let ((l (qualify-label-enclosing-namespace addr)))
+	(format nil "~a:~a" (car l) (cdr l)))))
 
 (defun register-vm-done ()
   (dolist (label (gethash (1- *compiler-ptr*) *compiler-address-labels*))
@@ -187,7 +191,7 @@
 ;;
 (defvmop vm-bra (if (can-omit-branch addr optimize)
 		    "VM-DONE"
-		    (format nil "VM-BRA -> ~a" (fmt-addr addr)))
+		    (format nil "VM-BRA ~a" (fmt-addr addr)))
   (addr &optional (optimize t))
   ((if (can-omit-branch addr optimize)
        (progn
@@ -202,52 +206,64 @@
 ;;
 ;;VM-BSET - Branch on bit set
 ;;
-(defvmop vm-bset (format nil "VM-BSET ~a -> ~a" bit (fmt-addr addr)) (bit addr)
-	 ((push-byte (bit-index bit))
-	  (push-byte (forward-branch-offset addr)))
-	 ((JSR :get-bit-mask)
-	  (AND.ABY :bit-table)
-	  (BNE '(:vm-branch . :branch))
-	  (BEQ '(:vm-branch . :dont-branch))))
+(defvmop vm-bset (format nil "VM-BSET ~a ~a"
+			 (string-downcase bit)
+			 (fmt-addr addr))
+  (bit addr)
+  ((push-byte (bit-index bit))
+   (push-byte (forward-branch-offset addr)))
+  ((JSR :get-bit-mask)
+   (AND.ABY :bit-table)
+   (BNE '(:vm-branch . :branch))
+   (BEQ '(:vm-branch . :dont-branch))))
 
 ;;
 ;;VM-BCLR - Branch on bit not set
 ;;
-(defvmop vm-bclr (format nil "VM-BCLR ~a -> ~a" bit (fmt-addr addr)) (bit addr)
-	 ((push-byte (bit-index bit))
-	  (push-byte (forward-branch-offset addr)))
-	 ((JSR :get-bit-mask)
-	  (AND.ABY :bit-table)
-	  (BEQ '(:vm-branch . :branch))
-	  (BNE '(:vm-branch . :dont-branch))))
+(defvmop vm-bclr (format nil "VM-BCLR ~a ~a"
+			 (string-downcase bit)
+			 (fmt-addr addr))
+  (bit addr)
+  ((push-byte (bit-index bit))
+   (push-byte (forward-branch-offset addr)))
+  ((JSR :get-bit-mask)
+   (AND.ABY :bit-table)
+   (BEQ '(:vm-branch . :branch))
+   (BNE '(:vm-branch . :dont-branch))))
 
 ;;;
 ;;;VM-BOIP - Branch on object in place
 ;;;
-(defvmop vm-boip (format nil "VM-BOIP ~a ~a -> ~a" object place (fmt-addr addr)) (object place addr)
-	 ((push-byte (object-id object))
-	  (push-byte (place-id place))
-	  (push-byte (forward-branch-offset addr)))
-	 ((vm-fetch)
-	  (TAX)
-	  (vm-fetch)
-	  (CMP.ABX (1- (resolve '(:object-table . :places))))
-	  (BEQ '(:vm-branch . :branch))
-	  (BNE '(:vm-branch . :dont-branch))))
+(defvmop vm-boip (format nil "VM-BOIP ~a IN ~a ~a"
+			 (string-downcase object)
+			 (string-downcase place) (fmt-addr addr))
+  (object place addr)
+  ((push-byte (object-id object))
+   (push-byte (place-id place))
+   (push-byte (forward-branch-offset addr)))
+  ((vm-fetch)
+   (TAX)
+   (vm-fetch)
+   (CMP.ABX (1- (resolve '(:object-table . :places))))
+   (BEQ '(:vm-branch . :branch))
+   (BNE '(:vm-branch . :dont-branch))))
 
 ;;;
 ;;;VM-BOOP - Branch on object not in place
 ;;;
-(defvmop vm-boop (format nil "VM-BOOP ~a ~a -> ~a" object place (fmt-addr addr)) (object place addr)
-	 ((push-byte (object-id object))
-	  (push-byte (place-id place))
-	  (push-byte (forward-branch-offset addr)))
-	 ((vm-fetch)
-	  (TAX)
-	  (vm-fetch)
-	  (CMP.ABX (1- (resolve '(:object-table . :places))))
-	  (BNE '(:vm-branch . :branch))
-	  (BEQ '(:vm-branch . :dont-branch))))
+(defvmop vm-boop (format nil "VM-BOOP ~a NOT IN ~a ~a"
+			 (string-downcase object)
+			 (string-downcase place) (fmt-addr addr))
+  (object place addr)
+  ((push-byte (object-id object))
+   (push-byte (place-id place))
+   (push-byte (forward-branch-offset addr)))
+  ((vm-fetch)
+   (TAX)
+   (vm-fetch)
+   (CMP.ABX (1- (resolve '(:object-table . :places))))
+   (BNE '(:vm-branch . :branch))
+   (BEQ '(:vm-branch . :dont-branch))))
 
 ;;;
 ;;; VM-NAV - Navigate to a new location
@@ -258,46 +274,70 @@
 	  (TAX)
 	  (vm-fetch)
 	  (JMP '(:navigate . :navigate-no-deref))))
+
+(defun vm-print-inline-fn (lines)
+  (dc "The string to print is right after the VM-PR instruction")
+  (cpy16.zp :vm-pc '(:typeset-cs . :str))
+  (LDA lines)
+  (JSR :print-message)
+  (dc "Now advance the vm-pc to after the string")
+  (cpy16.zp :vm-pc '(:typeset-cs . :str))
+  (inc16.zp :vm-pc)
+  (RTS))
+
+;;;
+;;; VM-PRI1 - Print one line string, inlined
+;;;
+(defvmop vm-pri1 (format nil "VM-PRI1 '~a'" str) (str)
+	 ((dcs nil str))
+	 ((vm-print-inline-fn 1)))
+;;;
+;;; VM-PRI2 - Print two line string, inlined
+;;;
+(defvmop vm-pri2 (format nil "VM-PRI2 '~a'" str) (str)
+	 ((dcs nil str))
+	 ((vm-print-inline-fn 2)))
+
+;;;
+;;; VM-PRI3 - Print three line string, inlined
+;;;
+(defvmop vm-pri3 (format nil "VM-PRI3 '~a'" str) (str)
+	 ((dcs nil str))
+	 ((vm-print-inline-fn 3)))
+
+(defun vm-print-string-fn (lines)
+  (dc "The address of the string is after the instruction")
+  (vm-fetch)
+  (STA.ZP (lo-add '(:typeset-cs . :str)))
+  (vm-fetch)
+  (STA.ZP (hi-add '(:typeset-cs . :str)))
+  (LDA lines)
+  (JMP :print-message))
+
 ;;;
 ;;; VM-PR1 - Print one line string
 ;;;
-(defvmop vm-pr1 (format nil "VM-PR1 ~a" (fmt-addr str)) (str)
-	 ((dw nil str))
-	 ((vm-fetch)
-	  (STA.ZP (lo-add '(:typeset-cs . :str)))
-	  (vm-fetch)
-	  (STA.ZP (hi-add '(:typeset-cs . :str)))
-	  (LDA 1)
-	  (JMP :print-message)))
-
+(defvmop vm-pr1 (format nil "VM-PR1 '~a'" str) (str)
+	 ((dcs nil str))
+	 ((vm-print-string-fn 1)))
 ;;;
 ;;; VM-PR2 - Print two line string
 ;;;
-(defvmop vm-pr2 (format nil "VM-PR2 ~a" (fmt-addr str)) (str)
-	 ((dw nil str))
-	 ((vm-fetch)
-	  (STA.ZP (lo-add '(:typeset-cs . :str)))
-	  (vm-fetch)
-	  (STA.ZP (hi-add '(:typeset-cs . :str)))
-	  (LDA 2)
-	  (JMP :print-message)))
+(defvmop vm-pr2 (format nil "VM-PR2 '~a'" str) (str)
+	 ((dcs nil str))
+	 ((vm-print-string-fn 2)))
 
 ;;;
 ;;; VM-PR3 - Print three line string
 ;;;
-(defvmop vm-pr3 (format nil "VM-PR3 ~a" (fmt-addr str)) (str)
-	 ((dw nil str))
-	 ((vm-fetch)
-	  (STA.ZP (lo-add '(:typeset-cs . :str)))
-	  (vm-fetch)
-	  (STA.ZP (hi-add '(:typeset-cs . :str)))
-	  (LDA 3)
-	  (JMP :print-message)))
-	 
+(defvmop vm-pr3 (format nil "VM-PR3 '~a'" str) (str)
+	 ((dcs nil str))
+	 ((vm-print-string-fn 3)))
+
 ;;
 ;;VM-CLR - Clear bit
 ;;
-(defvmop vm-clr (format nil "VM-CLR ~a" bit) (bit)
+(defvmop vm-clr (format nil "VM-CLR ~a" (string-downcase bit)) (bit)
 	 ((push-byte (bit-index bit)))
 	 ((JSR :get-bit-mask)
 	  (EOR #xff)
@@ -308,7 +348,7 @@
 ;;
 ;;VM-SET - Set bit
 ;;
-(defvmop vm-set (format nil "VM-SET ~a" bit) (bit)
+(defvmop vm-set (format nil "VM-SET ~a" (string-downcase bit)) (bit)
 	 ((push-byte (bit-index bit)))
 	 ((JSR :get-bit-mask)
 	  (ORA.ABY :bit-table)
@@ -318,14 +358,17 @@
 ;;;
 ;;;VM-MOV - Move object to place
 ;;;
-(defvmop vm-mov (format nil "VM-MOV ~a ~a " object place) (object place)
-	 ((push-byte (object-id object))
-	  (push-byte (place-id place)))
-	 ((vm-fetch)
-	  (TAX)
-	  (vm-fetch)
-	  (STA.ABX (1- (resolve '(:object-table . :places))))
-	  (RTS)))
+(defvmop vm-mov (format nil "VM-MOV ~a ~a "
+			(string-downcase object)
+			(string-downcase place))
+  (object place)
+  ((push-byte (object-id object))
+   (push-byte (place-id place)))
+  ((vm-fetch)
+   (TAX)
+   (vm-fetch)
+   (STA.ABX (1- (resolve '(:object-table . :places))))
+   (RTS)))
 
 ;; reverse the order of the ops since they were pushed in
 

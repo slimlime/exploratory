@@ -8,6 +8,7 @@
 (defparameter *processed-strings* nil)
 (defparameter *compiled-strings* nil)
 (defparameter *string-table* nil)
+(defparameter *deferred-strings* nil)
 
 ;;this string table is basically a hash look-up of strings
 ;;to addresses, which should be valid on the final pass
@@ -39,6 +40,7 @@
   (setf *processed-strings* nil)
   (setf *word-table* (make-hash-table :test 'equal))
   (setf *string-table* (make-hash-table :test 'equal))
+  (setf *deferred-strings* (make-hash-table :test 'equal))
   ;; Adding newline now means it will be in a predictable
   ;; location, namely 1
   (process-string (string #\Newline)))
@@ -156,10 +158,11 @@
 	    (encode-string str #'(lambda (i word)
 				   (declare (ignore word))
 				   (push-byte i)))
+	    ;;set the actual address of the string in the string table
 	    (setf (gethash str *string-table*) address)))
 	;;in the first pass, add the string to the table
 	(process-string str))
-    address))
+    (values)))
 
 (defun dstr (str)
   "Define a compressed string and inline it later"
@@ -170,9 +173,9 @@
 	    ;;return it.
 	    address
 	    (progn
-	      ;;add it to the hashtable so we know
-	      ;;we need to actually put it in the
-	      ;;memory at some point.
+	      ;;add the string to the table, and also
+	      ;;to a list of strings which will be generated later
+	      (setf (gethash str *deferred-strings*) t)
 	      (setf (gethash str *string-table*) 0)
 	      0)))
       (progn
@@ -186,7 +189,7 @@
     (maphash #'(lambda (str address)
 		 (declare (ignorable address))
 		 (push str strings))
-	     *string-table*)
+	     *deferred-strings*)
     (dc (format nil "String Table ~a entries" (length strings)))
     (dolist (str strings)
       (dcs nil str))))

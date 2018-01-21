@@ -123,12 +123,11 @@
 (defun respond (message &rest messages)
   (multiple-value-bind (text lines)
       (justify-response message messages)
-    (dc text t)
-    (let ((str (dstr text)))
-      (case lines
-	(1 (vm-pr1 str))
-	(2 (vm-pr2 str))
-	(3 (vm-pr3 str))))))
+    (
+    (case lines
+      (1 (vm-pr1 text))
+      (2 (vm-pr2 text))
+      (3 (vm-pr3 text)))))
 
 (defun respond-raw (message &rest messages)
   "Raw code response function"

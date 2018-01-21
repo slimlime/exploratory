@@ -1,3 +1,57 @@
+## 21/1/2018
+
+## Dead Branch Pruning
+
+When we emit byte-code for an if statement, we have to emit a `VM-BRA` instruction to skip over the else clause so that we don't execute it if the condition is met. Sometimes there is a branch to `VM-DONE`, this is a dead branch. Here is an example, at $0BB0 and $0BBA.
+
+~~~~
+
+                     ;ON EXAMINE FLOOR 
+N-CELL:EXAMINE-FLOOR 0BA7 07010007 VM-BOOP SHINY KEY NOWHERE -> $0BB2 (ELSE)
+                     0BAB 0AF82D   VM-PR2 $2DF8 ;There is a crack in the floor. Perhaps it
+bears further examination?
+                     0BAE 0D05     VM-SET FLOOR-EXAMINED
+                     0BB0 030F     VM-BRA -> $0BC1 (END-IF)
+          $0BA7:ELSE 0BB2 050607   VM-BCLR GORILLA-SEEN -> $0BBC (ELSE)
+                     0BB5 0AE22D   VM-PR2 $2DE2 ;Apart from the crack, there is nothing
+there.
+                     0BB8 0D0B     VM-SET SOUGHT-GORILLA
+                     0BBA 0305     VM-BRA -> $0BC1 (END-IF)
+          $0BB2:ELSE 0BBC 0AB82D   VM-PR2 $2DB8 ;The sad face of a gorilla peers out from
+the random pattern of a floor-brick.
+                     0BBF 0D06     VM-SET GORILLA-SEEN
+        $0BB2:END-IF
+        $0BA7:END-IF 0BC1 00       VM-DONE
+
+~~~~
+
+To prune these dead branches we could analyse the input code for this action, it is a macro after all. So we could 'simply' walk the tree and annotate the leaves that represent a final instruction. Sounds like it is probably simple for the simple style of actions we allow in the game, but sounds horrifically complex for any more convoluted LISP constructs. This is of course the best thing to do, as we can be sure of logical correctness. Anyway this sounds suspiciously like the sort of thing a compiler would do, in any case, here at scrozzbot towers we don't give a fig biscuit for logical correctness, preferring instead to get something that works with the minimum of brainthink.
+
+So, what we can do instead is add the labels where a `VM-DONE` is emitted to a list, and in the next pass, if we branch to that label, we can replace the branch with a `VM-DONE`, which is a byte cheaper. The crummy local namespaces have been replaced with labels which count cleanly, `L1:ELSE`, `L2:ELSE` etc.
+
+~~~~
+;ON EXAMINE FLOOR 
+N-CELL:EXAMINE-FLOOR 0B01 07010006 VM-BOOP SHINY KEY NOWHERE -> $0B0B (ELSE)
+                     0B05 0ABD2D   VM-PR2 $2DBD ;There is a crack in the floor. Perhaps it
+bears further examination?
+                     0B08 0D05     VM-SET FLOOR-EXAMINED
+                     0B0A 00       VM-DONE   ;Dead branch
+             L3:ELSE 0B0B 050606   VM-BCLR GORILLA-SEEN -> $0B14 (ELSE)
+                     0B0E 0AA72D   VM-PR2 $2DA7 ;Apart from the crack, there is nothing
+there.
+                     0B11 0D0B     VM-SET SOUGHT-GORILLA
+                     0B13 00       VM-DONE   ;Dead branch
+             L4:ELSE 0B14 0A7D2D   VM-PR2 $2D7D ;The sad face of a gorilla peers out from
+the random pattern of a floor-brick.
+                     0B17 0D06     VM-SET GORILLA-SEEN
+           L4:END-IF
+           L3:END-IF 0B19 00       VM-DONE
+~~~~
+
+Now what about branches to branches to `VM-DONE`? Well, of course you remember this dictat from the first post "*two or more simple but inefficient passes are better than one incredibly complex but inefficient pass.*" So we add a couple of passes to get those branches to dead-branches too. Clunky? Yes. Works? Yes. Logically correct? Probably.
+
+An interesting thing to note is that dead branch pruning in actual fact removed *all* the `VM-BRA` instructions from the test game. This won't be true in general, but it does mean that a certain optimization I wanted to do is now less likely to cause problems, namely string inlining.
+
 ## 20/1/2018
 
 ## Virtually Indistinguishable from the Real Thing

@@ -254,7 +254,7 @@
   (when namespace
     ; combine the label and namespace if one is present
     (setf label (cons namespace label)))
-  (push (gethash *compiler-ptr* *compiler-address-labels*) label)
+  (push label (gethash *compiler-ptr* *compiler-address-labels*))
   (setf (gethash label *compiler-labels*) *compiler-ptr*))
 
 (defun alias (alias label)
@@ -287,7 +287,6 @@
 		(format nil "Alias clash '~a'. These aliases ~a. Those aliases ~a"
 			that these those))))))
 
-	
 (defun db (label byte &rest bytes)
   (setf bytes (cons byte bytes))
   (add-hint (length bytes)

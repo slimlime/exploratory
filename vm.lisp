@@ -134,13 +134,27 @@
       (format nil "$~4,'0X" addr)
       (format nil "$~4,'0X (~a)" (resolve addr) addr)))
 
+(defparameter *vm-done-optimizations* (make-hash-table :test 'equal))
+
+(defun reset-vm ()
+  (setf *vm-done-optimizations* (make-hash-table :test 'equal)))
+
+;;TODO this is only going to work for branches within the calling namespace
+(defun qualify-label-enclosing-namespace (addr)
+  (if (or (consp addr) (numberp addr))
+      addr
+      (cons (second *compiler-namespace-stack*) addr)))
+
+(defun register-vm-done ()
+  (dolist (label (gethash (1- *compiler-ptr*) *compiler-address-labels*))
+    (setf (gethash label *vm-done-optimizations*) t)))
+
 ;;
 ;; VM-DONE Finish the VM code and return to where we came from
 ;;
 (defvmop vm-done "VM-DONE" ()
-	 ()
+	 ((register-vm-done))
 	 ())
-
 ;;
 ;; VM-EXE Execute 6502 here
 ;;
@@ -165,13 +179,25 @@
       (- (resolve label) *compiler-ptr* 1)
       0))
 
+(defun can-omit-branch (addr optimize)
+  (and optimize (gethash (qualify-label-enclosing-namespace addr) *vm-done-optimizations*)))
+  
 ;;
 ;;VM-BRA - Branch always
 ;;
-(defvmop vm-bra (format nil "VM-BRA -> ~a" (fmt-addr addr)) (addr)
-	 ((push-byte (forward-branch-offset addr)))
-	 ((BNE '(:vm-branch . :branch))
-	  (BEQ '(:vm-branch . :branch))))
+(defvmop vm-bra (if (can-omit-branch addr optimize)
+		    "VM-DONE"
+		    (format nil "VM-BRA -> ~a" (fmt-addr addr)))
+  (addr &optional (optimize t))
+  ((if (can-omit-branch addr optimize)
+       (progn
+	 (decf *compiler-ptr*)
+	 (dc "Dead branch" t)
+	 (push-byte 0)
+	 (register-vm-done))
+       (push-byte (forward-branch-offset addr))))
+  ((BNE '(:vm-branch . :branch))
+   (BEQ '(:vm-branch . :branch))))
 
 ;;
 ;;VM-BSET - Branch on bit set

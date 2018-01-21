@@ -279,6 +279,7 @@ preventing closed-minded mortals from seeing what is really there.")
   ;;todo, make a font-init function which just does the widths.
   (font-data)
   (reset-compiler)
+  (reset-vm)
   
   (flet ((pass ()
 
@@ -350,6 +351,10 @@ preventing closed-minded mortals from seeing what is really there.")
     ;;penultimate pass to ensure everything got a go and the structure
     ;;hasn't changed
 
+    ;;these two passes to optimize dead vm branches
+    (pass)
+    (pass)
+    
     (pass)
     (let ((end *compiler-ptr*))
       (pass)

@@ -2,7 +2,7 @@
 
 ## Dead Branch Pruning
 
-When we emit byte-code for an if statement, we have to emit a `VM-BRA` instruction to skip over the else clause so that we don't execute it if the condition is met. Sometimes there is a branch to `VM-DONE`, this is a dead branch. Here is an example, at $0BB0 and $0BBA.
+When we emit byte-code for an if statement, we have to emit a `VM-BRA` instruction to skip over the else clause so that we don't execute it if the condition is met. Sometimes there is a branch to `VM-DONE`, this is a dead branch, and mildly offends my sense of aesthetics. Here is an example, at `$0BB0` and `$0BBA`.
 
 ~~~~
 
@@ -25,7 +25,25 @@ the random pattern of a floor-brick.
 
 ~~~~
 
-To prune these dead branches we could analyse the input code for this action, it is a macro after all. So we could 'simply' walk the tree and annotate the leaves that represent a final instruction. Sounds like it is probably simple for the simple style of actions we allow in the game, but sounds horrifically complex for any more convoluted LISP constructs. This is of course the best thing to do, as we can be sure of logical correctness. Anyway this sounds suspiciously like the sort of thing a compiler would do, in any case, here at scrozzbot towers we don't give a fig biscuit for logical correctness, preferring instead to get something that works with the minimum of brainthink.
+From the LISP game code,
+
+~~~~
+
+    (action '(EXAMINE FLOOR)
+      (if-in-place "SHINY KEY" :nowhere
+		   (progn
+		     (respond "There is a crack in the floor. Perhaps it bears further examination?")
+		     (setbit :floor-examined))
+		   (if-not-bit :gorilla-seen
+			       (progn
+				 (respond "The sad face of a gorilla peers out from the random pattern of a floor-brick.")
+				 (setbit :gorilla-seen))
+			       (progn
+				 (respond "Apart from the crack, there is nothing there.")
+				 (setbit :sought-gorilla)))))
+~~~~
+
+To prune these dead branches we could analyse the input code for this action, `action` is a macro after all. So we could 'simply' walk the tree and annotate the leaves that represent a final instruction. Sounds like it is probably simple for the simple style of actions we allow in the game, but sounds horrifically complex for any more convoluted LISP constructs. This would be of course the best thing to do, as we could be sure of logical correctness. Having said that, this sounds suspiciously like the sort of thing a compiler would do, in any case, I think logical correctness is somewhat overrated, preferring instead to get something that works with the minimum of brainthink.
 
 So, what we can do instead is add the labels where a `VM-DONE` is emitted to a list, and in the next pass, if we branch to that label, we can replace the branch with a `VM-DONE`, which is a byte cheaper. The crummy local namespaces have been replaced with labels which count cleanly, `L1:ELSE`, `L2:ELSE` etc.
 
@@ -51,6 +69,17 @@ the random pattern of a floor-brick.
 Now what about branches to branches to `VM-DONE`? Well, of course you remember this dictat from the first post "*two or more simple but inefficient passes are better than one incredibly complex but inefficient pass.*" So we add a couple of passes to get those branches to dead-branches too. Clunky? Yes. Works? Yes. Logically correct? Probably.
 
 An interesting thing to note is that dead branch pruning in actual fact removed *all* the `VM-BRA` instructions from the test game. This won't be true in general, but it does mean that a certain optimization I wanted to do is now less likely to cause problems, namely string inlining.
+
+The good news is, we are now only 35 bytes off reclaiming the entire cost of implementing the VM. This will only improve as I add rooms.
+
+~~~~
+DUNGEON-CELL size 307
+CORRIDOR size 96
+FRAZBOLGS-CLOSET size 8
+GENERIC size 193
+GENERIC size 4
+Build size 13094
+~~~~
 
 ## 20/1/2018
 

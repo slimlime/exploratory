@@ -1,3 +1,47 @@
+## 22/1/2018
+
+## More Optimization
+
+Rather than intern the strings after the program data, I have added the ability to intern them directly at the first place they are encountered. This means a saving of two bytes per string, and we can still use them later by address. To support this there are three new VM instructions `VM-PRI1`,`VM-PRI2` and `VM-PRI3` which are just variants of the `VM-PR` instruction, except that they expect the string to occur immediately after the op-code,
+
+~~~~
+                     1171 00       VM-DONE
+            L25:ELSE 1172 09ABAE.. VM-PRI1 'The door is locked.'
+          L25:END-IF 117A 00       VM-DONE
+            L24:ELSE 117B 0CD510   VM-PR1 'Far out!'
+                     117E 09ABAE.. VM-PRI1 'The door creaks open.'
+                     1188 1004     VM-SET door-open
+~~~~
+
+Since 'Far out!' is a string that has already been inlined, it uses a slightly different instruction and passes an address.
+
+Build size after this optimization went down to 13037 so all the cost of the VM has been paid even though there are only two partially defined rooms- this will pay dividends as rooms are added. Inlining the strings with the definition code means that the sizes for each location are more realistic. Additionally, I included the image size so hence the seeming blow-up,
+
+~~~~
+Dungeon Cell size 2909
+Corridor size 1728
+Frazbolg's Closet size 1268
+GENERIC size 18
+Object Table size 104
+Dispatcher size 347
+String Table size 690
+Fonts size 2288
+Build size 13075
+~~~~
+
+*3k!* Not cool!
+
+Since I want this game to run on a C-64 I really need to think about getting the size down. At 2909 bytes per typical location, I won't be able to fit the 24 rooms I am planning for the final game. Perhaps I will just optimize as I go and just limit the game to what will fit. I don't think it is that far off being possible.
+
+## Verb-Object
+
+All this optimization and the virtual machine itself are something of a distraction from the main problem I have, which is that the game cannot yet dispatch on verbs with full objects, so for example `EAT FOOD` cannot be implemented in any way that is sensible. I propose to do some refactoring and re-introduce some of the unit tests that were lost in the VM implementation.
+
+- Each object will have a verb table associated with it
+- This will point to a list of words which has some VM code attached, implemented in a similar way to the `action` macro and supported by VM code.
+- After the location handlers and the generic handlers have run (but before the handler of last resort) then an object will be sought in the input string
+- Should such an object be found either in the inventory or in the location the action defined in the object table will be called, with the 'verb' as a parameter (of course, it will just be the first word in the parse output)
+
 ## 21/1/2018
 
 ## Dead Branch Pruning

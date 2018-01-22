@@ -31,8 +31,11 @@
     (defbits t :lock-jammed)
 
     (defobject "SHINY KEY" "It's a key, man." :initial-place :nowhere)
+    
     (defobject "INEDIBLE SLOP" "A balanced soup of entrails, small amphibians and mandibles. Ooh! Garlic croutons!" :name-override "Some inedible slop." :initial-place :nowhere)
 
+    ;;(defobject "FINGER BONE" "The digit of a long since departed previous occupant of your cell. Human? YOU decide.")
+        
     (action '(EXAMINE SLIME)
       (setbit :slime-examined)
       (respond "Millions of eyes peer out from the slime.")
@@ -252,7 +255,7 @@ preventing closed-minded mortals from seeing what is really there.")
     (action '(EXIT)
       (navigate :corridor))))
 
-(defun generic-handlers ()
+(defun generic-handlers () 
   ;;install the handlers common to all games
   (generic-generic-handlers)
   ;;then generic handlers for all the locations in this game
@@ -308,9 +311,14 @@ preventing closed-minded mortals from seeing what is really there.")
 	   ;;game state
 	   (label :game-code-start)
 	   (synonyms)
-	   (dungeon-cell)
-	   (corridor)
-	   (frazbolgs-closet)	   
+
+	   (measure-size "Dungeon Cell"
+	     (dungeon-cell))
+	   (measure-size "Corridor"
+	     (corridor))
+	   (measure-size "Frazbolg's Closet"
+	     (frazbolgs-closet))
+
 	   (generic-handlers)
 	   	   
 	   (bit-table)
@@ -331,18 +339,21 @@ preventing closed-minded mortals from seeing what is really there.")
 	   ;;testing functions
 
 	   (test-render-input)
-	   
-	   (object-table)
+
+	   (measure-size "Object Table"
+	     (object-table))
 	   (parser)
-	   
-	   (dispatcher)
-	   (string-table)
+
+	   (measure-size "Dispatcher"
+	     (dispatcher))
+	   (measure-size "String Table"
+	     (string-table))
 	   
 	   (image-decompressor)
 	   (label :end)
 	   ;font data is pretty boring so stick it here
-	   (font-data)
-	   ))
+	   (measure-size "Fonts"
+	     (font-data))))
     
     (pass)
     (build-symbol-table)

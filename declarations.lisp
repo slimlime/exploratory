@@ -28,9 +28,8 @@
 
 (defmacro with-location (location &body body)
   `(let ((*current-location* ,location))
-     (measure-size *current-location*
-       (with-namespace *current-location*
-	 ,@body))))
+     (with-namespace *current-location*
+       ,@body)))
 
 (defun if-bit-fn (bit then else)
   (defbit bit)

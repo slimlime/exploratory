@@ -8,7 +8,8 @@
 (defparameter *processed-strings* nil)
 (defparameter *compiled-strings* nil)
 (defparameter *string-table* nil)
-(defparameter *deferred-strings* nil)
+(defparameter *defined-strings* nil) ;;strings defined this pass
+                                     ;;cleared when building string table
 
 ;;this string table is basically a hash look-up of strings
 ;;to addresses, which should be valid on the final pass
@@ -40,7 +41,7 @@
   (setf *processed-strings* nil)
   (setf *word-table* (make-hash-table :test 'equal))
   (setf *string-table* (make-hash-table :test 'equal))
-  (setf *deferred-strings* (make-hash-table :test 'equal))
+  (setf *defined-strings* (make-hash-table :test 'equal))
   ;; Adding newline now means it will be in a predictable
   ;; location, namely 1
   (process-string (string #\Newline)))
@@ -137,62 +138,54 @@
       (close in)))
   (setf *symbol-table* (sort-word-table)))
 
-; assembler commands
+;; assembler commands
 
 (defun dcs (label str)
   "Define compressed string and inline it here"
-    (if *symbol-table*
-	;;if the string table is built, emit the string and supply
-	;;the label
-	(progn
-	  (when label
-	    (label label))
-	  (let ((len 0))
-	    (encode-string str #'(lambda (i word)
-				   (declare (ignore word i))
-				   (incf len)))
-	    (when *compiler-final-pass*
-	      (push (cons *compiler-ptr* str) *compiled-strings*))
-	    (add-hint len (format nil "DCS '~a' (~a->~a)" str (length str) len))
-	    (setf (gethash str *string-table*) *compiler-ptr*)
-	    (encode-string str #'(lambda (i word)
-				   (declare (ignore word))
-				   (push-byte i)))))
-	;;in the first pass, add the string to the table
-	(progn
-	  (process-string str)
-	  ;;also add to the table so later usages know it is inlined
-	  ;;somewhere earlier
-	  (setf (gethash str *string-table*) 0)))
-    (values))
+  (if *symbol-table*
+      ;;if the string table is built, emit the string and supply
+      ;;the label
+      (progn
+	(when label
+	  (label label))
+	(let ((len 0))
+	  (encode-string str #'(lambda (i word)
+				 (declare (ignore word i))
+				 (incf len)))
+	  (when *compiler-final-pass*
+	    (push (cons *compiler-ptr* str) *compiled-strings*))
+	  (add-hint len (format nil "DCS '~a' (~a->~a)" str (length str) len))
+	  (setf (gethash str *string-table*) *compiler-ptr*)
+	  (encode-string str #'(lambda (i word)
+				 (declare (ignore word))
+				 (push-byte i)))))
+      ;;in the first pass, add the string to the table
+      (progn
+	(process-string str)
+	(setf (gethash str *string-table*) *compiler-ptr*)))
+  ;;ensure that a string is inlined only once per pass
+  (setf (gethash str *defined-strings*) t)
+  (values))
 
-;; This function will return
-;; nil - this means the string has been inlined (only occurs if deferred = nil)
-;; address - this means the string has been (or will be) inlined elsewhere. This
-;; can occur whether deferred is t or nil.
-;; deferring means the string will be inlined later, by the string table.
-;; if you call the damn thing that is.
-(defun dstr (str &optional (defer t))  
+(defun dstr (str)
   (aif (gethash str *string-table*)
        it
-      (if defer
-	  (progn
-	    (setf (gethash str *deferred-strings*) t)
-	    (setf (gethash str *string-table*) 0)
-	    0)
-	  (progn
-	    (dcs nil str)
-	    nil))))
+       (progn
+	 (setf (gethash str *string-table* nil) 0)
+	 0)))
 
+  
+;;;this must be called last, after the last use of dcs/dstr
+;;;this hack means we don't have to reinitialise a hash set
+;;;on each pass
 (defun string-table ()
-  (let ((strings nil))
-    (maphash #'(lambda (str address)
-		 (declare (ignorable address))
-		 (push str strings))
-	     *deferred-strings*)
-    (dc (format nil "String Table ~a entries" (length strings)))
-    (dolist (str strings)
-      (dcs nil str))))
+  (dc "String Table")
+  (maphash #'(lambda (str _)
+	       (declare (ignorable _))
+	       (unless (gethash str *defined-strings*)
+		 (dcs nil str)))
+	   *string-table*)
+  (clrhash *defined-strings*))
 
 (defun emit-char-label (c)
   (format nil "EMIT-~a" c))

@@ -288,7 +288,7 @@
 ;;; VM-PRI1 - Print one line string, inlined after the op
 ;;;
 (defvmop vm-pri1 (format nil "VM-PRI1 '~a'" str) (str)
-	 ()
+	 ((dcs nil str))
 	 ((vm-print-inline-fn 1)))
 ;;;
 ;;; VM-PRI2 - Print two line string, inlined after the op

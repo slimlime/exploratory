@@ -123,17 +123,17 @@
 (defun respond (message &rest messages)
   (multiple-value-bind (text lines)
       (justify-response message messages)
-    (let ((x (dstr text nil)))
-      (format t "~a ~a~%" x text)
-    (aif x
-	 (case lines
-	   (1 (vm-pr1 it text))
-	   (2 (vm-pr2 it text))
-	   (3 (vm-pr3 it text)))
-	 (case lines
-	   (1 (vm-pri1 text))
-	   (2 (vm-pri2 text))
-	   (3 (vm-pri3 text))))))))
+    (if (gethash text *defined-strings*)
+	  (let ((addr (gethash text *string-table*)))
+	    (case lines
+	      (1 (vm-pr1 addr text))
+	      (2 (vm-pr2 addr text))
+	      (3 (vm-pr3 addr text))))
+	  (progn
+	    (case lines
+	      (1 (vm-pri1 text))
+	      (2 (vm-pri2 text))
+	      (3 (vm-pri3 text)))))))
 
 (defun respond-raw (message &rest messages)
   "Raw code response function"

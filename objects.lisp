@@ -11,7 +11,6 @@
 ;; ELSEWHERE and INVENTORY are PLACES
 
 (defparameter *current-location* nil)
-
 (defparameter *object-name->id* nil)
 (defparameter *object-id->data* nil)
 (defparameter *place->id* nil)
@@ -271,27 +270,26 @@
 	(apply #'db :name-lo (mapcar #'(lambda (o) (lo (fifth o))) objects))
 
 	;; object verb handlers
-	#|
+	
 	(labels ((verb-addr (o)
-		   (if (eighth o)
-		       (cons :verbs (second o))
+		   (if (gethash (seventh o) *object->vtable*) 
+		       (cons :vtable (seventh o))
 		       0)))
 	  (apply #'db :verb-hi (mapcar #'(lambda (o) (hi (verb-addr o))) objects))
 	  (apply #'db :verb-lo (mapcar #'(lambda (o) (lo (verb-addr o))) objects)))
-	|#
+	
 	;; object descriptions
 	
 	(apply #'db :description-hi (mapcar #'(lambda (o) (hi (fourth o))) objects))
 	(apply #'db :description-lo (mapcar #'(lambda (o) (lo (fourth o))) objects))
 	(apply #'db :description-lines (mapcar #'(lambda (o) (lo (sixth o))) objects))
-#|
+
 	(maphash #'(lambda (object verb-handlers)
-		     (label object :verbs)
+		     (label object :vtable)
 		     (dolist (verb-handler verb-handlers)
-		       (db nil (word-id (car verb-handler))
-		       (dw nil (cdr verb-handler)))))
-		 *object->vtable*)|#
-	))))
+		       (db nil (word-id (car verb-handler)))
+		       (dw nil (cdr verb-handler))))
+		 *object->vtable*)))))
 
 (defun dump-objects ()
   (dolist (object (build-object-table))
@@ -403,14 +401,6 @@
 (defobject "OBSIDIAN CUBE" "Black cube" :initial-place :nowhere)
 (defobject "CAT FLUFF" "Cat fluff" :initial-place :babylon)
 
-(assert (= 1 (object-id "MARDUK STATUE")))
-(assert (= 2 (object-id "STONE STATUE")))
-(assert (= 3 (object-id "GINGER BISCUIT")))
-(assert (= 4 (object-id "ENTRAILS")))
-(assert (= 5 (object-id "POCKET FLUFF")))
-(assert (= 6 (object-id "CAT FLUFF")))
-(assert (= 7 (object-id "OBSIDIAN CUBE")))
-
 (test-object-find "MARDUK" "STATUE" :ur :found :unique)
 (test-object-find "STONE" "STATUE" :ur :found :unique)
 (test-object-find "GINGER" "BISCUIT" :ur :found :unique)
@@ -432,17 +422,12 @@
 (test-object-find "STONE" "BISCUIT" :ur :not-found :unique)
 (test-object-find "ENTRAILS" "FLUFF" :ur :not-found :unique)
 (test-object-find nil "GINGER" :ur :not-found :unique)
-	  
-
-
-
-
-
-
-
-
-
       
-      
-      
+(assert (= 1 (object-id "MARDUK STATUE")))
+(assert (= 2 (object-id "STONE STATUE")))
+(assert (= 3 (object-id "GINGER BISCUIT")))
+(assert (= 4 (object-id "ENTRAILS")))
+(assert (= 5 (object-id "POCKET FLUFF")))
+(assert (= 6 (object-id "CAT FLUFF")))
+(assert (= 7 (object-id "OBSIDIAN CUBE")))
 

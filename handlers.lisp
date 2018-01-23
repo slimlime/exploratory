@@ -125,7 +125,7 @@
     ;; There is probs no point in doing that, let us have one that
     ;; does it then works out examine, take and drop.
     
-    (custom-action '()
+    (custom-action '(? ? ? ?)
       (with-namespace :verb-handler
 	(alias :vtable :A0)
 	(LDA.AB '(:parser . :words))

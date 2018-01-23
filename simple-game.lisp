@@ -124,7 +124,7 @@ preventing closed-minded mortals from seeing what is really there.")
 				 (progn
 				   (move-object "INEDIBLE SLOP" *current-location*)
 				   (clrbit :lock-jammed)
-				   (respond "He flings some inedible slop through the bars. You hear a key rattling in the lock."))
+				   (respond "He flings some inedible slop through the bars. You hear something rattling in the lock."))
 				 (respond "He tells you to keep the noise down using a stream of vowel-free goblin profanities. KRRPP KRRPP FNRGL!")))))
     
     (action '(EXAMINE KEYHOLE) (respond "It's a keyhole, man."))
@@ -268,8 +268,8 @@ preventing closed-minded mortals from seeing what is really there.")
   (generic-generic-handlers)
   ;;then generic handlers for all the locations in this game
   (with-location :generic 
-  (action '(? ? ?)
-    (respond "I don't know what that means."))))
+    (action '(? ? ?)
+      (respond "I don't know what that means."))))
 
 
 (defparameter origin #x600)

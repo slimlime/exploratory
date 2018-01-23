@@ -188,9 +188,11 @@
 	(defword verb))
       ;; all these verbs are handled at the same place for
       ;; this object
-      (push (cons verb label) (gethash object *object->vtable*)))
-    (label (cons (first verbs) object))
-    (vm-exe)
+      (let ((entry (cons verb label)))
+	(unless (find entry (gethash object *object->vtable*) :test 'equal)
+	  (push (cons verb label) (gethash object *object->vtable*)))))
+    (label object (first verbs))
+    (unless vm (vm-exe))
     (funcall fn)
     (if vm (vm-done) (rts))))
 

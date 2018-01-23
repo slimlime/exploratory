@@ -121,9 +121,64 @@
 	(label :not-found)
 	(respond-raw "Examine what?")))
 
+    ;; TODO each of these handlers calls the find object subroutine
+    ;; There is probs no point in doing that, let us have one that
+    ;; does it then works out examine, take and drop.
     
-
-    ))
+    (custom-action '()
+      (with-namespace :verb-handler
+	(alias :vtable :A0)
+	(LDA.AB '(:parser . :words))
+	(BNE :valid-ish-verb)
+	(respond-raw "I don't know that word.")
+	(RTS)
+	(label :valid-ish-verb)
+	(JSR :find-object-index-from-input)
+	(BCS :duplicate-found)
+	(BEQ :not-found)
+	(dc "Look for the verb handler for an object")
+	(LDA.ABY (1- (resolve '(:object-table . :verb-hi))))
+	(BEQ :nope "No handlers are on the zero page, so this means not set")
+	(STA.ZP (hi-add :vtable))
+	(LDA.ABY (1- (resolve '(:object-table . :verb-lo))))
+	(STA.ZP (lo-add :vtable))
+	(dc "Now look for the entry that corresponds to our verb")
+	(LDY 0)
+	(label :next)
+	(LDA.IZY :vtable)
+	(BEQ :nope)
+	(CMP.AB '(:parser . :words))
+	(BEQ :found)
+	;;TODO EARLY RETURN IF THE VERBS ARE SORTED
+	;;BY WORD ID WE CAN QUIT EARLY IF WE GO PAST IT
+	(dc "Skip to next, three bytes per entry")
+	(INY)
+	(INY)
+	(INY)
+	(BNE :next)
+	(label :nope)
+	(respond-raw "You can't do that to it!")
+	(RTS)
+	(label :duplicate-found)
+	(respond-raw *be-more-specific*)
+	(RTS)	
+	(label :found)
+	(dc "Call the VM with the address of the handler")
+	(INY)
+	(LDA.IZY :vtable)
+	(STA.ZP (lo-add :vm-pc))
+	(INY)
+	(LDA.IZY :vtable)
+	(STA.ZP (hi-add :vm-pc))
+	;;We are already in the context of the VM, but we don't care
+	;;don't bother returning there, when we return next we will
+	;;simply jump back to the original caller.
+	(PLA)
+	(PLA)
+	(JMP :vm-go "Execute VM code and return to grandparent")
+	(label :not-found)
+	(respond-raw "I don't see that.")
+	(RTS)))))
 
 (defun test-render-input ()
   (label :test-render-input)

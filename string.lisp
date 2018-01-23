@@ -1,7 +1,7 @@
-; assembler routines for building a string table in the first
-; pass. Each instance of (dcs "") will be processed in a string
-; table. In the next pass, the string table can be emitted and
-; the labels resolved.
+;; assembler routines for building a string table in the first
+;; pass. Each instance of (dcs "") will be processed in a string
+;; table. In the next pass, the string table can be emitted and
+;; the labels resolved.
 
 (defparameter *word-table* nil)
 (defparameter *symbol-table* nil)
@@ -161,7 +161,8 @@
 				 (push-byte i)))))
       ;;in the first pass, add the string to the table
       (progn
-	(process-string str)
+	(unless (gethash str *defined-strings*)
+	  (process-string str))
 	(setf (gethash str *string-table*) *compiler-ptr*)))
   ;;ensure that a string is inlined only once per pass
   (setf (gethash str *defined-strings*) t)

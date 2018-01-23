@@ -20,7 +20,8 @@
   (defword :LICK :EAT :TASTE)
   (defword :SLIME :OOZE)
   (defword :EXIT :OUT :GO)
-  (defword :ATTACK :KILL :HIT :CLEAVE :PUNCH :BANG))
+  (defword :ATTACK :KILL :HIT :CLEAVE :PUNCH :BANG)
+  (defword :TURN))
 
 (defun dungeon-cell ()
   (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/exploratory/images/cell.bmp"
@@ -31,8 +32,15 @@
     (defbits t :lock-jammed)
 
     (defobject "SHINY KEY" "It's a key, man." :initial-place :nowhere)
+
+    (with-object "SHINY KEY"
+      (verb 'EAT (respond "You eat the key. Much, much later, it re-emerges."))
+      (verb 'TURN (respond "You turn the key. Nothing happens")))
     
     (defobject "INEDIBLE SLOP" "A balanced soup of entrails, small amphibians and mandibles. Ooh! Garlic croutons!" :name-override "Some inedible slop." :initial-place :nowhere)
+
+    ;;(with-object "INEDIBLE SLOP"
+    ;;  (verb 'EAT (respond *thegodslookaway*)))
 
     ;;(defobject "FINGER BONE" "The digit of a long since departed previous occupant of your cell. Human? YOU decide.")
         

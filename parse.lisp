@@ -35,6 +35,12 @@
       (setf (gethash synonym *word->meaning*) *word-id-count*))
     (incf *word-id-count*)))
 
+(defun word-id (str &optional (assert t))
+  (let ((id (gethash (symbol-name str) *word->meaning*)))
+    (when (and assert *compiler-final-pass*)
+      (assert id nil (format nil "~a is not defined" str)))
+    (nil->0 id)))
+     
 (defun to-alphabet-pos (char)
   (let ((code (1+ (- (char-code (char-upcase char))
 		     (char-code #\A)))))

@@ -17,6 +17,9 @@
 (defparameter *place->id* nil)
 (defparameter *next-place-id* nil)
 
+(defparameter *current-object* nil)
+(defparameter *object->vtable* nil)
+
 ;; Define a new place, probably not necessary to call from game
 ;; code as the call which actually use the place will call this
 ;; indirectly.
@@ -33,6 +36,7 @@
   (setf *object-name->id* (make-hash-table :test 'equal))
   (setf *object-id->data* (make-hash-table :test 'equal))
   (setf *place->id* (make-hash-table :test 'equal))
+  (setf *object->vtable* (make-hash-table :test 'equal))
   (setf *next-place-id* 0)
   
   (defplace :nowhere)
@@ -103,7 +107,7 @@
 			      (name-with-indefinite-article name)))
 		    lines
 		    name))))))
-
+     
 ;;First use case- EXAMINE [ADJECTIVE] OBJECT
 
 ;;Entry in generic table EXAMINE ? ?
@@ -134,7 +138,6 @@
 ;; this better without making some trade-off which is also not
 ;; so excellent. Linear search will be used at first, though it
 ;; could be improved by binary search.
-
 
 ;; Build a table where the objects are sorted alphabetically
 ;; by name then adjective
@@ -252,7 +255,7 @@
 	(BNE :copy-place)
 	(RTS)
 	
-	;;now we can generate the object data tables
+	;; now we can generate the object data tables
 	
 	(apply #'db :names (mapcar #'(lambda (o) (ash (car o) -8)) objects))
 	(apply #'db :adjectives (mapcar #'(lambda (o) (logand #xff (car o))) objects))
@@ -268,11 +271,28 @@
 	(apply #'db :name-hi (mapcar #'(lambda (o) (hi (fifth o))) objects))
 	(apply #'db :name-lo (mapcar #'(lambda (o) (lo (fifth o))) objects))
 
+	;; object verb handlers
+	
+	(labels ((verb-addr (o)
+		   (if (eighth o)
+		       (cons :verbs (second o))
+		       0)))
+	  (apply #'db :verb-hi (mapcar #'(lambda (o) (hi (verb-addr o))) objects))
+	  (apply #'db :verb-lo (mapcar #'(lambda (o) (lo (verb-addr o))) objects)))
+	
 	;; object descriptions
 	
 	(apply #'db :description-hi (mapcar #'(lambda (o) (hi (fourth o))) objects))
 	(apply #'db :description-lo (mapcar #'(lambda (o) (lo (fourth o))) objects))
-	(apply #'db :description-lines (mapcar #'(lambda (o) (lo (sixth o))) objects))))))
+	(apply #'db :description-lines (mapcar #'(lambda (o) (lo (sixth o))) objects))
+
+	(maphash #'(lambda (object verb-handlers)
+		     (label object :verbs)
+		     (dolist (verb-handler verb-handlers)
+		       (db nil (word-id (car verb-handler))
+		       (dw nil (cdr verb-handler)))))
+		 *object->vtable*)
+	))))
 
 (defun dump-objects ()
   (dolist (object (build-object-table))

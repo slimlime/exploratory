@@ -127,31 +127,3 @@
 			 (car entry)
 			 (cdr entry))))
 	   *handlers*))
-
-;; Verb definitions here for now, they should be with object
-;; but there are some dependency issues involving the omnium gatherum that is vm.lisp
-
-(defun verb-fn (vm object verbs fn)
-  (assert object nil (format nil "~a has no object context" verbs))
-  ;;Accept a single list of words, or lists of words
-  (unless (listp verbs)
-    (setf verbs (list verbs)))
-  (let ((label (cons (first verbs) object)))
-    (dolist (verb verbs)
-      (unless (gethash (symbol-name verb) *word->meaning*)
-	(defword verb))
-      ;; all these verbs are handled at the same place for
-      ;; this object
-      (push (cons verb label) (gethash object *object->vtable*)))
-    (label (cons (first verbs) object))
-    (vm-exe)
-    (funcall fn)
-    (if vm (vm-done) (rts))))
-
-(defmacro verb (verb-or-verbs &body body)
-  "An action for a verb associated with this object"
-  `(verb-fn t *current-object* ,verb-or-verbs #'(lambda () ,@body)))
-
-(defmacro with-object (object &body body)
-  `(let ((*current-object* ,object))
-     ,@body))

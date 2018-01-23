@@ -16,7 +16,6 @@
 (defparameter *object-id->data* nil)
 (defparameter *place->id* nil)
 (defparameter *next-place-id* nil)
-
 (defparameter *current-object* nil)
 (defparameter *object->vtable* nil)
 
@@ -272,26 +271,26 @@
 	(apply #'db :name-lo (mapcar #'(lambda (o) (lo (fifth o))) objects))
 
 	;; object verb handlers
-	
+	#|
 	(labels ((verb-addr (o)
 		   (if (eighth o)
 		       (cons :verbs (second o))
 		       0)))
 	  (apply #'db :verb-hi (mapcar #'(lambda (o) (hi (verb-addr o))) objects))
 	  (apply #'db :verb-lo (mapcar #'(lambda (o) (lo (verb-addr o))) objects)))
-	
+	|#
 	;; object descriptions
 	
 	(apply #'db :description-hi (mapcar #'(lambda (o) (hi (fourth o))) objects))
 	(apply #'db :description-lo (mapcar #'(lambda (o) (lo (fourth o))) objects))
 	(apply #'db :description-lines (mapcar #'(lambda (o) (lo (sixth o))) objects))
-
+#|
 	(maphash #'(lambda (object verb-handlers)
 		     (label object :verbs)
 		     (dolist (verb-handler verb-handlers)
 		       (db nil (word-id (car verb-handler))
 		       (dw nil (cdr verb-handler)))))
-		 *object->vtable*)
+		 *object->vtable*)|#
 	))))
 
 (defun dump-objects ()

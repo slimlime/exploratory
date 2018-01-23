@@ -39,8 +39,10 @@
     
     (defobject "INEDIBLE SLOP" "A balanced soup of entrails, small amphibians and mandibles. Ooh! Garlic croutons!" :name-override "Some inedible slop." :initial-place :nowhere)
 
-    ;;(with-object "INEDIBLE SLOP"
-    ;;  (verb 'EAT (respond *thegodslookaway*)))
+    (with-object "INEDIBLE SLOP"
+      (verb 'EAT
+	(move-object "INEDIBLE SLOP" :nowhere)
+	(respond *thegodslookaway*)))
 
     ;;(defobject "FINGER BONE" "The digit of a long since departed previous occupant of your cell. Human? YOU decide.")
         

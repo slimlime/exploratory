@@ -170,11 +170,6 @@
 	(INY)
 	(LDA.IZY :vtable)
 	(STA.ZP (hi-add :vm-pc))
-	;;We are already in the context of the VM, but we don't care
-	;;don't bother returning there, when we return next we will
-	;;simply jump back to the original caller.
-	(PLA)
-	(PLA)
 	(JMP :vm-go "Execute VM code and return to grandparent")
 	(label :not-found)
 	(respond-raw "I don't see that.")

@@ -68,7 +68,7 @@
       ;;now it is sorted with the letters at the front alphabetically
       ;;followed by words by frequency*length
       ;;the the cdr of the cons pairs, set the index
-      (stable-sort words #'< :key #'(lambda (symbol) (length (car symbol))))
+      (stable-sort words #'< :key #'(lambda (symbol) (length (car symbol))))      
       (dotimes (i len)
 	(setf (aref words i)
 	      (car (aref words i))))
@@ -76,6 +76,24 @@
       ;to detect it in the code later
       (assert (char= (char (aref words 0) 0) #\nul))
       (assert (char= (char (aref words 1) 0) #\Newline))
+      words)))
+
+(defun dump-symbol-freqs ()
+  (let ((wordlist nil)
+	(len 0))
+    (maphash #'(lambda (k v)
+		 (incf len)
+		 (push (cons k v) wordlist))
+	     *word-table*)
+    (let ((words (make-array len)))
+      (dotimes (i len)
+	(setf (aref words i) (pop wordlist)))
+      (setf len (min 256 len))
+      (setf words
+	    (subseq
+	     (sort words #'> :key #'cdr)
+	     0
+	     len))
       words)))
 
 (defun encode-string (str emit)

@@ -31,20 +31,16 @@
     (defbits t :door-locked)
     (defbits t :lock-jammed)
 
-    (defobject "SHINY KEY" "It's a key, man." :initial-place :nowhere)
-
-    (with-object "SHINY KEY"
+    (defobject "SHINY KEY" "It's a key, man." :nowhere nil 
       (verb 'EAT (respond "You eat the key. Much, much later, it re-emerges."))
       (verb 'TURN (respond "You turn the key. Nothing happens")))
     
-    (defobject "INEDIBLE SLOP" "A balanced soup of entrails, small amphibians and mandibles. Ooh! Garlic croutons!" :name-override "Some inedible slop." :initial-place :nowhere)
-
-    (with-object "INEDIBLE SLOP"
+    (defobject "INEDIBLE SLOP" "A balanced soup of entrails, small amphibians and mandibles. Ooh! Garlic croutons!" :nowhere "Some inedible slop."
       (verb 'EAT
 	(move-object "INEDIBLE SLOP" :nowhere)
 	(respond *thegodslookaway*)))
 
-    ;;(defobject "FINGER BONE" "The digit of a long since departed previous occupant of your cell. Human? YOU decide.")
+    ;;(defobject "FINGER BONE" "The digit of a long since departed previous occupant of your cell. Human? YOU decide." nil nil)
         
     (action '(EXAMINE SLIME)
       (setbit :slime-examined)

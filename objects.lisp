@@ -72,9 +72,9 @@
 (assert (string= "An apple." (name-with-indefinite-article "APPLE")))
 (assert (string= "A telephone." (name-with-indefinite-article "TELEPHONE")))
 
-(defun defobject (name description
-		  &key (initial-place *current-location*)
-		    (name-override nil name-override-p))
+(defun defobject-fn (name description initial-place name-override)
+  (when (null initial-place)
+    (setf initial-place *current-location*))
   ;;firstly ensure the place exists
   (defplace initial-place)
   ;;Ok, so we're going to take the name and split it
@@ -98,13 +98,26 @@
 		   (lines (1+ (count #\Newline text))))
 	      (assert (< lines 4) nil (format nil "Object description must be 1-3 lines, was ~a ~a" lines text))
 	      (list noun initial-place (dstr text)
-		    (dstr (if name-override-p
+		    (dstr (if name-override
 			      (progn
 				(warn-if-not-punctuated name-override)
 				name-override)
 			      (name-with-indefinite-article name)))
 		    lines
 		    name))))))
+
+(defmacro with-object (object &body body)
+  `(let ((*current-object* ,object))
+     ,@body))
+
+(defmacro defobject (name description initial-place display-name-override &body body)
+  "Define an object. Initial place may be nil for 'here'. Name-override may be nil for
+standard object display name e.g. 'A golden apple.'"
+  (let ((name-sym (gensym)))
+    `(let ((,name-sym ,name))
+       (with-object ,name-sym
+	 (defobject-fn ,name-sym ,description ,initial-place ,display-name-override)
+	 ,@body))))
      
 ;;First use case- EXAMINE [ADJECTIVE] OBJECT
 
@@ -393,13 +406,13 @@
 (defplace :nippur)
 (defplace :babylon)
 
-(defobject "MARDUK STATUE" "A bronze statue" :initial-place :ur)
-(defobject "STONE STATUE" "A stone statue" :initial-place :ur)
-(defobject "GINGER BISCUIT" "A tasty snack" :initial-place :ur)
-(defobject "ENTRAILS" "Animal guts" :initial-place :nippur)
-(defobject "POCKET FLUFF" "Lovely pocket fluff" :initial-place :inventory)
-(defobject "OBSIDIAN CUBE" "Black cube" :initial-place :nowhere)
-(defobject "CAT FLUFF" "Cat fluff" :initial-place :babylon)
+(defobject "MARDUK STATUE" "A bronze statue" :ur nil)
+(defobject "STONE STATUE" "A stone statue" :ur nil)
+(defobject "GINGER BISCUIT" "A tasty snack" :ur nil)
+(defobject "ENTRAILS" "Animal guts" :nippur nil)
+(defobject "POCKET FLUFF" "Lovely pocket fluff" :inventory nil)
+(defobject "OBSIDIAN CUBE" "Black cube" :nowhere nil)
+(defobject "CAT FLUFF" "Cat fluff" :babylon nil)
 
 (test-object-find "MARDUK" "STATUE" :ur :found :unique)
 (test-object-find "STONE" "STATUE" :ur :found :unique)

@@ -199,7 +199,3 @@
 (defmacro verb (verb-or-verbs &body body)
   "An action for a verb associated with this object"
   `(verb-fn t *current-object* ,verb-or-verbs #'(lambda () ,@body)))
-
-(defmacro with-object (object &body body)
-  `(let ((*current-object* ,object))
-     ,@body))

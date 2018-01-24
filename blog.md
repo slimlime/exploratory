@@ -1,3 +1,34 @@
+## 23/1/2018
+
+## Goblin Food
+
+Well after some horrific bugs where SBCL tells you exactly what went wrong but not where, and equally as horrific if not moreso, those where SBCL tells you where something went wrong but not why, we can now `EAT SLOP` which is nice. We can also `EAT KEY`.
+
+This handy macro allows verbs to be defined against objects, in this case the 'inedible' slop.
+
+~~~~
+    (with-object "INEDIBLE SLOP"
+      (verb 'EAT
+	(move-object "INEDIBLE SLOP" :stomach)
+	(respond *thegodslookaway*)))
+~~~~
+
+I intend to fold this macro into `defobject` to reduce typing and forgetfulness.
+
+Some tidying up to do, and some refactoring of the other more generic verb/object handlers (`EXAMINE`, `TAKE`, `DROP`) is in order. The next thing to do is finish the test game and stress about the size of the build. I am seriously thinking about using Huffman coding, now I have a better understanding of 6502 programming it may work out ok, as in not be too complex. I had a quick look at the percentages,
+
+~~~~
+CL-USER> (subseq * 0 16)
+((" " . 7.2343082) ("e" . 4.50713) ("o" . 3.6744041) ("a" . 2.7688143)
+ ("t" . 2.7063599) ("n" . 2.6126783) ("i" . 2.3940876) ("r" . 2.3732696)
+ ("s" . 2.2691786) ("h" . 1.9985428) ("l" . 1.7383158) ("e " . 1.4364526)
+ ("d" . 1.3219527) ("u" . 1.3219527) ("." . 1.1866348) ("c" . 0.9784532))
+CL-USER> (reduce #'+ * :key #'cdr)
+40.522533
+~~~~
+
+Needs checking over because I am not 100% certain what the original compressor was actually measuring, but it looks like the top sixteen symbols cover 40% of the text. BOTE calculation, 15-20% reduction in size could be possible. I really don't want to go down this rabbit hole again, but needs must.
+
 ## 22/1/2018
 
 ## More Optimization

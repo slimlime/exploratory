@@ -1,6 +1,19 @@
 ## 23/1/2018
 
+## Goblin Food
+
 Well after some horrific bugs where SBCL tells you exactly what went wrong but not where, and equally as horrific if not moreso, those where SBCL tells you where something went wrong but not why, we can now `EAT SLOP` which is nice. We can also `EAT KEY`.
+
+This handy macro allows verbs to be defined against objects, in this case the 'inedible' slop.
+
+~~~~
+    (with-object "INEDIBLE SLOP"
+      (verb 'EAT
+	(move-object "INEDIBLE SLOP" :stomach)
+	(respond *thegodslookaway*)))
+~~~~
+
+I intend to fold this macro into `defobject` to reduce typing and forgetfulness.
 
 Some tidying up to do, and some refactoring of the other more generic verb/object handlers (`EXAMINE`, `TAKE`, `DROP`) is in order. The next thing to do is finish the test game and stress about the size of the build. I am seriously thinking about using Huffman coding, now I have a better understanding of 6502 programming it may work out ok, as in not be too complex. I had a quick look at the percentages,
 

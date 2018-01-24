@@ -22,6 +22,7 @@
   (setf *word-collisions* nil)
   (setf *binary-search-table* nil))
 
+;;TODO defword should be idempotent
 (defun defword (word &rest synonyms)
   ;;don't do anything once the table has already been built
   (unless *word-table-built*

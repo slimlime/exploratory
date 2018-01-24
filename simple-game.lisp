@@ -87,7 +87,7 @@
 		      (if-in-place "SHINY KEY" :nowhere
 				   (progn
 				     (respond "A glint of metal shines back at you..."
-					      "A key!")
+					      "a key!")
 				     (move-object "SHINY KEY" *current-location*))
 				   (respond "A crack in the floor, just like any other."
 					    "One might hide a small key-like object here."
@@ -121,8 +121,10 @@ preventing closed-minded mortals from seeing what is really there.")
 		    (if-in-place "INEDIBLE SLOP" :nowhere
 				 (progn
 				   (move-object "INEDIBLE SLOP" *current-location*)
-				   (clrbit :lock-jammed)
-				   (respond "He flings some inedible slop through the bars. You hear something rattling in the lock."))
+				   (respond "He flings some inedible slop through the bars.")
+				   (when-bit :lock-jammed
+				     (clrbit :lock-jammed)
+				     (respond "You hear something rattling in the lock.")))
 				 (respond "He tells you to keep the noise down using a stream of vowel-free goblin profanities. KRRPP KRRPP FNRGL!")))))
     
     (action '(EXAMINE KEYHOLE) (respond "It's a keyhole, man."))

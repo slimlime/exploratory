@@ -262,6 +262,12 @@
   (setmem-copy (monitor-buffer))
   (dump-state-base64))
 
+(defun gogogo ()
+  (tagbody
+     :top
+     (enter-input (read-line))
+     (go :top)))
+
 (defun restore-game (str &key (break-on 'brk))
   (restore-state-base64 str)
   (monitor-setpc :restore-game)

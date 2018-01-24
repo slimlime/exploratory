@@ -1,8 +1,14 @@
 ;; A simple game to test all the bits work
 
 ;; No assembly in here...
+;; ..(label has leaked through...)
 
 ;; ...TODO separate out the build process
+;; ...EXAMINE FINGER doesn't work COULD MAKE IT FINGER-BONE AND SYNONYMISE WITH BONE
+;; ...but EXAMINE BONE does
+;; TODO EAT DOOR -> I don't see that.
+;; TODO IT IT IT and Also, With What? etc
+;; todo POKE BONE DOOR fails to find the object- probs looking for a bone door
 
 ;; catchphrases
 
@@ -10,6 +16,7 @@
 (defparameter *thegodslookaway* "The gods look away in shame.")
 (defparameter *far-out* "Far out!")
 (defparameter *whatyoutalkingabout* "I am sure YOU know what you are talking about.")
+(defparameter *donothave* "You don't have that.")
 
 ;;todo what happens e.g. EXAMINE DOOR WINDOW
 ;;TODO CHECK THAT ALL STATEBITS HAVE BOTH A READ AND A WRITE
@@ -21,7 +28,8 @@
   (defword :SLIME :OOZE)
   (defword :EXIT :OUT :GO)
   (defword :ATTACK :KILL :HIT :CLEAVE :PUNCH :BANG)
-  (defword :TURN))
+  (defword :TURN)
+  (defword :LOCK :KEYHOLE)) ;Not really a synonm!
 
 (defun dungeon-cell ()
   (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/exploratory/images/cell.bmp"
@@ -35,13 +43,24 @@
       (verb 'EAT (respond "You eat the key. Much, much later, it re-emerges."))
       (verb 'TURN (respond "You turn the key. Nothing happens")))
     
-    (defobject "INEDIBLE SLOP" "A balanced soup of entrails, small amphibians and mandibles. Ooh! Garlic croutons!" :nowhere "Some inedible slop."
+    (defobject "INEDIBLE SLOP" "A balanced soup of entrails, small amphibian parts and mandibles. Ooh! Garlic croutons!" :nowhere "Some inedible slop."
       (verb 'EAT
-	(move-object "INEDIBLE SLOP" :nowhere)
+	(move-object this :nowhere)
 	(respond *thegodslookaway*)))
 
-    ;;(defobject "FINGER BONE" "The digit of a long since departed previous occupant of your cell. Human? YOU decide." nil nil)
-        
+    (defobject "FINGER BONE" "The long, slender digit of a long since departed previous occupant of your cell. Human? YOU decide." nil nil
+      (verb 'POKE
+	;;TODO I reckon we can make 'holding-verb' that does the check for holding
+	;;     in the generic handler at less cost.
+	(label :poke-finger) ;we call this if we try to unlock it further down
+	(if-has this
+		(progn
+		  (move-object this :nowhere)
+		  (respond *far-out*)
+		  (clrbit :lock-jammed)
+		  (respond "The bony finger pokes out the blockage in the lock and crumbles to dust, having fulfilled its destiny."))
+		(respond "You don't have that."))))
+	
     (action '(EXAMINE SLIME)
       (setbit :slime-examined)
       (respond "Millions of eyes peer out from the slime.")
@@ -115,42 +134,47 @@ preventing closed-minded mortals from seeing what is really there.")
 	      (respond "The door is closed.")))
     
     (action '((EXAMINE WINDOW) (BANG DOOR) (BANG WINDOW))
-      (if-not-bit :door-open
-		  (progn
-		    (respond "A goblin appears at the window.")
-		    (if-in-place "INEDIBLE SLOP" :nowhere
-				 (progn
-				   (move-object "INEDIBLE SLOP" *current-location*)
-				   (respond "He flings some inedible slop through the bars.")
-				   (when-bit :lock-jammed
-				     (clrbit :lock-jammed)
-				     (respond "You hear something rattling in the lock.")))
-				 (respond "He tells you to keep the noise down using a stream of vowel-free goblin profanities. KRRPP KRRPP FNRGL!")))))
+      (unless-bit :door-open
+	(respond "A goblin appears at the window.")
+	(if-in-place "INEDIBLE SLOP" :nowhere
+		     (progn
+		       (move-object "INEDIBLE SLOP" *current-location*)
+		       (respond "He flings some inedible slop through the bars.")
+		       (when-bit :lock-jammed
+			 (respond "You hear something rattling in the lock.")))
+		     (respond "He tells you to keep the noise down using a stream of vowel-free goblin profanities. KRRPP KRRPP FNRGL!"))))
     
-    (action '(EXAMINE KEYHOLE) (respond "It's a keyhole, man."))
-
+    (action '(EXAMINE KEYHOLE)
+      (respond "A plain old rusty keyhole.")
+      (if-bit :lock-jammed
+	      (respond "It appears to be blocked.")))
+      
+    ;;AT 5 bytes per entry this is pretty spicy. What would it cost in the verb table
+    ;;3 bytes, but plus the cost of it being an object -the examin cost etc.
+    ;;need to calculate cost benefit.
     (action '(TAKE CRACK) (respond "Inadvisable."))
-
     (action '(LICK CRACK) (respond *thegodslookaway*))
 
     (action '(ATTACK SLIME) (respond "Your hand is stayed by the slime's gaze of infinite sadness."))
 
     (action '(UNLOCK DOOR FINGER)
       (if-bit :door-locked
-	      (progn
-		(respond "Wise guy, eh? The lock doesn't budge. Your finger is now sore.")
-		(respond *snickering*))
+	      (if-has "FINGER BONE"
+		      (goto :poke-finger)
+		      (progn
+			(respond "Garrgh! You put your own finger in a rusty keyhole. Better get it checked out.")
+			(respond *snickering*)))
 	      (respond "You put your finger in the keyhole of an unlocked door.")))
     
     (action '((UNLOCK DOOR) (USE KEY DOOR))
       (if-bit :door-locked
-	      (if-in-place "SHINY KEY" :inventory
-			   (if-not-bit :lock-jammed
-				   (progn
-				     (clrbit :door-locked)
-				     (respond "The lock mechanism clicks..."))
-				   (respond "You rattle the key in the lock, but there is something stuck in the other side."))
-			   (respond "With what? Your finger?"))
+	      (if-has "SHINY KEY"
+		      (if-not-bit :lock-jammed
+				  (progn
+				    (clrbit :door-locked)
+				    (respond "The lock mechanism clicks..."))
+				  (respond "You rattle the key in the lock, but there is something stuck in the other side."))
+		      (respond "With what? Your finger?"))
 	      (respond "The door is already unlocked.")))
     
     (action '(CLOSE DOOR)

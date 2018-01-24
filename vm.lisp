@@ -1,6 +1,8 @@
 ;;; Virtual Machine
 ;;; Aim, compactness of generated code
 
+;;; TODO do we need VM-RBRA? VM-BRA only goes forward
+
 (defparameter *vmops* nil)
 
 (defun vm ()
@@ -129,7 +131,6 @@
   (LDA.IZY :vm-pc)
   (inc16.zp :vm-pc))
 
-
 (defparameter *vm-done-optimizations* (make-hash-table :test 'equal))
 
 (defun reset-vm ()
@@ -185,14 +186,14 @@
 
 (defun can-omit-branch (addr optimize)
   (and optimize (gethash (qualify-label-enclosing-namespace addr) *vm-done-optimizations*)))
-  
+
 ;;
-;;VM-BRA - Branch always
+;;VM-BRA - Forward Branch Always
 ;;
 (defvmop vm-bra (if (can-omit-branch addr optimize)
 		    "VM-DONE"
 		    (format nil "VM-BRA ~a" (fmt-addr addr)))
-  (addr &optional (optimize t))
+  (addr &optional (optimize nil))
   ((if (can-omit-branch addr optimize)
        (progn
 	 (decf *compiler-ptr*)
@@ -201,6 +202,34 @@
        (push-byte (forward-branch-offset addr))))
   ((BNE '(:vm-branch . :branch))
    (BEQ '(:vm-branch . :branch))))
+
+;;
+;;VM-JMP - Jump anywhere
+;;
+(defvmop vm-jmp (format nil "VM-JMP ~a" (fmt-addr addr))
+  (addr)
+  ((dw nil addr))
+  ((LDA.IZY :vm-pc)
+   (TAX)
+   (INY "Don't inc vm-pc as we throw it away")
+   (LDA.IZY :vm-pc)
+   (STX.ZP (lo-add :vm-pc))
+   (STA.ZP (hi-add :vm-pc))
+   (RTS)))
+
+#| SERIOUS INSTABILITY PROBLEM THAT THREATENS THE WHOLE
+   FABRIC OF SPACE AND TIME
+
+Using this, which is obviously not completely stable
+between passes REALLY screws up the build and introduces
+incorrect branch offsets elsewhere |#
+
+(defun vm-bra-or-jmp (addr)
+  (let ((offset (forward-branch-offset addr)))
+    (if (and (>= offset 0)
+	     (< offset 256))
+	(vm-bra addr)
+	(vm-jmp addr)))) |#
 
 ;;
 ;;VM-BSET - Branch on bit set

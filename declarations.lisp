@@ -2,6 +2,14 @@
 ;; Ideally the game would *only* see the functions defined here
 
 ;; TODO get rid of extra vm-done at the end of custom actions
+;; TODO (goto label) is fine, but the label it jumps to is somewhat leaky as it is a
+;; genuine assembler label. Probably fine.
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun translate-this (object-name)
+    (if (eq 'this object-name)
+	'*current-object*
+	object-name)))
 
 (defun defbits (initially-set &rest bits)
   (dolist (bit bits)
@@ -17,10 +25,13 @@
   (defbit bit)
   (vm-clr bit))
 
-(defun move-object (object place)
+(defun move-object-fn (object place)
   "Set the place of the object to be a new place"
   (defplace place)
   (vm-mov object place))
+
+(defmacro move-object (object place)
+  `(move-object-fn ,(translate-this object) ,place))
 
 (defun set-act (font colour)
   (setf *act-font* font)
@@ -41,7 +52,7 @@
 	    (with-namespace namespace
 	      (funcall then))
 	    (when else
-	      (vm-bra :end-if)))
+	      (vm-bra :end-if t)))
 	  (progn
 	    (assert else nil "Must have at least one clause")
 	    (vm-bset bit :end-if)))
@@ -81,7 +92,7 @@
 	    (with-namespace namespace
 	      (funcall then))
 	    (when else    
-	      (vm-bra :end-if)))
+	      (vm-bra :end-if t)))
 	  (progn
 	    (assert else nil "Must have at least one clause")
 	    (vm-boip object place :end-if)))
@@ -91,13 +102,23 @@
 	  (funcall else)))
       (label :end-if))))
 
-(defmacro if-in-place (object-name place then &optional (else nil else-supplied-p))
-  `(if-in-place-fn ,object-name ,place
+(defmacro if-has (object-name then &optional (else nil else-supplied-p))
+  `(if-in-place-fn ,(translate-this object-name) :inventory
 		   #'(lambda () ,then)
 		   (if ,else-supplied-p #'(lambda () ,else) nil)))
 
+(defmacro if-in-place (object-name place then &optional (else nil else-supplied-p))
+  `(if-in-place-fn ,(translate-this object-name) ,place
+		   #'(lambda () ,then)
+		   (if ,else-supplied-p #'(lambda () ,else) nil)))
+
+(defmacro when-in-place (object-name place &body then)
+  `(if-in-place-fn ,(translate-this object-name) ,place
+		   #'(lambda () ,@then)
+		   nil))
+
 (defmacro if-not-in-place (object-name place then &optional (else nil else-supplied-p))
-  `(if-in-place-fn ,object-name ,place
+  `(if-in-place-fn ,(translate-this object-name) ,place
 		   (if ,else-supplied-p #'(lambda () ,else) nil)
 		   #'(lambda () ,then)))
 
@@ -199,3 +220,7 @@
 (defmacro verb (verb-or-verbs &body body)
   "An action for a verb associated with this object"
   `(verb-fn t *current-object* ,verb-or-verbs #'(lambda () ,@body)))
+
+(defun goto (label)
+  (vm-jmp label))
+  

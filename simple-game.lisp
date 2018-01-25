@@ -295,10 +295,9 @@ preventing closed-minded mortals from seeing what is really there.")
     (action '(? ? ?)
       (respond "I don't know what that means."))))
 
-
 (defparameter origin #x600)
       
-(defun build-game (&key (full-reset nil))
+(defun build-game (initial-location game-fn &key (full-reset nil))
 
   (when full-reset
     (reset-image-cache))
@@ -328,7 +327,7 @@ preventing closed-minded mortals from seeing what is really there.")
 	   (sta16.zp (cons :font :present) :font)
 	   
 	   (JSR :vm-enter)
-	   (vm-nav :dungeon-cell)
+	   (vm-nav initial-location)
 	   (vm-done)
 	   
 	   (BRK)
@@ -342,16 +341,8 @@ preventing closed-minded mortals from seeing what is really there.")
 
 	   ;;game state
 	   (label :game-code-start)
-	   (synonyms)
 
-	   (measure-size "Dungeon Cell"
-	     (dungeon-cell))
-	   (measure-size "Corridor"
-	     (corridor))
-	   (measure-size "Frazbolg's Closet"
-	     (frazbolgs-closet))
-
-	   (generic-handlers)
+	   (funcall game-fn)
 	   	   
 	   (bit-table)
 
@@ -408,11 +399,24 @@ preventing closed-minded mortals from seeing what is really there.")
 
       (format t "Build size ~a~%" (- *compiler-ptr* origin))))
 
-(defun run-game (&key (full-reset nil) (break-on 'BRK))
-  (build-game :full-reset full-reset)
+(defun run-game (initial-location game-fn &key (full-reset nil) (break-on 'BRK))
+  (build-game initial-location game-fn :full-reset full-reset)
   (monitor-reset #x600)
   (monitor-run :break-on break-on)
   (setmem-copy (monitor-buffer)))
+
+(defun run-simple-game (&key (full-reset nil) (break-on 'BRK))
+  (run-game :dungeon-cell
+	    #'(lambda ()
+		(synonyms)
+		(measure-size "Dungeon Cell"
+		  (dungeon-cell))
+		(measure-size "Corridor"
+		  (corridor))
+		(measure-size "Frazbolg's Closet"
+		  (frazbolgs-closet))
+		(generic-handlers))
+	    :full-reset full-reset :break-on break-on))
 
 ;;You see a spanner
 

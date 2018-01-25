@@ -101,6 +101,8 @@ Some ideas,
 
 - Prediction is closely related to action, which is transformation of state
 
+Note, 24/2/2018 if that last statement is baffling to you, check out the work of Jeff Hawkins who talks about it in On Intelligence. If the bit about prediction is baffling, check out some stuff on data compression, it's all about making the best predictions about the next bit. If the idea of creativity being related to reducing the problem space to something palatable seems strange then see some of the work on framing problems in symbolic AI and also the work summarised by Jordan Peterson about *attention*. Additionally there is an incredibly strange connection between chaos/randomness and compressed data, which is also *seemingly* random. What's the difference, well, the *act* of decompressing it gives it meaning. To the decompressor, at least. To create habitable order out of chaos, so to speak.
+
 ## 24/1/2018
 
 ## Finger Bone

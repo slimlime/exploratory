@@ -1,3 +1,65 @@
+## 24/1/2018
+
+## Finger Bone
+
+So a `FINGER BONE` has been added to the game and it has caused a number of problems. Finger is an adjective, but to a human `TAKE FINGER` makes a lot of sense because it is also a noun. To this game, it makes absolutely no sense- why does the stupid player want to take an adjective. Ok, ignoring that for the moment, my plan is to gloss over it by renaming it to `FINGER-BONE` and making it synonymous with `BONE`. Kicking the can till another day.
+
+What I really want is to *poke the bone into the keyhole*, the parser doesn't implicitly support two nouns, but I can certainly add an explicit check for the second noun. But it's worse than that, `POKE BONE KEYHOLE` does not even parse. The thing that looks for an object fails to even find the finger bone and is instead probably looking for a keyhole made of bone.
+
+So at the moment, the best we can do is `POKE BONE`.
+
+## This
+
+Using macrology, we can interpret `this` as the current object we are defining, making game code like this possible when calling the `if-has` variant of the `if-object-in-place` function.
+
+~~~~
+(defobject "FINGER BONE" "The long, slender digit of a long since departed previous occupant of your cell. Human? YOU decide." nil nil
+      (verb 'POKE
+	(label :poke-finger) ;we call this if we try to unlock it further down
+	(if-has this
+		(progn
+		  (move-object this :nowhere)
+		  (respond *far-out*)
+		  (clrbit :lock-jammed)
+		  (respond "The bony finger pokes out the blockage in the lock and crumbles to dust, having fulfilled its destiny."))
+		(respond "You don't have that."))))
+~~~~
+
+I think it will be the case that there will be a lot of verbs that do make sense, but only if the user is holding the object, rather than it just being in the room. The `if-has this` code can be moved up the stack into the `verb` function, based on a parameter. The message '*You don't have that*' can likewise be moved.
+
+Here's the VM code generated from the above.
+
+~~~~
+POKE:FINGER BONE
+EON-CELL:POKE-FINGER 0B2B 0803013E VM-BOOP finger bone NOT IN inventory L1:ELSE
+                     0B2F 120300   VM-MOV finger bone nowhere 
+                     0B32 0A0E52.. VM-PRI1 'Far out!'
+                     0B39 1007     VM-CLR lock-jammed
+                     0B3B 0CB169.. VM-PRI3 'The bony finger pokes out the blockage
+and crumbles to dust, having fulfilled its
+destiny.'
+                     0B6C 00       VM-DONE
+             L1:ELSE 0B6D 0AAEB3.. VM-PRI1 'You don't have that.'
+           L1:END-IF 0B77 00       VM-DONE
+~~~~
+
+## Jump
+
+Notice there is a `(label :poke-finger)`. This is because there is a special handler for `UNLOCK DOOR WITH FINGER` which would rather like to re-use the code, so we can just `goto :poke-finger`. `label` is technically a construct from the assembler part of the project, and should not be used directly in the game code which should be implementation independent. In this case even if I thought of a new name, say, `tag` it would simply call `label` with the same parameter anyway.
+
+# Rupture in the fabric of space and time
+
+This clever code which does a short or a long jump should be uncontentious. It is obviously going to differ from the first run as the offset to the address cannot be computed, but after a while it should be stable, right? Well it is stable, but it seriously messed up the destination of a jump in a *completely unrelated piece of code*. The 6502 ended up jumping to a location in the middle of an instruction :-( I think I saw something like this before with the LDA.* instructions which can change size from one pass to another- in that case I quietly changed the instruction to be a fixed LDA.AB and pretended I never saw it. This time, I'm going to comment it out and think deeply about it- I suspect it is because there is an error in the assumptions about how labels get resolved between passes. But all the string data changes size, the strings can't even be compressed until at least the second pass. Could be really serious and ultimately be a logical flaw in the whole design. Having said that, we have come this far, thus proving that logical correctness is merely a theoretical nicety and nothing to concern ourselves with overly in the real world.
+
+~~~~
+(defun vm-bra-or-jmp (addr)
+  (let ((offset (forward-branch-offset addr)))
+    (if (and (>= offset 0)
+	     (< offset 256))
+	(vm-bra addr)
+	(vm-jmp addr))))
+~~~~
+
 ## 23/1/2018
 
 ## Goblin Food

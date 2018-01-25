@@ -1,3 +1,106 @@
+## 24/1/2018 Guest post from last year
+
+I didn't actually finish this post and then I forgot about, but it was close enough, so here it is. I am going to do another post soon about OO and how it is pretty terrible, so tune in for that if you are into opinionated, poorly-argued discussions on the philosophy of programming.
+
+### 3/7/2017 Esoteric Considerations
+
+### What is programming?
+
+If one imagines a cross-section of the different programs in existence one will find that they all share some things in common. Namely, state and changes to state. Put alternatively, state and behaviour. Fundamentally I think this is what computation is all about. Database app, web-sites, games all take, manipulate and deliver state.
+
+But what about pure functional languages? Surely they aren't about manipulating state? Absolutely they are. They do not exist in a vacuum- their state is the input provided to them and the output they give. Conceptually the sausage factory in the middle can be described as functions which have no side-effects but IMO this is a distinction without a difference. Functional concepts are absolutely essential in arranging ones thoughts about computation, but they are not fundamental to its implementation. Definite advantages can be had by thinking about a computational process in terms of pure function composition, but it is a category error to insist this be the basis for a *real* programming language.
+
+Early programs (some of mine from the 80s for example) are a mess of state and gotos; they are basically impossible to fully understand. Programs such as this have a combinatorial explosion of state such that it is easy to get into the soup with no idea how it happened. The only solution is to turn it off and on again. Absolutely no-one who has experienced this wants to go back to it.
+
+What I have learned programming this 6502 adventure game so far,
+
+- Most bugs were in behaviour code- i.e. either incorrect design or just flat out incorrectly implemented logic.
+- TWO 'state' bugs that went undetected. One was an uninitialised loop counter, the other was the parse input buffer not being cleared down. This is not indicative of a combinatorial explosion of dodgy state.
+- Unit testing is good to ensure behaviour works
+- Unit testing still can't deal with unknown state transitions
+
+So,
+
+- Functional thinking is useful *in the conceptual or design realm*. Make a serious effort to reduce the amount of state, and therefore the number of state transitions.
+- Functional straitjackets *in the implementation realm* are not useful. Loop, modify state, do what needs to be done, get over it.
+
+### Fetishization of recursion.
+
+(UPDATE: There actually is a recursive thing in the binary tree parser- it was a nightmare, and it will need to be unpicked so that tree analysis can be done before conversion into code- for that to happen I will do it in a way that produces an explicit stack or tree structure)
+
+Recursion is over-rated. There are *very* few problems which require recursion, for example, there is no recursion in the code-base for this adventure game. None. Scheme, Haskell (and most modern LISP) tutorials would have us believe that if we aren't doing recursion to add a list of numbers together then we are like the apes at the beginning of the 2001 movie, frantically bashing away at a mutable accumulator with a bone. LISP tutorials would be a whole lot more palatable to a wider subsection of the programming population *if* they didn't try to convert everyone to the mysteries of functionalism at the same time. That's not to say there isn't a place for it; there is, but LISP is complicated enough as it is  (and that's without considering the whole EMACS/SLIME dimension)
+
+### Do we need recursion?
+
+Can you type a recursive solution faster than you can type a loop based solution? If so, do it. Did we *need* to do it recursively? No. Is it faster? Probably not, most languages don't have tail-call optimisation.
+
+Ok, my language has tail-call optimisation (TCO). Great! You might even get it as a benefit of any JITting that occurs. Now, did you remember to put the recursive call in the tail position? Not sure? Is it even possible? If it's not possible, you may be able to do it as a loop- if not congratulations, you may need recursion!
+ 
+Ok, we need recursion, we can't use TCO as this is a problem that requires some state to be saved until after the recursive call. Now, there is but one question. Do you have enough stack to solve the problem? No, make it two questions. Do you have enough stack to solve the problem *and* can you arrange the code so that it doesn't melt your brain? This is not an idle consideration. In my programming career I have written enough recursive code that really did need to store up the state, and the primary worry was whether it would scale. The secondary worry was arranging the functions just so, so that the shape of the call stack fit the shape of the problem. This was often a frustrating afternoon of re-arranging functions and prototypes etc which often left me with a tail-wagging-the-dog type feeling.
+
+If the problem doesn't fit the shape of the call stack well, or if the call stack would not be large enough you may need to 'emulate' recursion by using some sort of queue, or explicit stack and... a loop. At this point I guarantee your code will not have the idiomatic shape of recursive code in your chosen language- all those pretty tutorials are for nothing.
+
+Oh hell! Now my code isn't functional! How can I compose it and take advantage of all the gifts and boons this bestows? Just concentrate on make your top-level function pure, if composing it and keeping it nice and modular is your concern. Don't worry about the seething mass of state inside, no-one else will ever see it.
+
+Oh hell! Now my code isn't functional! How can I compose it with other behaviour INSIDE the recursive code. Have you ever tried to do this as a solution to anything outside a toy problem? I think there are probably five people in the world who can do this with ease and they are either working on the Haskell compiler or their PhD thesis is literally called "Mutually Recursive Functions for Fun and Recreation". Of course, for this thesis, they have written their own Scheme implementation in Python, and the recursive bits are transpiled to imperative code, just for now, until they can make it more performant.
+
+### Fibonacci
+
+Let us examine three Fibonaccis in SBCL LISP.
+
+- Loop based
+- Recursive
+- Recursive, memoized
+
+~~~~
+
+CL-USER> (time (fibonacci-1 40))
+Evaluation took:
+  9.362 seconds of real time
+  9.084000 seconds of total run time (9.068000 user, 0.016000 system)
+  97.03% CPU
+  12,148,887,044 processor cycles
+  0 bytes consed
+  
+102334155
+CL-USER> (time (fibonacci-2 40))
+Evaluation took:
+  0.000 seconds of real time
+  0.000000 seconds of total run time (0.000000 user, 0.000000 system)
+  100.00% CPU
+  5,385 processor cycles
+  0 bytes consed
+  
+102334155
+
+~~~~
+
+Guess which one is the recursive solution. Now, you may complain that the recursive solution is naive. But how precisely do you know this? In this case, it scales pretty badly and in a real world problem you would notice immediately that it is a bad idea. But lots of real world problems do not scale that badly, to begin with. There is a creeping sense of dread as the problem scales.. in production. Now you have a much larger problem. That's not to say you won't get scaling problems with an imperative solution; this definitely happens, but IMO it is a lot clearer in imperative code that, for example, you have an n^2 algorithm waiting to bite you. Plus, was it really worth the extra time and effort to arrange your code *just so*, that you are all nice and recursive.
+
+## Conclusion
+
+Recursion (as in, that which is implemented canonically using the language constructs) is mostly useful for toy problems of the sort found in modern programming tutorials, but may find occasional use where the problem is well suited to being expressed recursively and has no scaling problems. Mutual recursion in anything more complex than working out Fibonacci is basically far too complex to arrange in practice. Sadly I think that in the case of LISP tutorials, they tend to feature too much emphasis on mapcar and pals- a construct which is not very efficient. It makes more sense to instruct functional programming in C# using LINQ, but even there we see the limits of composability very quickly. Going beyond a few chained Selects and Wheres is a painful nightmare in practice. Grouping? Forget about it.
+
+Now let us look at a recursive solution with memoization, which will lead us to the other thing that programming is.
+
+~~~~
+THIS SPACE LEFT BLANK
+~~~~
+
+Note to self, the other thing that the act of programming is- compression of state transformation. Since we are transforming state, all programming can be conceptualised as a big look up table- given this, produce that. Programming is the act of making this palatable to a real computer, such that it produces the answer before the end of time, and without using all the available matter in the universe to store your look-up table.
+
+Related to this idea is that programming is a creative endeavour, there are an infinite number of ways of taking an enormous state projection and producing a program to compress it.
+
+Some ideas, 
+
+- Programming is transformation of state
+
+- Transformation of state is Data (de-)compression
+
+- Data (de-)compression is prediction
+
+- Prediction is closely related to action, which is transformation of state
+
 ## 24/1/2018
 
 ## Finger Bone

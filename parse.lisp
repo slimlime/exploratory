@@ -5,14 +5,13 @@
 (defparameter *word->meaning* nil)
 (defparameter *meaning->word* nil)
 (defparameter *word-collisions* nil)
-(defparameter *max-input-length* 40)
+(defparameter *max-input-length* 64)
 ;;this following parameter is boring because it just suppresses the
 ;;defword assertion that a word not already be in the table.
 ;;and so needs to be set at the end of the build pass.
 (defparameter *word-table-built* nil)
 (defparameter *binary-search-table* nil) ;;for debugging
-(defparameter *max-words* 4) ;;bit misleading as this is the max words in the input buffer
-;;but we only parse 3 of them.
+(defparameter *max-words* 8)
 
 (defun reset-parser ()
   (setf *word-table-built* nil)
@@ -425,6 +424,7 @@
 (defword :CHAD :CHADRIC :CHADRIX :IMPERATOR :LORD)
 (defword :I :INVENTORY)
 (defword :DROP)
+(defword :WITH :USING)
 
 (maphash #'(lambda (k v) (test-parse-word k v :debug nil)) *word->meaning*)
 
@@ -473,13 +473,13 @@
   
   (coerce (subseq (monitor-buffer)
 		  (resolve '(:parser . :words))
-		  (+ -1 (resolve '(:parser . :words)) *max-words*))
+		  (+ (resolve '(:parser . :words)) *max-words*))
 	  'list))
 
 (defun test-parse-input (input expected)
   ;;(format t "Testing ~a~%" input)
   (let ((words (parse-words-tester input)))
-    ;;(print words)
+    (print words)
     (loop
        for e in expected
        for r in words do
@@ -503,3 +503,7 @@
 (test-parse-input "PRESS   CYLINDER" '(PUSH CYLINDER))
 (test-parse-input "    OPEN  FRABJOUS  DOOR  " '(OPEN ? DOOR))
 (test-parse-input "OPEN     DOOR      CLOSE    " '(OPEN DOOR CLOSE))
+(test-parse-input "OPEN DOOR WITH CYLINDER" '(OPEN DOOR WITH CYLINDER))
+(test-parse-input "OPEN DOOR WITH CYLINDER IN HORSE TABLE COLA"
+		  '(OPEN DOOR WITH CYLINDER IN HORSE TABLE COLA))
+

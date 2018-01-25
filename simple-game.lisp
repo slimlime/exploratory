@@ -8,7 +8,8 @@
 ;; ...but EXAMINE BONE does
 ;; TODO EAT DOOR -> I don't see that.
 ;; TODO IT IT IT and Also, With What? etc
-
+;; SMILE AT SLIME
+;;TODO EXAMINE FLOOR FAILS TO SET THE BIT (OR THE CHECK FAILS)
 ;; catchphrases
 
 (defparameter *snickering* "You hear the faint sound of snickering...")
@@ -32,7 +33,7 @@
 
 (defun dungeon-cell ()
   (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/exploratory/images/cell.bmp"
-	"You are in the dungeon prison of Wangband under the fortress of the Black Wizard, Gordon. Home to stench-rats, were-toads, sniveling goblins and you. Of the current denizens, you are currently the most wretched. A lime-green slime oozes out of the wall, making a rasping, wheezing sound. You must escape, but your cell has a door...")
+	"You are in the dungeon prison of Wangband under the fortress of the Black Wizard, Gordon. Home to stench-rats, were-toads, sniveling goblins and you. Of the current denizens, you are currently the most wretched. A lime-green slime oozes out of the wall, making a rasping, wheezing sound. You must escape... Perhaps you could try the door?")
   (with-location :dungeon-cell
 
     (defbits t :door-locked)
@@ -62,7 +63,7 @@
       (setbit :slime-examined)
       (respond "Millions of eyes peer out from the slime.")
       (if-in-place "SHINY KEY" :nowhere
-		   (respond "Some of them staring at the floor.")))
+		   (respond "Some of them are staring at the floor.")))
     
     (action '(EXAMINE EYES)
       (if-bit :slime-examined
@@ -100,19 +101,20 @@
     (action '(EXAMINE CRACK)
       (if-bit :floor-examined
 	      (if-bit :slime-licked
-		      (if-in-place "SHINY KEY" :nowhere
-				   (progn
-				     (respond "A glint of metal shines back at you..."
-					      "a key!")
-				     (move-object "SHINY KEY" *current-location*))
-				   (respond "A crack in the floor, just like any other."
-					    "One might hide a small key-like object here."
-					    "Like, for example, a key."))
+		      (with-object "SHINY KEY"
+			(if-in-place this :nowhere
+				     (progn
+				       (respond "A glint of metal shines back at you..."
+						"a key!")
+				       (move-object this here))
+				     (respond "A crack in the floor, just like any other."
+					      "One might hide a small key-like object here."
+					      "Like, for example, a key.")))
 		      (progn
 			(respond "The Veil of Maya prevents you from seeing anything interesting.")
 			(setbit :maya)))
 	      (respond *whatyoutalkingabout*)))
-      
+    
     (action '((EXAMINE VEIL) (EXAMINE MAYA))
       (if-bit :maya
 	      (respond "Many believe Maya casts her net of illusion over the world
@@ -133,13 +135,14 @@ preventing closed-minded mortals from seeing what is really there.")
     (action '((EXAMINE WINDOW) (BANG DOOR) (BANG WINDOW))
       (unless-bit :door-open
 	(respond "A goblin appears at the window.")
-	(if-in-place "INEDIBLE SLOP" :nowhere
-		     (progn
-		       (move-object "INEDIBLE SLOP" *current-location*)
-		       (respond "He flings some inedible slop through the bars.")
-		       (when-bit :lock-jammed
-			 (respond "You hear something rattling in the lock.")))
-		     (respond "He tells you to keep the noise down using a stream of vowel-free goblin profanities. KRRPP KRRPP FNRGL!"))))
+	(with-object "INEDIBLE SLOP"
+	  (if-in-place this :nowhere
+		       (progn
+			 (move-object this here)
+			 (respond "He flings some inedible slop through the bars.")
+			 (when-bit :lock-jammed
+			   (respond "You hear something rattling in the lock.")))
+		       (respond "He tells you to keep the noise down using a stream of vowel-free goblin profanities. KRRPP KRRPP FNRGL!")))))
     
     (action '(EXAMINE KEYHOLE)
       (respond "A plain old rusty keyhole.")
@@ -225,7 +228,12 @@ preventing closed-minded mortals from seeing what is really there.")
   (dloc :corridor "CORRIDOR" "/home/dan/exploratory/images/corridor.bmp"
 	"A torch-lit corridor. You see a row of cell doors, identical to your own. Moans and pleas waft through the bars- sounds which you are not entirely certain are human in origin. At one end, a brick wall, at the other a green door, different than all the rest.")
   (with-location :corridor
-    (defbits nil :green-door-open :torch-carried :torches-examined)
+    
+    (defobject "IMAGINARY BISCUIT" "A biscuit that exists only in your head." :nowhere nil
+	(verb 'EAT
+	  (respond "Mmmm! Satisfying.")
+	  (move-object this :nowhere)))
+    
     (action '((EXAMINE TORCHES) (EXAMINE TORCH))
       (progn
 	(setbit :torches-examined)
@@ -237,13 +245,29 @@ preventing closed-minded mortals from seeing what is really there.")
     (action '((CHEEZOWS) (PACKET))
       (if-bit :torches-examined
 	     (respond "There are no Cheezows! It was a metaphor for your situation.")
-	     (respond "What a strange thing to say.")))
+	     (respond *whatyoutalkingabout*)))
     (action '(EXAMINE METAPHOR)
+      (setbit :metaphor-examined)
       (respond "That really is taking the biscuit."))
-    (action '(EXAMINE BISCUIT)
-      (respond "There is no biscuit, man!"))
-    (action '(TAKE BISCUIT)
-      (respond "Fine. You take the biscuit. Happy now?")
+
+    (with-object "IMAGINARY BISCUIT"
+      (action '(EXAMINE BISCUIT)
+	;;TODO has and here combined seems useful, since it is similar to
+	;;find object.
+	(when-has this (delegate-action))
+	(when-in-place this here (delegate-action))
+	(if-bit :metaphor-examined
+		(respond "There is no biscuit, man!")
+		(respond *whatyoutalkingabout*)))
+    
+      (action '(TAKE BISCUIT)
+	(when-has this (delegate-action))
+	(when-in-place this here (delegate-action))
+	(if-in-place this :nowhere
+		     (respond "Fine. You take the imaginary biscuit. Happy now?")
+		     (respond "Ha! You lost your imaginary biscuit"))
+	(move-object this here)))
+    
     (action '(ENTER CELL)
       (respond "You enter your cell."))
     (action '(ENTER GREEN DOOR)
@@ -270,7 +294,7 @@ preventing closed-minded mortals from seeing what is really there.")
 	       (respond "You knock on the door and wait patiently.")
 	       (respond "Presently, it swings open. There appears to be some sort of lodging beyond the threshold."))))
     (action '(KNOCK DOOR)
-      (respond "Which one?")))))
+      (respond "Which one?"))))
 
 (defun frazbolgs-closet ()
   (dloc :frazbolgs-closet "FRAZBOLG'S CLOSET" "/home/dan/exploratory/images/porsche.bmp"

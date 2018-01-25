@@ -9,7 +9,12 @@
   (defun translate-this (object-name)
     (if (eq 'this object-name)
 	'*current-object*
-	object-name)))
+	object-name))
+
+  (defun translate-here (place)
+    (if (eq 'here place)
+	'*current-location*
+	place)))
 
 (defun defbits (initially-set &rest bits)
   (dolist (bit bits)
@@ -31,7 +36,8 @@
   (vm-mov object place))
 
 (defmacro move-object (object place)
-  `(move-object-fn ,(translate-this object) ,place))
+  `(move-object-fn ,(translate-this object)
+		   ,(translate-here place)))
 
 (defun set-act (font colour)
   (setf *act-font* font)
@@ -107,21 +113,25 @@
 		   #'(lambda () ,then)
 		   (if ,else-supplied-p #'(lambda () ,else) nil)))
 
+(defmacro when-has (object-name &body body)
+  `(if-in-place-fn ,(translate-this object-name) :inventory
+		   #'(lambda () ,@body)
+		   nil))
+
 (defmacro if-in-place (object-name place then &optional (else nil else-supplied-p))
-  `(if-in-place-fn ,(translate-this object-name) ,place
+  `(if-in-place-fn ,(translate-this object-name) ,(translate-here place)
 		   #'(lambda () ,then)
 		   (if ,else-supplied-p #'(lambda () ,else) nil)))
 
 (defmacro when-in-place (object-name place &body then)
-  `(if-in-place-fn ,(translate-this object-name) ,place
+  `(if-in-place-fn ,(translate-this object-name) ,(translate-here place)
 		   #'(lambda () ,@then)
 		   nil))
 
 (defmacro if-not-in-place (object-name place then &optional (else nil else-supplied-p))
-  `(if-in-place-fn ,(translate-this object-name) ,place
+  `(if-in-place-fn ,(translate-this object-name) ,(translate-here place)
 		   (if ,else-supplied-p #'(lambda () ,else) nil)
 		   #'(lambda () ,then)))
-
 
 ;;todo make justification work with the - at the beginning without actually
 ;;puting it into the string table

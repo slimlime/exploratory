@@ -40,5 +40,3 @@
   ;; the games...
   
   (bload "simple-game.lisp"))
-
-(load-project)

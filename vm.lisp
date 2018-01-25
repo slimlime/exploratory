@@ -222,7 +222,7 @@
 
 Using this, which is obviously not completely stable
 between passes REALLY screws up the build and introduces
-incorrect branch offsets elsewhere |#
+incorrect branch offsets elsewhere
 
 (defun vm-bra-or-jmp (addr)
   (let ((offset (forward-branch-offset addr)))

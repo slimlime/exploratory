@@ -36,6 +36,7 @@
   (bload "declarations.lisp")
   (bload "location.lisp")
   (bload "handlers.lisp")
+  (bload "build.lisp")
 
   ;; the games...
   

@@ -196,7 +196,13 @@ standard object display name e.g. 'A golden apple.'"
 	(STA.ZP :noun)
 	(LDA.AB (+ 1 (resolve '(:parser . :words))))
 	(STA.ZP :adjective)
-	(JMP :find-object-index)
+	(JSR :find-object-index)
+	(BEQ :ignore-word-three)
+	(RTS)
+	(dc "We didn't find it, but what if the third word")
+	(dc "isn't part of the first object? Could be TAKE NOUN1 NOUN2")
+	(label :ignore-word-three)
+	(LDA 0)
 	(label :no-adjective)
 	(STA.ZP :adjective)
 	(LDA.AB (+ 1 (resolve '(:parser . :words))))
@@ -435,6 +441,12 @@ standard object display name e.g. 'A golden apple.'"
 (test-object-find "STONE" "BISCUIT" :ur :not-found :unique)
 (test-object-find "ENTRAILS" "FLUFF" :ur :not-found :unique)
 (test-object-find nil "GINGER" :ur :not-found :unique)
+
+;; Add parse input tests
+;; So this test case comes from POKE BONE DOOR which didn't work
+;; because the finder is looking for a Bone Door rather than
+;; Bone and ignoring the door.
+;; (test-object-find "BISCUIT" "DOG" :ur :found :unique)
       
 (assert (= 1 (object-id "MARDUK STATUE")))
 (assert (= 2 (object-id "STONE STATUE")))

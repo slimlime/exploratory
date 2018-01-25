@@ -8,7 +8,6 @@
 ;; ...but EXAMINE BONE does
 ;; TODO EAT DOOR -> I don't see that.
 ;; TODO IT IT IT and Also, With What? etc
-;; todo POKE BONE DOOR fails to find the object- probs looking for a bone door
 
 ;; catchphrases
 
@@ -29,7 +28,7 @@
   (defword :EXIT :OUT :GO)
   (defword :ATTACK :KILL :HIT :CLEAVE :PUNCH :BANG)
   (defword :TURN)
-  (defword :LOCK :KEYHOLE)) ;Not really a synonm!
+  (defword :LOCK :KEYHOLE))
 
 (defun dungeon-cell ()
   (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/exploratory/images/cell.bmp"
@@ -50,8 +49,6 @@
 
     (defobject "FINGER BONE" "The long, slender digit of a long since departed previous occupant of your cell. Human? YOU decide." nil nil
       (verb 'POKE
-	;;TODO I reckon we can make 'holding-verb' that does the check for holding
-	;;     in the generic handler at less cost.
 	(label :poke-finger) ;we call this if we try to unlock it further down
 	(if-has this
 		(progn
@@ -59,7 +56,7 @@
 		  (respond *far-out*)
 		  (clrbit :lock-jammed)
 		  (respond "The bony finger pokes out the blockage in the lock and crumbles to dust, having fulfilled its destiny."))
-		(respond "You don't have that."))))
+		(respond *donothave*))))
 	
     (action '(EXAMINE SLIME)
       (setbit :slime-examined)
@@ -294,116 +291,6 @@ preventing closed-minded mortals from seeing what is really there.")
   (with-location :generic 
     (action '(? ? ?)
       (respond "I don't know what that means."))))
-
-(defparameter origin #x600)
-      
-(defun build-game (initial-location game-fn &key (full-reset nil))
-
-  (when full-reset
-    (reset-image-cache))
-  
-  (reset-compiler)
-  (reset-symbol-table)
-  (reset-bits)
-  (reset-parser)
-  (reset-object-model)
-  (reset-game-state-ranges)
-
-  ;;this (atm) must be called so the widths are initialised
-  ;;todo, make a font-init function which just does the widths.
-  (font-data)
-  (reset-compiler)
-  (reset-vm)
-  
-  (flet ((pass ()
-
-	   (reset-dispatcher)
-	   	   
-	   (zeropage)
-	   (org origin)
-	   (CLD)
-	   (label :start)
-	   (cls #x10)
-	   (sta16.zp (cons :font :present) :font)
-	   
-	   (JSR :vm-enter)
-	   (vm-nav initial-location)
-	   (vm-done)
-	   
-	   (BRK)
-
-	   (label :test-input)
-	   (JSR :test-render-input)
-	   (JSR :parse)
-	   (JSR :dispatch)
-
-	   (BRK "<-- The correct end point after input")
-
-	   ;;game state
-	   (label :game-code-start)
-
-	   (funcall game-fn)
-	   	   
-	   (bit-table)
-
-	   (label :game-code-end)
-
-	   ;;inline functions we will need
-
-	   (deref-w)
-	   (print-message)
-	   (memcpy)
-	   (memset)
-	   (typeset)
-	   (fleuron)
-	   (navigator)
-	   (vm)
-	   
-	   ;;testing functions
-
-	   (test-render-input)
-
-	   (measure-size "Object Table"
-	     (object-table))
-	   (parser)
-
-	   (measure-size "Dispatcher"
-	     (dispatcher))
-	   (measure-size "String Table"
-	     (string-table))
-	   
-	   (image-decompressor)
-	   (label :end)
-	   ;font data is pretty boring so stick it here
-	   (measure-size "Fonts"
-	     (font-data))))
-    
-    (pass)
-    (build-symbol-table)
-    ;;TODO This is BORING
-    (setf *word-table-built* t)
-    ;;penultimate pass to ensure everything got a go and the structure
-    ;;hasn't changed
-
-    ;;these two passes to optimize dead vm branches
-    (pass)
-    (pass)
-    
-    (pass)
-    (let ((end *compiler-ptr*))
-      (pass)
-      (assert (= end *compiler-ptr*) nil "Build was not stable"))
-    
-      (setf *compiler-final-pass* t)
-      (pass)
-
-      (format t "Build size ~a~%" (- *compiler-ptr* origin))))
-
-(defun run-game (initial-location game-fn &key (full-reset nil) (break-on 'BRK))
-  (build-game initial-location game-fn :full-reset full-reset)
-  (monitor-reset #x600)
-  (monitor-run :break-on break-on)
-  (setmem-copy (monitor-buffer)))
 
 (defun run-simple-game (&key (full-reset nil) (break-on 'BRK))
   (run-game :dungeon-cell

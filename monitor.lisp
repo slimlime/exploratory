@@ -69,8 +69,10 @@
     (let ((*compiler-buffer* buffer))
       (loop for i from 1 to max-cycles do
 	   (multiple-value-bind (buffer pc sp sr a x y)
-	       (funcall *monitor-get-state*)
+	       (funcall *monitor-get-state* nil)
 	     (declare (ignore buffer sp sr a x y))
+	     ;;THIS IS USING THE COMPILER BUFFER IT SHOULD PROBABLY
+	     ;;LOOK INTO THE 6502 BUFFER...
 	     (let ((op (gethash (aref *compiler-buffer* pc)
 				*reverse-opcodes*)))
 	       ;(format t "~2,'0X ~a~%" pc op)
@@ -107,14 +109,14 @@
 	      (unless (zerop byte)
 		(cl-6502:step-cpu cl-6502:*cpu* byte)))))
   (setf *monitor-get-state* 
-	#'(lambda () (values
-		      (cl-6502:get-range 0)
-		      (6502:cpu-pc cl-6502:*cpu*)
-		      (6502:cpu-sp cl-6502:*cpu*)
-		      (6502:cpu-sr cl-6502:*cpu*)
-		      (6502:cpu-ar cl-6502:*cpu*)
-		      (6502:cpu-xr cl-6502:*cpu*)
-		      (6502:cpu-yr cl-6502:*cpu*)))))
+	#'(lambda (&optional (slow-get-buffer t)) (values
+					(if slow-get-buffer (cl-6502:get-range 0) nil)
+					(6502:cpu-pc cl-6502:*cpu*)
+					(6502:cpu-sp cl-6502:*cpu*)
+					(6502:cpu-sr cl-6502:*cpu*)
+					(6502:cpu-ar cl-6502:*cpu*)
+					(6502:cpu-xr cl-6502:*cpu*)
+					(6502:cpu-yr cl-6502:*cpu*)))))
 
 (defparameter *monitor-reset* #'monitor-setup-for-cl-6502)
 

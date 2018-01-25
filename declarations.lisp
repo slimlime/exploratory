@@ -234,3 +234,18 @@
 (defun goto (label)
   (vm-jmp label))
   
+(defun if-has-word (word fn)
+  ;;LET'S MAKE BRANCH ON CON
+  (vm-exe)
+  (LDA (word-id word))
+  (with-local-namespace
+    (LDY (1- *max-words*))
+    (label :next)
+    (CMP.ABY '(:parser . :words))
+    (BEQ :word-found)
+    (DEY)
+    (BNE :next)
+    (
+    
+    (label :word-found)
+    (

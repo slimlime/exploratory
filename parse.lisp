@@ -479,7 +479,7 @@
 (defun test-parse-input (input expected)
   ;;(format t "Testing ~a~%" input)
   (let ((words (parse-words-tester input)))
-    (print words)
+    ;;(print words)
     (loop
        for e in expected
        for r in words do

@@ -17,6 +17,7 @@
 (defparameter *far-out* "Far out!")
 (defparameter *whatyoutalkingabout* "I am sure YOU know what you are talking about.")
 (defparameter *donothave* "You don't have that.")
+(defparameter *cantdoit* "You can't do that!")
 
 ;;todo what happens e.g. EXAMINE DOOR WINDOW
 ;;TODO CHECK THAT ALL STATEBITS HAVE BOTH A READ AND A WRITE
@@ -52,11 +53,13 @@
       (verb 'POKE
 	(label :poke-finger) ;we call this if we try to unlock it further down
 	(if-has this
-		(progn
-		  (move-object this :nowhere)
-		  (respond *far-out*)
-		  (clrbit :lock-jammed)
-		  (respond "The bony finger pokes out the blockage in the lock and crumbles to dust, having fulfilled its destiny."))
+		(if-word-present 'DOOR
+				 (progn
+				   (move-object this :nowhere)
+				   (respond *far-out*)
+				   (clrbit :lock-jammed)
+				   (respond "The bony finger pokes out the blockage in the lock and crumbles to dust, having fulfilled its destiny."))
+				 (respond *cantdoit*))
 		(respond *donothave*))))
 	
     (action '(EXAMINE SLIME)

@@ -92,7 +92,7 @@
       (db '(:present . #\ ) 3 0 0 0 0 0 0 0 0 0 0)
       (setf (gethash '(:present . #\ ) *font-widths*) 3)
 
-      (defchar #\! '(128 128 128 128 128 128 0 0 128 0))
+      (defchar #\! '(16 48 48 48 48 48 16 0 48 48) :kern-lr)
       (defchar #\' '(192 192 64 128 0 0 0 0 0 0))
       (defchar #\, '(0 0 0 0 0 0 192 192 64 128))
       (defchar #\- '(0 0 0 #xF0 0 0 0 0 0 0))

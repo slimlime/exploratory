@@ -11,7 +11,7 @@
 ;;and so needs to be set at the end of the build pass.
 (defparameter *word-table-built* nil)
 (defparameter *binary-search-table* nil) ;;for debugging
-(defparameter *max-words* 8)
+(defparameter *max-input-words* 8)
 
 (defun reset-parser ()
   (setf *word-table-built* nil)
@@ -153,7 +153,7 @@
     (LDX 0 "X is our word pointer")
     (STX.ZP :word-index)
     (dc "Clear the parsed words buffer")
-    (dotimes (i *max-words*)
+    (dotimes (i *max-input-words*)
       (STX.AB (+ (resolve :words) i)))
     (LDY #xff)
     (label :trim)
@@ -252,7 +252,7 @@
     (label :found-next)
     (INX)
     (STX.ZP :word-index)
-    (CPX *max-words*)
+    (CPX *max-input-words*)
     (BNE :next-word)
     (label :done)
     (RTS)
@@ -260,10 +260,10 @@
     ;;TODO Ensure that only real collisions are added, e.g. CHADRIC and CHADRIX
     ;;are synonymous, but CHEETOWS and CHEEZOWS are not.
     (dc "The parsed word meanings get put here")
-    (dbs :words *max-words*)
+    (dbs :words *max-input-words*)
     (dc "The user input buffer")
     (dc "Terminated with many zeroes for convenience.")
-    (dbs :input (+ *max-words* *max-input-length*))
+    (dbs :input (+ *max-input-words* *max-input-length*))
     
     (let ((strings nil)
 	  (collisions (make-hash-table :test 'equal))
@@ -473,7 +473,7 @@
   
   (coerce (subseq (monitor-buffer)
 		  (resolve '(:parser . :words))
-		  (+ (resolve '(:parser . :words)) *max-words*))
+		  (+ (resolve '(:parser . :words)) *max-input-words*))
 	  'list))
 
 (defun test-parse-input (input expected)

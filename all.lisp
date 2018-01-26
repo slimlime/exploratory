@@ -5,7 +5,6 @@
 
 (defun load-project ()
   (ql:quickload 'cl-6502)
-  (ql:quickload 'lispbuilder-sdl)
 
   ;; the compiler...
   
@@ -41,3 +40,8 @@
   ;; the games...
   
   (bload "simple-game.lisp"))
+
+(defun load-vicky ()
+  (ql:quickload 'lispbuilder-sdl)
+  (bload "vicky-shared.lisp")
+  (bload "vicky.lisp"))

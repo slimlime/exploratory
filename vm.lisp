@@ -3,10 +3,18 @@
 
 ;;; TODO do we need VM-RBRA? VM-BRA only goes forward
 
+;;; So there is now a register VM-T which contains the result
+;;; of a test, and two instructions for branching on the result
+;;; of a test.
+
+;;; TODO LDA.IZY :xxx should show XXX address in the comment automatically
+
 (defparameter *vmops* nil)
 
 (defun vm ()
   (zp-w :vm-pc)
+  (zp-b :vm-t) ;;Wow, a register
+
   (with-namespace :vm
 
     (dc "Begin executing VM code at the callsite")
@@ -33,8 +41,8 @@
     (dc "This is the normal entry point for an action handler") 
     (label :vm-go nil)
     (LDY 0)
-    (LDA.IZY :vm-pc)
     (dc "Get the instruction")
+    (LDA.IZY :vm-pc)
     (BEQ :done "VM-DONE")
     (inc16.zp :vm-pc)    
     (BNE :go)
@@ -203,33 +211,9 @@
   ((BNE '(:vm-branch . :branch))
    (BEQ '(:vm-branch . :branch))))
 
-;;
-;;VM-JMP - Jump anywhere
-;;
-(defvmop vm-jmp (format nil "VM-JMP ~a" (fmt-addr addr))
-  (addr)
-  ((dw nil addr))
-  ((LDA.IZY :vm-pc)
-   (TAX)
-   (INY "Don't inc vm-pc as we throw it away")
-   (LDA.IZY :vm-pc)
-   (STX.ZP (lo-add :vm-pc))
-   (STA.ZP (hi-add :vm-pc))
-   (RTS)))
-
-#| SERIOUS INSTABILITY PROBLEM THAT THREATENS THE WHOLE
-   FABRIC OF SPACE AND TIME
-
-Using this, which is obviously not completely stable
-between passes REALLY screws up the build and introduces
-incorrect branch offsets elsewhere
-
-(defun vm-bra-or-jmp (addr)
-  (let ((offset (forward-branch-offset addr)))
-    (if (and (>= offset 0)
-	     (< offset 256))
-	(vm-bra addr)
-	(vm-jmp addr)))) |#
+;;Clearly VM-BOOP, BOIP, BSET, BCLR could be implemented
+;;;in terms of VM-BRT/BRF, but they are rather more common
+;; so they can stay.
 
 ;;
 ;;VM-BSET - Branch on bit set
@@ -292,6 +276,54 @@ incorrect branch offsets elsewhere
    (CMP.ABX (1- (resolve '(:object-table . :places))))
    (BNE '(:vm-branch . :branch))
    (BEQ '(:vm-branch . :dont-branch))))
+
+;;
+;;VM-BRT - Forward Branch When True
+;;
+(defvmop vm-brt (format nil "VM-BRT ~a" (fmt-addr addr))
+  (addr)
+  ((push-byte (forward-branch-offset addr)))
+  ((BIT.ZP :vm-t)
+   (BVS '(:vm-branch . :branch))
+   (BVC '(:vm-branch . :dont-branch))))
+
+;;
+;;VM-BRF - Forward Branch When False
+;;
+(defvmop vm-brf (format nil "VM-BRF ~a" (fmt-addr addr))
+  (addr)
+  ((push-byte (forward-branch-offset addr)))
+  ((BIT.ZP :vm-t)
+   (BVC '(:vm-branch . :branch))
+   (BVS '(:vm-branch . :dont-branch))))
+
+;;
+;;VM-JMP - Jump anywhere
+;;
+(defvmop vm-jmp (format nil "VM-JMP ~a" (fmt-addr addr))
+  (addr)
+  ((dw nil addr))
+  ((LDA.IZY :vm-pc)
+   (TAX)
+   (INY "Don't inc vm-pc as we throw it away")
+   (LDA.IZY :vm-pc)
+   (STX.ZP (lo-add :vm-pc))
+   (STA.ZP (hi-add :vm-pc))
+   (RTS)))
+
+#| SERIOUS INSTABILITY PROBLEM THAT THREATENS THE WHOLE
+   FABRIC OF SPACE AND TIME
+
+Using this, which is obviously not completely stable
+between passes REALLY screws up the build and introduces
+incorrect branch offsets elsewhere
+
+(defun vm-bra-or-jmp (addr)
+  (let ((offset (forward-branch-offset addr)))
+    (if (and (>= offset 0)
+	     (< offset 256))
+	(vm-bra addr)
+	(vm-jmp addr)))) |#
 
 ;;;
 ;;; VM-NAV - Navigate to a new location
@@ -396,6 +428,27 @@ incorrect branch offsets elsewhere
    (TAX)
    (vm-fetch)
    (STA.ABX (1- (resolve '(:object-table . :places))))
+   (RTS)))
+
+;;;
+;;;VM-TWORD - Test for a word
+;;;
+(defvmop vm-tword (format nil "VM-TWORD ~a"
+			  (string-downcase word))
+  (word)
+  ((push-byte (word-id word)))
+  ((vm-fetch)
+   (LDY (1- *max-input-words*))
+   (label :next)
+   (CMP.ABY '(:parser . :words))
+   (BEQ :found)
+   (DEY)
+   (BPL :next)
+   (STY.ZP :vm-t)
+   (RTS)
+   (label :found)
+   (LDA #xff)
+   (STA.ZP :vm-t)
    (RTS)))
 
 ;; reverse the order of the ops since they were pushed in

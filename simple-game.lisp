@@ -53,15 +53,19 @@
       (verb 'POKE
 	(label :poke-finger) ;we call this if we try to unlock it further down
 	(if-has this
-		(if-word-present 'DOOR
-				 (progn
-				   (move-object this :nowhere)
-				   (respond *far-out*)
-				   (clrbit :lock-jammed)
-				   (respond "The bony finger pokes out the blockage in the lock and crumbles to dust, having fulfilled its destiny."))
-				 (respond *cantdoit*))
+		(progn
+		  (label :testit nil)
+		  (vm-tword 'DOOR)
+		  (vm-brf :cant)
+		  (move-object this :nowhere)
+		  (respond *far-out*)
+		  (clrbit :lock-jammed)
+		  (respond "The bony finger pokes out the blockage in the lock and crumbles to dust, having fulfilled its destiny.")
+		  (vm-done)
+		  (label :cant)
+		  (respond "The finger seems to say, 'Not there! You fool!'"))
 		(respond *donothave*))))
-	
+    
     (action '(EXAMINE SLIME)
       (setbit :slime-examined)
       (respond "Millions of eyes peer out from the slime.")
@@ -151,7 +155,7 @@ preventing closed-minded mortals from seeing what is really there.")
       (respond "A plain old rusty keyhole.")
       (if-bit :lock-jammed
 	      (respond "It appears to be blocked.")))
-      
+    
     ;;AT 5 bytes per entry this is pretty spicy. What would it cost in the verb table
     ;;3 bytes, but plus the cost of it being an object -the examin cost etc.
     ;;need to calculate cost benefit.

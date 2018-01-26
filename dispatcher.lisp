@@ -70,7 +70,7 @@
     (BEQ :matched-sentence)
     (label :next-input-word)    
     (INX)
-    (CPX *max-words*)
+    (CPX *max-input-words*)
     (BNE :next-word)
     (dc "We exhausted the input words")
     (label :next-handler)

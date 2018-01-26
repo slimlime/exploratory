@@ -51,20 +51,16 @@
 
     (defobject "FINGER BONE" "The long, slender digit of a long since departed previous occupant of your cell. Human? YOU decide." nil nil
       (verb 'POKE
-	(label :poke-finger) ;we call this if we try to unlock it further down
-	(if-has this
-		(progn
-		  (label :testit nil)
-		  (vm-tword 'DOOR)
-		  (vm-brf :cant)
-		  (move-object this :nowhere)
-		  (respond *far-out*)
-		  (clrbit :lock-jammed)
-		  (respond "The bony finger pokes out the blockage in the lock and crumbles to dust, having fulfilled its destiny.")
-		  (vm-done)
-		  (label :cant)
-		  (respond "The finger seems to say, 'Not there! You fool!'"))
-		(respond *donothave*))))
+	(if-word 'KEYHOLE
+		 (if-has this
+			 (progn
+			   (label :poke-finger)
+			   (move-object this :nowhere)
+			   (respond *far-out*)
+			   (clrbit :lock-jammed)
+			   (respond "The bony finger pokes out the blockage in the lock and crumbles to dust, having fulfilled its destiny."))
+			 (respond "The finger seems to say, 'Not there! You fool!'"))
+		 (respond *donothave*))))
     
     (action '(EXAMINE SLIME)
       (setbit :slime-examined)
@@ -164,7 +160,8 @@ preventing closed-minded mortals from seeing what is really there.")
 
     (action '(ATTACK SLIME) (respond "Your hand is stayed by the slime's gaze of infinite sadness."))
 
-    (action '(UNLOCK DOOR FINGER)
+    ;;We could do this with double dispatch properly
+    (action '(UNLOCK DOOR BONE)
       (if-bit :door-locked
 	      (if-has "FINGER BONE"
 		      (goto :poke-finger)

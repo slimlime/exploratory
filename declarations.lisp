@@ -48,6 +48,8 @@
      (with-namespace *current-location*
        ,@body)))
 
+;; TODO refactor these three functions
+
 (defun if-bit-fn (bit then else)
   (defbit bit)
   (let ((namespace *compiler-label-namespace*))
@@ -68,6 +70,55 @@
 	  (funcall else)))
       (label :end-if))))
 
+(defun if-in-place-fn (object place then else)
+  (let ((namespace *compiler-label-namespace*))
+    (with-local-namespace
+      (if then
+	  (progn
+	    (vm-boop object place (if else :else :end-if))
+	    (with-namespace namespace
+	      (funcall then))
+	    (when else    
+	      (vm-bra :end-if t)))
+	  (progn
+	    (assert else nil "Must have at least one clause")
+	    (vm-boip object place :end-if)))
+      (when else
+	(when then (label :else))
+	(with-namespace namespace
+	  (funcall else)))
+      (label :end-if))))
+
+(defun if-word-fn (word then else)
+  (let ((namespace *compiler-label-namespace*))
+    (with-local-namespace
+      (vm-tword word)
+      (if then
+	  (progn
+	    (vm-brf (if else :else :end-if))
+	    (with-namespace namespace
+	      (funcall then))
+	    (when else    
+	      (vm-bra :end-if t)))
+	  (progn
+	    (assert else nil "Must have at least one clause")
+	    (vm-brt :end-if)))
+      (when else
+	(when then (label :else))
+	(with-namespace namespace
+	  (funcall else)))
+      (label :end-if))))
+
+(defmacro if-word (word then &optional (else nil else-supplied-p))
+  `(if-word-fn ,word
+	       #'(lambda () ,then)
+	       (if ,else-supplied-p #'(lambda () ,else) nil)))
+
+(defmacro when-word (word &body then)
+  `(if-word-fn ,word
+	       #'(lambda () ,then)
+	       nil))
+
 (defmacro if-bit (bit then &optional (else nil else-supplied-p))
   `(if-bit-fn ,bit
 	     #'(lambda () ,then)
@@ -87,26 +138,6 @@
   `(if-bit-fn ,bit
 	     (if ,else-supplied-p #'(lambda () ,else) nil)
 	     #'(lambda () ,then)))
-
-;;; Can be refactored with the if bit- the difference is the vm-ops
-(defun if-in-place-fn (object place then else)
-  (let ((namespace *compiler-label-namespace*))
-    (with-local-namespace
-      (if then
-	  (progn
-	    (vm-boop object place (if else :else :end-if))
-	    (with-namespace namespace
-	      (funcall then))
-	    (when else    
-	      (vm-bra :end-if t)))
-	  (progn
-	    (assert else nil "Must have at least one clause")
-	    (vm-boip object place :end-if)))
-      (when else
-	(when then (label :else))
-	(with-namespace namespace
-	  (funcall else)))
-      (label :end-if))))
 
 (defmacro if-has (object-name then &optional (else nil else-supplied-p))
   `(if-in-place-fn ,(translate-this object-name) :inventory

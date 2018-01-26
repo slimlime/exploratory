@@ -444,6 +444,7 @@ incorrect branch offsets elsewhere
    (BEQ :found)
    (DEY)
    (BPL :next)
+   (INY "Set Y to 0")
    (STY.ZP :vm-t)
    (RTS)
    (label :found)

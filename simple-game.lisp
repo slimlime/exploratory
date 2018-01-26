@@ -51,15 +51,15 @@
 
     (defobject "FINGER BONE" "The long, slender digit of a long since departed previous occupant of your cell. Human? YOU decide." nil nil
       (verb 'POKE
-	(if-word 'KEYHOLE
-		 (if-has this
+	(if-has this
+		(if-word 'KEYHOLE
 			 (progn
 			   (label :poke-finger)
 			   (move-object this :nowhere)
 			   (respond *far-out*)
 			   (clrbit :lock-jammed)
 			   (respond "The bony finger pokes out the blockage in the lock and crumbles to dust, having fulfilled its destiny."))
-			 (respond "The finger seems to say, 'Not there! You fool!'"))
+			 (respond "The finger seems to say, `Not there! You fool!'"))
 		 (respond *donothave*))))
     
     (action '(EXAMINE SLIME)

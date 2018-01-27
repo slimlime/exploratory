@@ -97,7 +97,7 @@
 (defun lentest (f)
   (let ((img (posterize-image 104 104 (load-image f 104 104) :reduce-popcount t)))
     (copy2screen img 104)
-    (vicky)   
+    ;(vicky)   
     (format t "file ~a ~a ~a~%"
 	    f
 	    (length (compress (first img) (/ 104 8)))
@@ -105,7 +105,8 @@
     (copy2screen (list (decompress (compress (first img) 13) 13)
 		       (decompress (compress (second img) 13) 13))
 		 104)
-    (vicky)))
+    ;(vicky)
+    ))
 
 (defun test-images ()
   (lentest "/home/dan/Downloads/odd.bmp")

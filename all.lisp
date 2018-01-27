@@ -5,6 +5,7 @@
 
 (defun load-project ()
   (ql:quickload 'cl-6502)
+  (ql:quickload 'lispbuilder-sdl)
 
   ;; the compiler...
   
@@ -22,7 +23,6 @@
   (bload "sharedmem.lisp")
   (bload "chars.lisp")
   (bload "vicky-shared.lisp")
-  (bload "vicky.lisp")
   (bload "justify.lisp")
   (bload "image.lisp")
   (bload "graphics.lisp")

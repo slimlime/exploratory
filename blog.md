@@ -83,7 +83,14 @@ So what next?
 
 - Encoding scheme, Huffman or the spangly new and just as efficient to decode the tabled variant of [Asymmetric Numeral System](https://en.wikipedia.org/wiki/Asymmetric_numeral_systems). Tabled ANS appears to be quite brilliant and uses an almost identical decoding strategy to the table method of decoding Huffman. Sadly I still don't understand how the encoding tables are built for this system and the original paper is extremely difficult to understand.
 
-Since I don't yet understand *tANS* I am going to do the first two things first and the third thing third.
+To try to understand *tANS* I will be skipping the [Jarek Duda original paper](https://arxiv.org/abs/1311.2540), which I definitely do not understand and proceeding straight to,
+
+- [cbloom rants](https://cbloomrants.blogspot.co.uk/2014/01/1-30-14-understanding-ans-1.html)
+- [Real Time Data Compression](https://fastcompression.blogspot.co.uk/2013/12/finite-state-entropy-new-breed-of.html)
+
+which I also do not understand.
+
+Since I don't yet understand *tANS* I am going to do the first two things first and the third thing third. Additionally, for the third thing, if I still don't understand *tANS* I will do Huffman with the table decode implementation as the machinery on the 6502 side will be almost identical to the *tANS* decode implementation.
 
 ### Double Dispatch Envy
 
@@ -186,6 +193,8 @@ Evaluation took:
 ~~~~
 
 It constantly surprises me that SBCL (and emacs for that matter) has some pretty advanced features that are paid-for extras with Visual Studio. Anyway, I expect code quality to precipitously decline as I have lost out on a significant amount of thinking time between edit/compile/run cycles.
+
+See [John Fremlin's blog](http://john.freml.in/sbcl-optimise-profiling)
 
 ## 24/1/2018 Guest post from last year
 

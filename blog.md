@@ -1,3 +1,185 @@
+## 28/1/2018 
+
+### Entropy Reigns in the Celestial String Table
+
+You are familiar with the compression rabbit hole no-doubt (see the previous posts) and I decided to take another look having been spurred into action by the ever increasing build sizes, even after making some massive gainz with the virtual machine.
+
+To recap, for images I am using a custom pattern matching compression scheme which looks for similar runs of bytes on each scanline and the scanline immediately above. For text I am using a Tunstall table, where a byte can stand in for either
+
+- a single character
+- two characters
+- three characters
+
+(including the end-of-line character)
+
+This compression scheme captures some of the higher order redundancy in the strings, but there is still a lot of redundancy in the frequency distribution of the symbols (for example, *space* and the letter *e* are going to occur vastly more often than *j*). The normal way to reduce this is to use an encoding system on top of the higher order dictionary type compression. To see just how skewed the distribution is, I wrote something to dump out a table with the frequencies of the symbols as they are written out.
+
+~~~~
+-- Strings ------------------
+ #               96
+ Size            5093
+ Size w/nul      5189
+ Compressed size 2784 (53%)
+*    35 | ^    78 |      26 | !    19 | '    16 | ,     2 | -    14 | .     7 | 
+?    14 | A    16 | B     4 | C     5 | D     3 | E     6 | F     6 | G     6 | 
+H     7 | I    14 | K     2 | L     6 | M    10 | N     8 | O    12 | P     8 | 
+R     9 | S     6 | T     1 | U     3 | V     1 | W     7 | Y     2 | Z     1 | 
+`     1 | a    47 | b    32 | c    44 | d    27 | e    20 | f    32 | g    36 | 
+h    21 | i    55 | j     2 | k     8 | l    29 | m    30 | n    16 | o    22 | 
+p    43 | r    20 | s    48 | t    19 | u    39 | v     4 | w    34 | x     3 | 
+y    28 | z    10 | e    18 | 
+
+in   26 | he    4 | th    2 |  t    6 | ou   10 |  a    6 | s    28 | 
+t    35 | .*   47 | re   27 |  i    1 |  o    4 |  s   12 | ng    4 | er    9 | 
+n    11 | r    14 | or   25 | an   18 | u     8 | ar   22 |  d    4 | is   15 | 
+ha   10 | en   11 | d    19 | do    8 | at    8 | on   19 | lo   18 | nd    3 | 
+ke   16 | ,    33 | Yo    0 | yo    1 | li   11 | oo    3 |  c   13 |  y    0 | 
+a    18 | ll   13 | of    3 |  b    4 |  f   14 | Th    1 | ck    7 | es    5 | 
+it   20 | ea    2 | y    27 | me   23 | ed    4 | ee    9 | .    19 | f     7 | 
+hi    6 | g     6 |  w    8 | al    7 | ur    9 | se   10 | st   19 |  l    3 | 
+ h    5 | nt   11 | ow    7 | le    9 | ro   18 | to    5 |  p    5 |  k    5 | 
+pe   12 | ve    7 |  g    3 |  m    6 | om    1 | no   14 | ey    2 | e.    3 | 
+ri   12 | ic    7 | k     7 | un    8 | so   13 | el   10 | ne    5 | ge    8 | 
+o     3 | ..    8 | ma   15 | ra   13 | ch   15 | oc    0 |  e    7 | ut   11 | 
+ti    2 | de    9 | ns    1 |  r    4 | d.    1 | ta    7 | ol   12 | te    6 | 
+ad    6 | rs    2 | ot    7 | s.   10 | et    2 | bl   13 | n.    5 | he    4 | 
+
+ th  26 | the  33 | ing  25 | ou    0 | You  26 | you  23 |  yo   9 | 
+The  29 |  do  22 |  of   7 | ng    9 |  a   11 | of   12 | oor   1 |  in   5 | 
+is   15 |  is   5 | in   18 | at   10 | doo   2 | re    5 | nd    7 | hin   8 | 
+hat   7 | her   4 | er   10 |  lo   7 | e s  10 | or   13 |  to   6 | ere   5 | 
+ an   7 | e d   2 | thi  11 | and   6 | s a   9 | our   1 | n t   4 | ock   2 | 
+ent   3 | t t   2 | all   5 | e i   4 |  ke   5 | key   9 | loc   6 | ear   9 | 
+e t   4 | rea  10 | ur    5 | s o   9 | tha   5 | ed    6 | d.*   9 | e a   1 | 
+ome   4 |  ar   4 |  ha   2 |  so   3 | r i   0 | e.*   5 |  sl   5 | ck   10 | 
+lin   5 | ve    4 | are   6 |  go   4 |  Yo   7 | cke   3 | see   5 | nge   2 | 
+e o   5 | es    8 | ave   2 | und   6 |  it   1 | ll    6 | to    7 |  be   2 | 
+hav   7 | e f   2 |  wa   2 |  on   3 | it    6 | pen   8 |  no   3 | 
+-----------------------------
+
+~~~~
+
+As you can see the word *You* and *The* are very common as is to be expected, but there is a critical observation to be made here. To decide which symbols go into the table in the first place, I run all the strings through a counter which counts the occurance of each combination of two and three letter words. However, this does not reflect the reality of how frequently they will be used when the strings are encoded. Look at the following string,
+
+~~~~
+The The The
+
+S        f(analysis)  f(encoding)
+---------------------------------
+0  (spc) 2            2
+1  The   3            3
+2  he    2            0
+3  e T   2            0
+4  Th    2            0
+~~~~
+
+As you can see this string would be encoded using the symbols {1,0,1,0,1}, but our analysis showed that `e T` was something good we should have in our Tunstall table. I knew this was an approximation, but I didn't realise just how different the actual encoding frequencies would be compared to the frequencies in the analysis. Of course, for entropy reduction we need the encoding frequencies since that is what appears in the actual output. So now I have two things to think about
+
+- Better symbol choice
+- Encoding scheme, Huffman or the spangly new and just as efficient to decode (Tabled Asymmetric Numeral System)'[https://en.wikipedia.org/wiki/Asymmetric_numeral_systems]
+
+### Double Dispatch Envy
+
+In OO we have dispatch against an object, usually in the form `noun.verb()` or somesuch. A thorny problem is how to do double-dispatch, where you have two nouns and want to do one thing to them,
+
+~~~~
+POKE FINGER BONE IN KEYHOLE
+~~~~
+
+This is a perfectly understandable imperative sentence and we should be able to parse it. All day could be spent arguing about how to do this in C++, who does what to whomst and whatnot, but at the end of the day the realy problem is *where to put the code*. Because, some code really does need to be written to actually put the bone in the keyhole, so to speak.
+
+However, I hear YAGNI cackling over my shoulder and since this is the only use-case so far, I have avoided the temptation to implement double-dispatch and just implemented a basic word-presence check,
+
+~~~~
+    (defobject "FINGER BONE" "The long, slender digit of a long since departed previous occupant of your cell. Human? YOU decide." nil nil
+      (verb 'POKE
+	(if-has this
+		(if-word 'KEYHOLE
+			 (progn
+			   (label :poke-finger)
+			   (move-object this :nowhere)
+			   (respond *far-out*)
+			   (clrbit :lock-jammed)
+			   (respond "The bony finger pokes out the blockage in the lock and crumbles to dust, having fulfilled its destiny."))
+			 (respond "The finger seems to say, `Not there! You fool!'"))
+		 (respond *donothave*))))
+~~~~
+
+In the code so far we distinguish between words and objects- objects have an optional adjective and can be carried around. There is code to look around and do basic disambiguation to resolve objects with the same name but different adjectives and also to do things like checking if the object is in the room or in your inventory. With plain old *words* we don't have that. But do we need it. I think ultimately the answer is yes, but since I don't exactly know what form it will take I have implemented something very basic. Clearly there would be problems if there was a `RUSTY KEYHOLE` and a `SHINY KEYHOLE`. The other area where this will be somewhat inefficient is if the two objects are objects that can be carried around; we would have to explicitly test for their presence.
+
+A new virtual machine instruction to check for the presence of a plain old word, along with a wrapper to specify it in game code- `if-word`.
+
+Unlike the existing test-and-branch op-codes like `VM-BSET` and `VM-BOOP` which are very common and deserve their own single byte opcode, I decided to introduce a *register* to the virtual machine, namely `vm-t` this will be used to contain the result of various and sundry tests we can come up with. Along with a new pair of branching instructions, we will have everything we need to implement any old test and branch we care to come up with in the future. Here is the disassembly
+
+In conclusion, I will probably implement double dispatch, but I am not going to do so until I have to.
+
+~~~~
+POKE:FINGER BONE 0BCF 07030163 VM-BOOP finger bone NOT IN inventory L1:ELSE
+                     0BD3 1507     VM-TWORD keyhole
+                     0BD5 0942     VM-BRF L2:ELSE
+EON-CELL:POKE-FINGER 0BD7 140300   VM-MOV finger bone nowhere 
+                     0BDA 0C0E4F.. VM-PRI1 'Far out!'
+                     0BE1 1208     VM-CLR lock-jammed
+                     0BE3 0EB165.. VM-PRI3 'The bony finger pokes out the blockage in
+the lock and crumbles to dust, having
+fulfilled its destiny.'
+                     0C18 00       VM-DONE
+             L2:ELSE 0C19 0DB166.. VM-PRI2 'The finger seems to say, `Not there! You
+fool!''
+           L2:END-IF 0C35 00       VM-DONE
+             L1:ELSE 0C36 0CAEB2.. VM-PRI1 'You don't have that.'
+           L1:END-IF 0C40 00       VM-DONE
+~~~~
+
+Of course, I could have done the same as with `VM-BOOP` and `VM-BOIP`, combining the branch and test to save myself a byte, but the difference is that those two are very common, as are `VM-BSET` and `VM-BCLR`. So in this case it is probably not worth it.
+
+## 27/1/2018 Backquoth the Raven
+
+Having added some quoted 'speech' I decided I didn't like the asymmetric quote. Backquote has now been added and it looks much nicer,
+
+![Alt text](/blog/pokeboneinear.png)
+
+Can be added to the game with the back-tick. I might automate this but I have no idea how many edge cases there will be for making smart quotes.
+
+~~~~
+(respond "The finger seems to say, `Not there! You fool!'")
+~~~~
+
+Which gives me an idea for a character, Backquoth the Raven and his owner Noteye, the Necromancer.
+
+## 26/1/2018 Time
+
+It used to take approximately 10 seconds (on Marceline, the Celeron laptop) to start the game- and a good few seconds to see the input. This was mildly troubling but I wasn't that concerned as I had a hard limit of 1,000,000 cycles per run, so I knew that on a real 6502 at 1MHz nothing was taking longer than a second. On a whim I decided to profile using sbcl's simple profiler (there is a more powerful one too).
+
+~~~~
+CL-USER> (require :sb-sbrof)
+CL-USER> (sb-sprof:with-profiling (:report :flat) (run-simple-game))
+
+           Self        Total        Cumul
+  Nr  Count     %  Count     %  Count     %    Calls  Function
+------------------------------------------------------------------------
+   1    281  47.4    389  65.6    281  47.4        -  SB-IMPL::VECTOR-SUBSEQ-DISPATCH/SIMPLE-ARRAY-UNSIGNED-BYTE-8
+   2    129  21.8    129  21.8    410  69.1        -  "foreign function pthread_sigmask"
+   3    108  18.2    108  18.2    518  87.4        -  SB-KERNEL:UB8-BASH-COPY
+   4     13   2.2     16   2.7    531  89.5        -  SB-KERNEL:STRING=*
+   5     12   2.0     64  10.8    543  91.6        -  ENCODE-STRING
+   6     10   1.7     10   1.7    553  93.3        -  SB-KERNEL:UB32-BASH-COPY
+   7      8   1.3     17   2.9    561  94.6        -  SB-IMPL::VECTOR-SUBSEQ-DISPATCH/SIMPLE-CHARACTER-STRING
+   8      5   0.8      5   0.8    566  95.4        -  SB-KERNEL:VECTOR-SUBSEQ*
+   
+   Evaluation took:
+  6.187 seconds of real time (on Nyarlathotep, the Xeon)
+~~~~
+
+Turns out I was copying the entire 64K memory buffer from the 6502 emulator on every cycle. I have been working on this for some months now, so that time has really added up. Compare to this, now it doesn't do the copy,
+
+~~~~
+Evaluation took:
+  1.017 seconds of real time
+~~~~
+
+It constantly surprises me that SBCL (and emacs for that matter) has some pretty advanced features that are paid-for extras with Visual Studio. Anyway, I expect code quality to precipitously decline as I have lost out on a significant amount of thinking time between edit/compile/run cycles.
+
 ## 24/1/2018 Guest post from last year
 
 I didn't actually finish this post and then I forgot about, but it was close enough, so here it is. I am going to do another post soon about OO and how it is pretty terrible, so tune in for that if you are into opinionated, poorly-argued discussions on the philosophy of programming.

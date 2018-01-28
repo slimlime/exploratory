@@ -1,3 +1,41 @@
+## 28/1/2018
+
+### Results of longer pattern matching
+
+The first experiment I tried before looking at straight entropy encoding, to reduce some of the higher-order redundancy in the strings is matching longer patterns. The Tunstall table takes care of common two and three letter symbols, maybe this will give massive gainz for longer patterns, e.g.
+
+~~~~
+Funny you should mention eyes, you have a
+strange feeling someone or something is
+staring at you.
+The wall oozes with a repellant [green slime].
+Eugh! The slime is look[ing at you]!
+There is a crack in [the floor][. Perhaps ]it
+bears further examination?
+Apar[t from th]e crack, there is nothing
+~~~~
+
+The bits in square brackets are strings (actually, encoded strings rather than raw strings) that have occured before in the text. Rather than output the actual code for it we can use codes #xF0 - #xFF where weren't gaining anything with our Tunstall table, we can emit, `#(255 LO HI)` which costs three bytes rather than `#(39 68 83 231 41 109 0) [green slime]`. Where `LO HI` is the address of where `#(39 68 83 231 41 109 0) [green slime]` has been seen before.
+
+Amazing you exclaim, that must save absolutely loads of bytes! Here's the result when run on the test game, with a maximum of 4 symbol length patterns,
+
+~~~~
+ Size                   5093
+ Size w/nul             5189
+ Compressed size        2784 (53%)
+ Size w/pattern 4 max   2678 (52%)
+~~~~
+
+What about if we whack it up to 16 symbol patterns? That top end of the table is pretty crummy, we never even see `r i` a single time!
+
+~~~~
+ Size w/pattern 16 max  2659 (51%)
+~~~~
+
+Going to check the code is correct but I think it is time to sad-dog face this idea.
+
+![Sad Dog](/blog/dog.jpg)
+
 ## 28/1/2018 
 
 ### Entropy Reigns in the Celestial String Table

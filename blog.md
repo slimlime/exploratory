@@ -73,10 +73,17 @@ S        f(analysis)  f(encoding)
 4  Th    2            0
 ~~~~
 
-As you can see this string would be encoded using the symbols {1,0,1,0,1}, but our analysis showed that `e T` was something good we should have in our Tunstall table. I knew this was an approximation, but I didn't realise just how different the actual encoding frequencies would be compared to the frequencies in the analysis. Of course, for entropy reduction we need the encoding frequencies since that is what appears in the actual output. So now I have two things to think about
+As you can see this string would be encoded using the symbols `{1,0,1,0,1}`, but our analysis showed that `e T` was something good we should have in our Tunstall table. I knew this was an approximation, but I didn't realise just how different the actual encoding frequencies would be compared to the frequencies in the analysis. It is clear why this is the case, during the analysis phase we have no idea that any particular three letter symbol will actually make it into the top 100 or whatever, it might be completely useless like `e T` is in the above example. During the encoding phase we greedily consume the characters and our assumption of independent probabilities is violated.
 
-- Better symbol choice
-- Encoding scheme, Huffman or the spangly new and just as efficient to decode (Tabled Asymmetric Numeral System)'[https://en.wikipedia.org/wiki/Asymmetric_numeral_systems]
+So what next?
+
+- Perform second pass after the analysis pass to generate actual encoding frequencies. We will need these frequencies, since they are the frequencies of the actual symbols in the output stream. I will sort this and have a look at what sort of distribution we are getting. It might be apparent that we can drop the number of symbols, or something else obvious may pop out.
+
+- LZ77 style substring searching. We can reserve the top end of the symbol table, say `#xF0-#xFF` which means, "You know the next two bytes? Well, these two bytes are the address of a substring of between 4 and 20 symbols. Steal these symbols please." This could be easy to decode, but a pig to implement due to the size of the strings going all over the place during the build passes. We'll see. But anyway, now we need a hash table of substrings. Brute force is the way to go, as I really don't want to do any reading into how proper LZ does it. The rabbit hole is a dangerous place for amateurs.
+
+- Encoding scheme, Huffman or the spangly new and just as efficient to decode the tabled variant of [Asymmetric Numeral System](https://en.wikipedia.org/wiki/Asymmetric_numeral_systems). Tabled ANS appears to be quite brilliant and uses an almost identical decoding strategy to the table method of decoding Huffman. Sadly I still don't understand how the encoding tables are built for this system and the original paper is extremely difficult to understand.
+
+Since I don't yet understand *tANS* I am going to do the first two things first and the third thing third.
 
 ### Double Dispatch Envy
 

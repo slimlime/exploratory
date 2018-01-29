@@ -1,3 +1,102 @@
+## 29/1/2018
+
+## Tunstall Squared
+
+Now see if we can squeeze anything out of having two symbols together
+and replace some of the rubbish in the back end of the Tunstall table.
+`r i` and `e a` are not that common, perhaps we can steal their places
+in the table. So, if we see "The" we might like to also have a space.
+This is a higher order correlation in the input stream, not just redundancy
+in the frequency distribution.
+
+It is probably best that we remove the higher order correlations before we do entropy
+encoding; the estimates for the probability of the symbol drive the
+length of the code. So, P(`The`) is high, so it gets a short code. To
+the human eye, we can see that P(`The`|`The`) is very low, but the second
+`The` will still get the same short code, whereas P(`The`|` `), P(`The`|`re `)
+are much higher so space and `re ` should really get the short codes.
+
+To counteract this, let us explicitly
+put "`The`|`ere`" and "`The`|` `" into the table. This is similar to having
+4 letter words, but in this case I will be making the symbol table
+self referential. I will only be considering S1 where L(S1)>1. S2 and
+optionally S3 can be anything already in the table.
+
+Addition of these symbols to the table will be done on a greedy best
+cost approach, if it saves more to remove a symbol from the back
+end of the table and insert a new self-referential symbol then I will
+do that. The best thing about this approach is that it is essentially
+free in time (almost) and space on the decode side.
+
+~~~~
+Politel[y, ]you[ kno]ck on the alrea[dy ]open
+g[reen][ door], but there is no answer.
+You[ kno]ck on the door and wait patiently.
+Presentl[y, ]it swings open. There appears to
+
+-- Strings ------------------
+ #                        96
+ Size                   5093
+ Size w/nul             5189
+ Compressed size        2784 (53%)
+ Size with 32 syms      2627 (50%)
+~~~~
+
+Surprisingly better than the pattern match approach, which I find
+pretty amazing tbh, but still not good enough to justify actually doing
+it. Additionally, it looks like it uses some of the symbols in the
+back end of the table, so realistically the improvement wouldn't be
+as good as these figures suggest, and it will only get more stuffed
+as the size of the game increases.
+
+Just to confirm that this result is somewhat reasonable, here is a quick check
+for what I would look for if I was trying to reduce redundancy manually.
+First I would look for the distribution of symbols following `the` and
+`The` and then `You` and `you`. Though these are not the top used
+symbols it seems to me that you can make a much better guess than you
+can, e.g. following on from a carriage return or an `i`.
+
+~~~~
+
+F(*|the), that is, the frequency of something after `the`
+
+ go   4 |  ke   4 |  lo   4 |  do   4 |  f    4 |  c    3 |  wa   2 |  sl   2 |  to   2 | 
+re    2 |  w    2 | r     2 | re    2 |  r    1 |  m    1 |  g    1 |  o    1 |  no   0 | 
+
+F(*|The)
+
+ do  20 | re    8 |  lo   6 |  sl   4 |  wa   2 |  go   2 |  f    2 |  e    1 |  g    1 | 
+ b    1 |  s    1 | re    1 |  no   0 | pen   0 | it    0 |  on   0 | e f   0 | hav   0 | 
+
+F(*|you)
+
+r     6 |  ha   2 |  ar   2 |  to   2 |  do   2 |  k    2 | rs    1 |  e    1 | ..    1 | 
+ m    1 | .     1 |  f    1 |  c    1 |  s    1 | .*    1 |  no   0 | pen   0 | it    0 | 
+
+F(*|You)
+
+ h    3 |  t    3 |  ar   2 |  r    2 |  e    2 |  s    2 |  ha   1 |  to   1 |  do   1 | 
+ m    1 |  k    1 |  p    1 |  w    1 |  c    1 |  d    1 | r     1 |  a    1 | '     1 | 
+ no   0 |
+
+~~~~
+
+This shows there really is redundancy. I think the distribution is much flatter where
+we would not expect to be able to predict the next, e.g. with `ing`...
+
+~~~~
+
+F(*|ing)
+
+er   10 |  th   4 |  a    3 |  be   2 | s o   2 |  an   2 |  a    2 | .*    2 |  w    1 | 
+ c    1 | ,     1 | er    1 |  no   0 | pen   0 | it    0 |  on   0 |  wa   0 | e f   0 |
+
+~~~~
+
+Which shows what thought did. Just as skewed! In all these cases, it seems that we don't
+need more than 4 bits. This immediately suggests that at the entropy encoding stage we
+can make a lot of savings by having different tables.
+
 ## 28/1/2018
 
 ### Results of longer pattern matching

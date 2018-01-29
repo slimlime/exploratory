@@ -1,5 +1,124 @@
 ## 29/1/2018
 
+### Implementing prefix decoding
+
+Huffman is a prefix code based on a binary tree. You have your symbol when you
+read the bits in, traverse down the tree and come to a leaf node.
+
+~~~~
+       *
+      / \
+     A   *
+        / \
+       B   *
+          / \
+         C   D
+
+A 0
+B 10
+C 110
+D 111
+
+~~~~
+
+To do a fast lookup, you would build an array. Let's say 16 entries for this example. A larger symbol set, say 256, might need a larger index, say 16 bits.
+
+~~~~
+
+index | symbol | length | rest
+------+--------+--------+------
+0000  | A      | 1      | AAA
+0001  | A      | 1      | AA?
+0010  | A      | 1      | AB
+0011  | A      | 1      | A?
+0100  | A      | 1      | BA
+0101  | A      | 1      | B?
+0111  | A      | 1      | D
+1000  | B      | 2      | AA
+1001  | B      | 2      | A? 
+1010  | B      | 2      | B
+1011  | B      | 2      | ?
+1100  | C      | 3      | A
+1101  | C      | 3      | ?
+1110  | D      | 3      | A
+1111  | D      | 3      | ?
+
+~~~~
+
+In such a table the same symbols occur more than once- these tables tell you how many bits
+you actually need to consume from the input stream.
+
+Now you can shift your 4 bit buffer over by length bits each time you output a symbol
+of course, where more symbols can be inferred, you could just output them directly
+and shift by the appropriate number of bits.
+
+(tANS tables work in a similar way, except they have an extra field which tells the
+decoder what the next 'state' is. The state + the bits read are used as the index into
+the array)
+
+It occurs to me we won't have the memory to use the 'fast' table look up system
+where all the bits are fed into some fixed bit width index, as to be useful it would probably
+have to be 16 bits giving a table size of 128K, which is a little bit more than I have to play with. I would prefer to do it in 1K. This also rules out *tANS*.
+
+For my reduced memory needs I am going to do the following,
+
+A main table, containing 256 entries, indexed on the prefix code. To find an
+entry here we will read in 16 bits and then do a search. You know you've
+found a match if your 16 bits masked off with the length is the same as the
+index. Now, I wonder if there is a magic way of ordering the table such
+that a comparison function can be made? It might involve padding trailing 1s 
+or something. Yes I think there must be.
+If so, then this table will be amenable to binary search.
+
+### Slow lookup
+
+Having thought about it, binary search will work, we just need an ordering function
+We simply shift over each prefix pattern to the left most position and sort into
+numerical order. Here's an example with an 16 bit input register.
+
+~~~~
+
+       *
+      / \
+     A   *
+        / \
+       B   *
+          / \
+         *   C
+        / \
+       D   E
+
+A 0
+B 10
+C 111
+D 1100
+E 1101
+
+Sorted table,
+
+* | n(*) - 16 bit
+--+------------------ 
+A | 0 000000000000000
+B | 10 00000000000000
+D | 1100 000000000000
+E | 1101 000000000000
+C | 111 0000000000000
+
+Input stream          C  AB D   E   B     E   AC  AE
+
+16 bit Input register 1110101100110110 <- 1101011101011 rest of stream
+
+~~~~
+
+So anything in our 16 bit read buffer that contains a D is strictly >= n(D) and also < n(E). This should
+be a good enough constraint for a binary search to find the item we need. Once we have found the item, we then know
+exactly how many bits caused the match and we can read some more into the input buffer and do a new search.
+
+I will update this later once I have worked it through... I might use seven entries in the table, since this is
+2^3 - 1
+
+## 29/1/2018
+
 ## Binary Search
 
 I thought I had already done a post on binary search way back in the
@@ -127,7 +246,13 @@ back end of the table, so realistically the improvement wouldn't be
 as good as these figures suggest, and it will only get more stuffed
 as the size of the game increases.
 
-Just to confirm that this result is somewhat reasonable, here is a quick check
+Still, no good.
+
+![Sad Dog](/blog/dog.jpg)
+
+## Secondary Probabilities
+
+Having said that, just to confirm that this result is somewhat reasonable, here is a quick check
 for what I would look for if I was trying to reduce redundancy manually.
 First I would look for the distribution of symbols following `the` and
 `The` and then `You` and `you`. Though these are not the top used

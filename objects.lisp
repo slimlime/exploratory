@@ -306,8 +306,10 @@ standard object display name e.g. 'A golden apple.'"
 	(maphash #'(lambda (object verb-handlers)
 		     (label object :vtable)
 		     (dolist (verb-handler verb-handlers)
+		       (dc (format nil "~a" (car verb-handler)) t)
 		       (db nil (word-id (car verb-handler)))
-		       (dw nil (cdr verb-handler))))
+		       (dw nil (cdr verb-handler)))
+		     (db nil 0))
 		 *object->vtable*)))))
 
 (defun dump-objects ()

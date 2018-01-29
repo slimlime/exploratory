@@ -1,5 +1,83 @@
 ## 29/1/2018
 
+## Binary Search
+
+I thought I had already done a post on binary search way back in the
+mists of time. Turns out, I hadn't so here it is.
+
+Normally when you do binary search, you have a range and then sub-divide
+into the midpoint. Obviously division is going to fill you with dread
+if you are on 6502, so what I have done for the word finder code (part of the parser) is
+to restrict the number of entries to 2^n-1. 2^n-1 is a nice binary-searchy
+number, for the following reason,
+
+~~~~
+                                    8
+                                   / \
+                                  /   \
+  +/- 4                          /     \
+                                /       \
+                               /         \
+                              4          12
+  +/= 2                      / \        /  \
+                            2   6      10  14
+  +/= 1                    / \ / \    / \  / \
+                          1  3 5  7  9  11 13 15 = (2^n-1)
+~~~~
+
+Look at that majestic 8 sat atop the tree like that. He is there for
+a good reason, which is that 8 = 16/2, where 16 is 2^4. 2^4 -1 is
+15. By adding or subtracting the numbers on the left we can move
+down the tree and reach all numbers from 1-15. If 1-15 is a position
+in an array, and you are looking for something with a natural
+comparison, this is very handy.
+
+(If we really want 0 we can either start at zero or check it
+at the end if we get to one, but who cares? In the word list 0
+is not an object we can use anyway, it signifies nothing. So it
+works out rather nicely.)
+
+Each level on the tree is reached by adding half of the level above, and
+we start on half of N+1.
+
+So to move through the tree we need
+
+- The number we need to add/subtract at each level, which halves each time
+- The number we are at
+
+The only division we need is divide by 2, which is really a shift. We
+certainly don't need to worry about rounding.
+
+Here's a snippet of how to do it. It kicks off with BPL, which is how
+we decide whether to go left or right down our tree. `$0B` contains
+the number we use to add or subtract depending on whether we are going
+left or right. As you can see we use a single `LSR` to divide by 2
+then either an `SBC` or an `ADC` to go left or right. If the number
+we are using to move drops to 0, we haven't found our item.
+
+~~~~
+
+    PARSER:NOT-MATCH 2860 100B     BPL $286D ;PARSER:GT 
+                     ;Less than...
+                     2862 460B     LSR $0B
+                     2864 F023     BEQ $2889 ;PARSER:NOT-FOUND 
+                     2866 A50D     LDA $0D
+                     2868 38       SEC
+                     2869 E50B     SBC $0B
+                     ;Always jump... A != 0 since 128 - 64 ... - 1 = 1
+                     286B D0C7     BNE $2834 ;PARSER:NEXT-ENTRY 
+                     ;Greater than...
+           PARSER:GT 286D 460B     LSR $0B
+                     286F F018     BEQ $2889 ;PARSER:NOT-FOUND 
+                     2871 A50D     LDA $0D
+                     2873 18       CLC
+                     2874 650B     ADC $0B
+                     2876 D0BC     BNE $2834 ;PARSER:NEXT-ENTRY 
+
+~~~~
+
+## 29/1/2018
+
 ## Tunstall Squared
 
 Now see if we can squeeze anything out of having two symbols together

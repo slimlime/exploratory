@@ -1,3 +1,336 @@
+## 30/1/2018 The Programmatic Dialogues, II
+
+~~~~
+
+FUNCTIONALES OF RECURSIA
+ 
+Ah, Programmaticus, I must congratulate you
+in dragging Objecticus out of that morass of
+state he has been wallowing in all these years.
+ 
+PROGRAMMATICUS
+ 
+Quite. In his heart he always knew this day would
+come. Doubts surely crept in when he overheard his
+students talking about singletons and he started
+having flashbacks to global variables.
+ 
+FUNCTIONALES
+ 
+Ugh! Variables of any sort fill me with dread,
+let alone those of a global nature.
+ 
+I ask you Programmaticus, how can *anything* vary?
+ 
+PROGRAMMATICUS
+ 
+Indeed. Surely the gods have it all worked out in
+advance and we have merely to discover the answer.
+ 
+FUNCTIONALES
+ 
+You are a reasonable man Programmaticus, I was
+convinced you would have me believe that when I
+see something changing in front of my eyes it
+really does change.
+ 
+PROGRAMMATICUS
+ 
+Quite.
+ 
+Now, let us calculate the Numbers of
+Fibonaccicus, I hear you have a particularly
+elegant solution.
+ 
+FUNCTIONALES and PROGRAMMATICUS withdraw Abaci from
+their tunics. They finish calculating at approximately
+the same time.
+ 
+PROGRAMMATICUS
+ 
+Great Knuth! I am impressed! I must admit,
+I thought with your fondness for recursion,
+you would be calculating with that thing until
+long after the sun had burnt out and you had run out
+of marbles. I see I was wrong.
+ 
+FUNCTIONALES
+ 
+Of course you are wrong.
+ 
+PROGRAMMATICUS
+ 
+Then you must divulge your secret.
+ 
+FUNCTIONALES
+ 
+Memoization my dear Programmaticus.
+ 
+PROGRAMMATICUS
+ 
+Ah yes! The look-up table of the gods we were just
+talking about. You must be blessed not to have the
+burden of calculation like poor Programmaticus.
+ 
+The answer simply arrives in Functionales's head
+fully formed.
+ 
+FUNCTIONALES
+ 
+Well not quite, the gods are not that generous.
+The table must be calculated first.
+ 
+PROGRAMMATICUS
+ 
+So you start with an empty table?
+
+FUNCTIONALES
+ 
+Yes.
+ 
+PROGRAMMATICUS
+ 
+And then fill it in?
+ 
+FUNCTIONALES
+ 
+Well, yes, of course.
+ 
+PROGRAMMATICUS
+ 
+So you change the table?
+ 
+FUNCTIONALES
+ 
+How dare you! It's a different table each time.
+An elegant unchanging monoid that neatly solves the
+so-called problem of state.
+ 
+PROGRAMMATICUS
+ 
+I am even more impressed, you managed to calculate
+all these tables in the time it took me to get a
+single answer!
+ 
+FUNCTIONALES
+ 
+That... isn't entirely true. I must admit I haven't
+yet figured out how to not bother with all
+those other tables in practice.
+ 
+O gods! I must confess I used the same table...
+ 
+PROGRAMMATICUS
+ 
+Please do not continue. Your secret is safe with me.
+ 
+But perhaps then you will admit that *some* change is
+necessary? Nothing vulgar, of course.
+ 
+FUNCTIONALES with a sigh
+ 
+Then I suppose I must. But only the tiniest amount,
+and nothing more than is absolutely necessary...
+but please, *nothing vulgar*...
+
+~~~~
+
+## 30/1/2018 The Programmatic Dialogues, I
+
+~~~~
+
+OBJECTICUS, in a daydream
+ 
+Ah! There goes Programmaticus to his dinner. Or does
+the dinner go to Programmaticus? Hmmm. Perhaps there is
+no difference. No matter, I must speak with him and
+glean his knowledge. Or is it that I must to him speak
+and knowledge glean from him...?
+ 
+I say, Programmaticus!
+ 
+PROGRAMMATICUS
+ 
+Objecticus dear fellow. Please, won't you join me
+for dinner?
+ 
+OBJECTICUS
+ 
+Oh yes, though we ought to say that dinner will be
+joined, by us both.
+ 
+PROGRAMMATICUS
+ 
+Isn't that the same thing?
+ 
+OBJECTICUS
+ 
+Yes of course. But it rather begs the question of whether
+we know how to eat the dinner or whether the dinner knows
+how to be eaten by us.
+ 
+PROGRAMMATICUS
+ 
+A practical difficulty, to be sure.
+ 
+OBJECTICUS
+ 
+Silly Programmaticus, one must be sure who does what
+to whom or what and not get it mixed up with what does
+whom to who, or what.
+ 
+PROGRAMMATICUS
+ 
+Certainly, though I fail to see what that has to do
+with dinner. Shall we sit on these chairs?
+ 
+OBJECTICUS
+ 
+Please! These chairs will surely *seat us*, since chairs
+are primarily concerned with being sat on. The sitee is of
+secondary importance in this calculation.
+ 
+PROGRAMMATICUS
+ 
+Speak for yourself, Objecticus.
+ 
+Now, will you be ordering soup? Or will
+the soup be ordering you?
+ 
+OBJECTICUS
+ 
+There's no need to be facetious Programmaticus. Actually
+it is neither. All food knows how to be ordered, and eaten.
+The soup merely needs to know that it goes in a bowl.
+ 
+PROGRAMMATICUS
+ 
+Food for thought. I see you have finished your soup.
+Shall we say the soup now knows it has been eaten?
+ 
+OBJECTICUS
+ 
+Pah! I can't think on a full stomach.
+ 
+PROGRAMMATICUS
+ 
+Ah, so Objecticus also knows that he is full? Surely
+this is a lot of things to keep straight in one's head.
+ 
+OBJECTICUS
+ 
+I don't have to know if I am full, I merely ask the bowl
+if it is empty. If the bowl is empty, Objecticus is full.
+ 
+PROGRAMMATICUS
+ 
+Look! The bowl is full again, is Objecticus now hungry?
+ 
+OBJECTICUS
+ 
+Tsk! Of course not. You refilled it while I wasn't looking.
+ 
+PROGRAMMATICUS
+ 
+Perhaps the bowl forgot to ask you?
+ 
+OBJECTICUS
+ 
+Next you'll be saying that these bowls don't know anything
+and 'a bowl is just a bowl' and such like.
+ 
+PROGRAMMATICUS
+ 
+They certainly seem to have a poor grasp of the facts.
+ 
+OBJECTICUS
+ 
+Oh, please Programmaticus please don't sit on the table like
+that, it is making me feel faint. Tables are dining places,
+they surely can't also be sitting places. You'll upend the
+entire social order! Now I really do have a headache.
+ 
+PROGRAMMATICUS
+ 
+And yet here I am. Perhaps Genericus could be of help?
+ 
+OBJECTICUS
+ 
+Ah, yes, Genericus. He's always full of good ideas. I am
+feeling better already.
+ 
+Say, have you heard him tell of an object so wise it is
+capable of feats of self-reflection? I'm sure we
+could both sit and dine on such an object as our fancy
+dictates. That is if Genericus ever finishes his treatise.
+ 
+PROGRAMMATICUS
+ 
+Why in such a world a bowl could be a table and Objecticus
+could sit in the soup!
+ 
+OBJECTICUS
+ 
+My headache is returning. Perhaps it really is better if
+things remain what they are.
+ 
+PROGRAMMATICUS
+ 
+Unchanging?
+ 
+OBJECTICUS
+ 
+Yes. Immutable, as it were.
+ 
+PROGRAMMATICUS
+ 
+In that case won't you agree they don't need to know *how* to 
+do anything. Indeed, what good would it do them? We did
+after all decide that it would be better if they don't change.
+ 
+OBJECTICUS
+ 
+Yes I suppose.
+ 
+PROGRAMMATICUS
+ 
+Excellent!
+
+One might say 'The only good object is a dead object!'
+ 
+OBJECTICUS
+ 
+Oh dear. I fear you might be right.
+ 
+PROGRAMMATICUS
+ 
+Which reminds me, I must catch up with Functionales.
+ 
+OBJECTICUS
+ 
+I love that guy! He just says what he is going
+to do, then gets right on and does it. As easy as
+10, 20, 30! No messing about with him.
+
+But he's dead isn't he?
+ 
+PROGRAMMATICUS
+
+Ah, you must be thinking of Imperacles- he's not dead,
+he just went away for a while...
+
+Anyway I’m talking about Functionales of Recursia.
+ 
+OBJECTICUS
+
+Recursia! Eurgh! Then I'm afraid I must bid you good day. 
+
+He's so annoying! I simply don't see how he ever gets
+anything *done* since all he ever does is talk about how
+pure he is. All those monadtheists are the same.
+ 
+~~~~
+
 ## 29/1/2018
 
 ### Implementing prefix decoding

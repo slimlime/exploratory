@@ -19,6 +19,7 @@
 
   (bload "base64.lisp")  
   (bload "state.lisp")
+  (bload "huffman.lisp")
   (bload "string.lisp")
   (bload "sharedmem.lisp")
   (bload "chars.lisp")

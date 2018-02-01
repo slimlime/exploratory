@@ -1,10 +1,4 @@
-;; assembler routines for building a string table in the first
-;; pass. Each instance of (dcs "") will be processed in a string
-;; table. In the next pass, the string table can be emitted and
-;; the labels resolved.
-
-(defparameter *word-table* nil)
-(defparameter *symbol-table* nil)
+(defparameter *freq-table* nil)
 (defparameter *processed-strings* nil)
 (defparameter *compiled-strings* nil)
 (defparameter *string-table* nil)
@@ -15,129 +9,69 @@
 ;;to addresses, which should be valid on the final pass
 (defparameter *string-table* nil)
 
-(defun add-to-word-table (str)
-  (let ((count (gethash str *word-table*)))
-    (setf (gethash str *word-table*)
-	  (if (null count)
-	      1
-	      (1+ count)))))
-
 (defun append-eos (str)
   (format nil "~a~a" str #\nul))
 
 (defun process-string (str)
   (push str *processed-strings*)
-  (setf str (append-eos str))
-  (loop for i from 0 to (- (length str) 1) do
-       (add-to-word-table (subseq str i (+ 1 i))))
-  (loop for i from 0 to (- (length str) 2) do
-       (add-to-word-table (subseq str i (+ 2 i))))
-  (loop for i from 0 to (- (length str) 3) do
-       (add-to-word-table (subseq str i (+ 3 i)))))
-
+  (loop for c across str do
+       (incf (gethash c *freq-table*))))
+  
 (defun reset-symbol-table ()
   (setf *compiled-strings* nil)
   (setf *symbol-table* nil)
   (setf *processed-strings* nil)
-  (setf *word-table* (make-hash-table :test 'equal))
+  (setf *freq-table* (make-hash-table :test 'equal))
   (setf *string-table* (make-hash-table :test 'equal))
   (setf *defined-strings* (make-hash-table :test 'equal))
-  ;; Adding newline now means it will be in a predictable
-  ;; location, namely 1
-  (process-string (string #\Newline)))
+  (loop for c across *charset* do
+       (setf (gethash c *freq-table*) 0))
+  (setf (gethash #\Nul *freq-table*) 0))
 
-(defun sort-word-table ()
-  (let ((wordlist nil)
-	(len 0))
-    (maphash #'(lambda (k v)
-		 (incf len)
-		 (push (cons k v) wordlist))
-	     *word-table*)
-    (let ((words (make-array len)))
-      (dotimes (i len)
-	(setf (aref words i) (pop wordlist)))
-      (setf len (min 256 len))
-      (setf words
-	    (subseq
-	     (sort words #'> :key #'(lambda (symbol)
-				      (if (= 1 (length (car symbol)))
-					  (- 10000000 (char-code (aref (car symbol) 0)))
-					  (* (cdr symbol) (length (car symbol))))))
-	     0
-	     len))
-      ;;now it is sorted with the letters at the front alphabetically
-      ;;followed by words by frequency*length
-      ;;the the cdr of the cons pairs, set the index
-      (stable-sort words #'< :key #'(lambda (symbol) (length (car symbol))))      
-      (dotimes (i len)
-	(setf (aref words i)
-	      (car (aref words i))))
-      ;assert that code 0 is the eos indicator as we use BEQ
-      ;to detect it in the code later
-      (assert (char= (char (aref words 0) 0) #\nul))
-      (assert (char= (char (aref words 1) 0) #\Newline))
-      words)))
 
-(defun dump-symbol-freqs ()
-  (let ((wordlist nil)
-	(len 0))
-    (maphash #'(lambda (k v)
-		 (incf len)
-		 (push (cons k v) wordlist))
-	     *word-table*)
-    (let ((words (make-array len)))
-      (dotimes (i len)
-	(setf (aref words i) (pop wordlist)))
-      (setf len (min 256 len))
-      (setf words
-	    (subseq
-	     (sort words #'> :key #'cdr)
-	     0
-	     len))
-      words)))
+;; step 1. Make a function to huffman encode a string
+;; step 2. Make a function to huffman decode a string
 
-(defun encode-string (str emit)
-  (setf str (append-eos str))
-  (let ((strend (1- (length str))))
-    (loop for i from 0 to strend do
-	 (loop for j from (1- (length *symbol-table*)) downto 0 do
-	      (let ((word (aref *symbol-table* j)))
-		(when (and (<= (+ i -1 (length word)) strend)
-			   (equal word (subseq str i (+ i (length word)))))
-		  (funcall emit j word)
-		  (incf i (1- (length word)))
-		  (return)))))))
+(defun build-huffman-string-table (freqs)
+  (let ((l))
+    (maphash #'(lambda (c f)
+		 (when (> f 0)
+		   (push (list c f) freqs)))
+	     freqs)
+    (huffman2 l)))
 
-; check that (in theory) all the strings we used as input
-; can be reproduced. Obviously the 6502 assembler to do
-; it has to be right too...
-(defun validate-strings ()
-  (let ((symcount 0))
-    (dolist (str *processed-strings*)
-      (let ((str2 ""))
-	    (encode-string str #'(lambda (i word)
-				   (declare (ignore word))
-				   (incf symcount)
-				   (setf str2 (format nil "~a~a" str2
-						      (aref *symbol-table* i)))))
-	    (setf str (append-eos str))
-	    (assert (equal str str2)
-	      (str str2) 
-	      (format nil "Expected ~a, but decoded to ~a" str str2))))
-    (when *compiler-debug*
-      (format t "Checked ~d bytes of string data~%" symcount))))
+(defun build-huffman-bit-pattern-lookup (table)
+  (let ((lookup (make-hash-table)))
+    (dolist (e table)
+      (assert (<= (fourth table) 16)
+	      nil
+	      "~a has a ~a bit pattern." (first table) (fourth table))
+      (setf (gethash (first e) lookup) e))
+    lookup))
 
-(defun build-symbol-table ()
-  (setf *symbol-table* (sort-word-table))
-  (when (< (length *symbol-table*) 256)
-	   (setf *symbol-table*
-		 (concatenate 'vector 
-			      *symbol-table*
-			      (make-array (- 256 (length *symbol-table*))
-					  :initial-element "   "))))
-  (validate-strings))
+(defun huffman-encode-string (lookup str)
+  (let ((vec (make-array (length str)
+			 :fill-pointer 0
+			 :adjustable t
+			 :element-type '(unsigned-byte 8)))
+	(let ((word 0) ;;24 bits
+	      (bits 0))
+	  (loop for c across str do
+	       (let ((e (gethash c lookup)))
+		 (assert e nil "character ~a not in lookup" c)
+		 ;;shift the bit patter to the right so it would be at the
+		 ;;24 bit position if the word buffer were empty
+		 (setf word (logior word (ash (- 8 bits) (fourth e))))
+		 ;;now add on the number of bits
+		 (incf bits (second e))
+		 (when (>= 8 bits)
+		   ;;now we can emit
+		   (vector-push-extend (ash -16 word))
+		   (setf word (logand #xffff00 (ash 8 word)))
+		   (
 
-(defun process-test ()
+
+(defun huffman-encoding-test ()
   (reset-symbol-table)
   (process-string "The cat sat on")
   (process-string "the mat")

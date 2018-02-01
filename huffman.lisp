@@ -21,8 +21,7 @@
       (ninsert node q))
     node))
 
-(defun huffman2 (symbols)
-  (setf symbols (mapcar #'(lambda (s) (list (car s) (cdr s))) (coerce symbols 'list)))
+(defun huffman (symbols)
   (let ((tree (car (huffman1 symbols)))
 	(patterns nil))
     (labels ((doit (tr depth byte)
@@ -36,10 +35,10 @@
 		   )))	  
       (doit tree 0 0))
     (sort patterns #'< :key #'fourth)))
-   
+
 (defun print-huffman (pattern)
   (dolist (p pattern)
-    (format t "~17a len:~3a bits:~16,'0b~%"
-	    (format-word (first p))
+    (format t "~a len:~3a bits:~16,'0b~%"
+	    (first p)
 	    (second p)
 	    (fourth p))))

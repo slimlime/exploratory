@@ -25,14 +25,13 @@
   (let ((tree (car (huffman1 symbols)))
 	(patterns nil))
     (labels ((doit (tr depth byte)
-	       (if (stringp tr)
-		   (push (list tr depth byte (ash byte (- 16 depth))) patterns)
+	       (if (listp tr)
 		   (progn
 		     (when (> (length tr) 0)
 		       (doit (first tr) (1+ depth) (ash byte 1)))
 		     (when (> (length tr) 1)
 		       (doit (second tr) (1+ depth) (1+ (ash byte 1)))))
-		   )))	  
+		   (push (list tr depth byte (ash byte (- 16 depth))) patterns))))	  
       (doit tree 0 0))
     (sort patterns #'< :key #'fourth)))
 

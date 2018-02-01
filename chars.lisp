@@ -6,7 +6,7 @@
 (defparameter *font-widths* (make-hash-table :test 'equal))
 (defparameter *font-height* 10)
 (defparameter *line-height* (1+ *font-height*))
-(defparameter *charset* " !'`,-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+(defparameter *charset* " !'`,-.0123456789?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
 
 (defun byte-width (b)
   (when (= 1 (logand 1 b)) (return-from byte-width 8))

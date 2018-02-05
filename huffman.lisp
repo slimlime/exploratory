@@ -21,6 +21,7 @@
       (ninsert node q))
     node))
 
+;;; Build a canonical form huffman table
 (defun huffman (symbols)
   (let ((tree (car (huffman1 symbols)))
 	(patterns nil))
@@ -34,7 +35,6 @@
 		   (push (list tr depth nil) patterns))))
       (doit tree 0))
     (setf patterns (sort patterns #'< :key #'second))
-    (print patterns)
     ;;canonical form
     (setf (third (first patterns)) 0)
     (let ((code 0)
@@ -45,10 +45,26 @@
 	  (dotimes (_ (- (second p) prev-length))
 	    (setf code (ash code 1)))
 	  (setf prev-length (second p)))
-	(setf (third p) (ash code (- 16 (second p))))
-	))
-    (print patterns)
+	(setf (third p) (ash code (- 16 (second p))))))
     patterns))
+
+;;; Return a vector containing the populations of each
+;;; level of a huffman table, e.g. how many symbols of
+;;; each length.
+(defun huffman-population (table)
+  (let* ((max-len (apply #'max (mapcar #'second table)))
+	 (pop (make-array max-len)))
+    (loop for i from 0 to (1- max-len) do
+	 (setf (aref pop i) (list 0 nil)))
+    (dolist (p table)
+      (let ((len (1- (second p))))
+	;;increment pop count
+	(incf (first (aref pop len)))
+	(when (null (second (aref pop len)))
+	  ;;set lowest amount for this level
+	  (setf (second (aref pop len))
+		(ash (third p) (- (second p) 16))))))
+    pop))
 
 (defun print-huffman (pattern)
   (let ((i -1))

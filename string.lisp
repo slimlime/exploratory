@@ -18,6 +18,7 @@
   (format nil "~a~a" str #\nul))
 
 (defun process-string (str)
+  (setf str (append-eos str))
   (setf (gethash str *processed-strings*) t)
   (loop for c across str do
        (incf (gethash c *freq-table*))))
@@ -65,7 +66,7 @@
 	       (assert e nil "character ~a not in lookup" c)
 	       ;;shift the bit patter to the right so it would be at the
 	       ;;24 bit position if the word buffer were empty
-	       (setf word (logior word (ash (fourth e) (- 8 bits))))
+	       (setf word (logior word (ash (third e) (- 8 bits))))
 	       ;;now add on the number of bits
 	       (incf bits (second e))
 	       (when (>= bits 8)
@@ -76,10 +77,45 @@
 	      (emit))))
     vec))
 
+;;decode a string using an input vector and a huffman population
+;;count. Done in the manner it will have to be implmented in 6502
+(defun huffman-decode-string (pop eos vec)
+  (let ((maxlen (1- (length pop))) 
+	(acc 0)    ;;accumulator- 16 bit?
+	(next (aref vec 0))
+	(pos 0)    ;;position in input- must be 1+ eos at end
+	(bits 8)
+	(out nil))
+    (flet ((rol ()
+	     (when (= bits 0)
+	       (setf bits 8)
+	       (incf pos)
+	       (setf next (aref vec pos)))
+	     (setf next (ash next 1))
+	     (setf acc (logior (ash acc 1) (if (>= next 256) 1 0)))
+	     (setf next (logand #xff next))
+	     (decf bits)))
+      (do ()
+	  ((= pos (length vec)))
+	(loop for i from 0 to maxlen do
+	     (rol)
+	     (format t "~a ~a~%" i (aref pop i))
+	     (when (> (first (aref pop i)) 0)
+	       ;;some symbols exist at this length
+	       (when (or (= i maxlen)
+			 (< acc (second (aref pop (1+ i)))))
+		 (push (- acc (second (aref pop i))) out)
+		 (print (car out))
+		 (when (= (car out) eos)
+		   (return-from huffman-decode-string (nreverse out)))
+		 (setf acc 0)
+		 (return))))))
+    (assert nil nil "Blew past eos for ~a, got ~a" vec out)))
+    
 (defun huffman-encoding-test ()
   (reset-symbol-table)
   (process-string "The cat sat on")
-  (process-string "the mat") ;;1010|1101 0|1111|00|0 1001|1011| 1010^0000 173 120 155 160
+  (process-string "the mat") ;;0110|1010 0|0100|00|1 1001|0101 |0110|0000 106 33 149 96
   (process-string "and didn't like it it it one bit")
   (process-string "The quick brown fox killed the lazy dog and ate his innards")
   (process-string "Sing a song of sixpence, a pocket full of eyes")
@@ -95,8 +131,8 @@
   (let* ((table (build-huffman-string-table *freq-table*))
 	 (lookup (build-huffman-bit-pattern-lookup table)))
     (print-huffman table)
-    ;(assert (equalp (huffman-encode-string lookup "the mat") #(173 120 155 160)))
-    ;(assert (equalp (huffman-encode-string lookup " ") #(0)))
+    (assert (equalp (huffman-encode-string lookup "the mat") #(106 33 162 176)))
+    (assert (equalp (huffman-encode-string lookup " ") #(0)))
     (assert (equalp (huffman-encode-string lookup "    ") #(0)))))
 
 (huffman-encoding-test)

@@ -1,3 +1,84 @@
+## 5/2/2018 Decompression Chamber
+
+I return from the depths of the entropy mines bearing good and bad news. Given that there are to be twenty-four rooms in the game I plan for the competition, and that each room was running to 3k, I decided to investigate better compression schemes. 40K is probably about the maximum size, as clearly Kevin will want to port the game to Z80 and have it running in all the garish colours the ZX Spectrum affords.
+
+## LZ style dictionaries
+
+They are expensive! LZ style dictionaries are built up in memory as the compressor (and decompressor) runs along the input, then discarded. We can't afford to build any dictionaries at run time so we have to statically allocate them in memory. It is not clear where the break even point is, and my test game certainly wasn't large enough to show a break even.
+
+My experiments showed compression rates down to just less than 3k- realistically I think another 30% was possible with a large dictionary, but at huge cost. There were also some extremely counter-intuitive results, for example, for total size of strings and tables, small words were preferable, with the best performer (for the simple game) being word size 1! One thing I have learned from this is that when it comes to data compression you *must* do experiments. I would have bet real money the compression would have increased with word size. Meh, perhaps my experimental code was just crummy. Either way, the numbers don't lie and everything being equal, for *total cost of ownership* the Tunstall table is pretty damn good, and I decided it wasn't worth commiting to a dictionary scheme yet.
+
+## Huffman coding
+
+Huffman coding was used to generate variable length bit codes to store the strings. Now, Huffman gives pretty similar compression ratio to the Tunstall table, but the cost is minimal. Surprisingly there is a thing called the canonical Huffman code, which is an additional ordering on the codes. It has the property that it can be described by a very small table. So, here is an example set of Huffman codes. Notice the total ordering in both the length and the bit pattern. Notice also how the bit patterns, for a given length, are consecutive.
+
+~~~~
+
+  0   len:2   bits:0000000000000000 0
+  1 e len:4   bits:0100000000000000 4
+  2 a len:4   bits:0101000000000000 5
+  3 t len:4   bits:0110000000000000 6
+  4 i len:4   bits:0111000000000000 7
+  5 n len:4   bits:1000000000000000 8
+  6 o len:4   bits:1001000000000000 9
+  7 h len:5   bits:1010000000000000 20
+  8 l len:5   bits:1010100000000000 21
+  9 s len:5   bits:1011000000000000 22
+ 10 d len:5   bits:1011100000000000 23
+ 11 * len:5   bits:1100000000000000 24 <- End Marker
+ 12 c len:5   bits:1100100000000000 25
+ 13 m len:6   bits:1101000000000000 52
+ 14 f len:6   bits:1101010000000000 53
+ 15 k len:6   bits:1101100000000000 54
+ 16 r len:6   bits:1101110000000000 55
+ 17 g len:6   bits:1110000000000000 56
+ 18 p len:6   bits:1110010000000000 57
+ 19 u len:6   bits:1110100000000000 58
+ 20 ' len:7   bits:1110110000000000 118
+ 21 S len:7   bits:1110111000000000 119
+ 22 T len:7   bits:1111000000000000 120
+ 23 b len:7   bits:1111001000000000 121
+ 24 x len:7   bits:1111010000000000 122
+ 25 y len:7   bits:1111011000000000 123
+ 26 , len:7   bits:1111100000000000 124
+ 27 ? len:7   bits:1111101000000000 125
+ 28 I len:8   bits:1111110000000000 252
+ 29 q len:8   bits:1111110100000000 253
+ 30 w len:8   bits:1111111000000000 254
+ 31 z len:8   bits:1111111100000000 255
+
+~~~~
+
+Looks pretty fancy, right? Like the Cadillac of codes, also pretty expensive. Well there is a neat way to express it,
+
+~~~~
+
+Code Length | # Symbols | Lowest Code
+------------+-----------+------------
+1           | 0         | nil
+2           | 1         | 0
+3           | 0         | nil
+4           | 6         | 4
+5           | 6         | 20
+6           | 7         | 52
+7           | 8         | 118
+8           | 4         | 252
+
+~~~~
+
+To decode a symbol we shift into an accumulator and see whether the number we have for a given code length is within the
+range of the lowest code and the number of symbols of that length. If so, then the difference gives us an index. Literally all the Huffman code is doing for is mapping codes onto an integer range. It did take some work and experimentation to understand, but the algorithm is pretty simple and should be straightforward to implement in 6502.
+
+Once I manage to port the game to use Huffman compressed strings, I can use the same technique on the images, which should compress readily. Given the table above is so darned cheap, I imagine massive gainz are on the horizon.
+
+### Build Size
+
+One thing I found was that the simple game did not have enough data to get a good idea of what was going to work. To rememdy this I will add some test data to bulk it out to the full size, then I should get a better idea if my changes are improving the build size.
+
+### Future Work
+
+Since Huffman is variable bit width, it should be straightforward to add words to the dictionary once a larger body of text is inserted. I am holding off judgement for now, but surely words like `the ` and `and ` will improve things. Or maybe they will not, and longer words will. Everything is a trade off that can only be tested through experiment.
+
 ## 30/1/2018 The Programmatic Dialogues, II
 
 ~~~~

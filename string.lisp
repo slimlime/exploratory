@@ -8,6 +8,11 @@
 ;;this string table is basically a hash look-up of strings
 ;;to addresses, which should be valid on the final pass
 (defparameter *string-table* nil)
+(defparameter *huffman-table* nil)
+
+;;TODO can probably save 256 bytes by packing the 'bits left' table
+;;somewhere else. We could pack it in the lo byte of the prefix and
+;;and it off, if all the symbols have codes < 12 bits. 
 
 (defun append-eos (str)
   (format nil "~a~a" str #\nul))
@@ -71,34 +76,6 @@
 	      (emit))))
     vec))
 
-;;This is a lisp version of the code that will be implemented in 6502
-;;it is here so the algorithm can be proven.
-(defun prefix-bsearch (table prefix)
-  (setf table (coerce table 'vector))
-  (let* ((size (length table))
-	 (pos (/ (+ 1 (smallest-2^n-1 size)) 2))
-	 (hop pos))
-    (format t "~a size~%" size)
-    (do () ((= 0 hop))
-      (setf hop (ash hop -1))
-      (format t "pos ~a -> ~a hop ~a ~a~%"
-	      pos (aref table (- pos 1)) hop prefix)
-      (if (or (> pos size)
-	      (< prefix (fourth (aref table (- pos 1)))))
-	  ;;strictly, that the input prefix is less
-	  ;;than the item at pos.
-	  (decf pos hop)
-	  (incf pos hop)))
-    ;;Now we have it, or we have the one immediately after it,
-    (when (< prefix (fourth (aref table (- pos 1))))
-      (decf pos))
-    (format t "pos ~a -> ~a hop ~a ~a~%"
-	    pos (aref table (- pos 1)) hop prefix)
-    (first (aref table (- pos 1)))))
-
-(defun huffman-decode-string (table vec)
-  
-
 (defun huffman-encoding-test ()
   (reset-symbol-table)
   (process-string "The cat sat on")
@@ -117,22 +94,9 @@
 	    total))
   (let* ((table (build-huffman-string-table *freq-table*))
 	 (lookup (build-huffman-bit-pattern-lookup table)))
-    (print-huffman table)
-    (assert (equalp (huffman-encode-string lookup "the mat") #(173 120 155 160)))
-    (assert (equalp (huffman-encode-string lookup " ") #(0)))
-    (assert (equalp (huffman-encode-string lookup "    ") #(0)))
-    ;;now test the prefix search
-    ;;we test twice- once where the prefix is an exact match
-    ;;once where it has some extra bits, this is the chaff coming in
-    (assert (eq (prefix-bsearch table #b0110000000000000) #\o))
-    (assert (eq (prefix-bsearch table #b0110000000000001) #\o))
-    (dolist (e table)
-      (assert (eq (prefix-bsearch table (fourth e)) (first e)))
-      (assert (eq (prefix-bsearch table (1+ (fourth e))) (first e))))))
+    (print-huffman table)))
+    ;(assert (equalp (huffman-encode-string lookup "the mat") #(173 120 155 160)))
+    ;(assert (equalp (huffman-encode-string lookup " ") #(0)))
+    (assert (equalp (huffman-encode-string lookup "    ") #(0)))))
 
 (huffman-encoding-test)
-
-;;This decode is done using the method that will be implemented in 6502
-
-(defun prefix-bsearch-test ()
-  (

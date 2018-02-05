@@ -33,12 +33,14 @@
 		       (doit (second tr) (1+ depth) (1+ (ash byte 1)))))
 		   (push (list tr depth byte (ash byte (- 16 depth))) patterns))))	  
       (doit tree 0 0))
-    (sort patterns #'< :key #'fourth))) 
+    (stable-sort (sort patterns #'< :key #'fourth) #'< :key #'second))))
 
 (defun print-huffman (pattern)
-  (dolist (p pattern)
-    (format t "~a len:~3a bits:~16,'0b ~a~%"
-	    (first p)
-	    (second p)
-	    (fourth p)
-	    (fourth p))))
+  (let ((i -1))
+    (dolist (p pattern)
+      (format t "~3d ~a len:~3a bits:~16,'0b ~a~%"
+	      (incf i)
+	      (first p)
+	      (second p)
+	      (fourth p)
+	      (fourth p)))))

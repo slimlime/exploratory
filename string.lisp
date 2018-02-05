@@ -94,7 +94,7 @@
 	    total))
   (let* ((table (build-huffman-string-table *freq-table*))
 	 (lookup (build-huffman-bit-pattern-lookup table)))
-    (print-huffman table)))
+    (print-huffman table)
     ;(assert (equalp (huffman-encode-string lookup "the mat") #(173 120 155 160)))
     ;(assert (equalp (huffman-encode-string lookup " ") #(0)))
     (assert (equalp (huffman-encode-string lookup "    ") #(0)))))

@@ -86,8 +86,7 @@
 	(next (aref vec 0))
 	(pos 0)    ;;position in input- must be 1+ eos at end
 	(bits 8)
-	(out nil)
-	(index 0))
+	(out nil))
     (flet ((rol ()
 	     (when (= bits 0)
 	       (setf bits 8)
@@ -105,15 +104,87 @@
 	       (when (> (first p) 0)
 		 ;;some symbols exist at this length
 		 (when (or (= i maxlen)
-			   (< (- acc (second p)) (first p)))
-		   (push (+ index (- acc (second p))) out)
-		   (setf index 0)
+			   (<= acc (second p)))
+		   (push (- acc (third p)) out)
 		   (when (= (car out) eos)
 		     (return-from huffman-decode-string (nreverse out)))
 		   (setf acc 0)
-		   (return))
-		 (incf index (first p)))))))
+		   (return)))))))
     (assert nil nil "Blew past eos for ~a, got ~a" vec out)))
+
+(defun huffman-decoder ()
+  (with-namespace :decoder
+    ;;these two parameters must be set
+    (zp-w :huffman-pop-table)
+    (zp-w :huffman-ptr)
+
+    ;;for convenience the decoder gets reserved space in the
+    ;;zero-page as the state is saved between invocations.
+    ;;this saves callers from having to avoid collisions with
+    ;;the general purpose D0 etc
+    
+    (alias :ptr :huffman-ptr)
+    (alias :pop :huffman-pop-table)
+    (zp-b :acc-hi)
+    (zp-b :acc-lo)
+    (zp-b :next-byte)
+    (zp-b :bits)
+    
+    ;;this variable is not stored up between invocs
+    ;;it tracks the depth in the 
+    (alias :len :D0)
+
+    (label :huffman-start nil)
+    (LDY 0)
+    (STY.ZP :len)
+    (STY.ZP :acc-hi)
+    (STY.ZP :acc-lo)
+    (LDA.IZY :ptr)
+    (STA.ZP :next-byte)
+    (inc16.zp :ptr)
+    (LDA 8)
+    (STA.ZP :bits)
+    
+    (dc "Fetch a bit")
+    (label :fetch-bit)
+    (DEC.ZP :bits)
+    (BNE :got-bits)
+    (dc "New byte required")
+    (LDY 0)
+    (LDA.IZY :ptr)
+    (STA.ZP :next-byte)
+    (inc16.zp :ptr)
+    (LDA 8)
+    (STA.ZP :bits)
+    (label :got-bits)
+    (dc "Lets rotate a bit from the next byte")
+    (dc "into the accumulator")
+    (ASL.ZP :next-byte)
+    (ROL.ZP :acc-lo)
+    (ROL.ZP :acc-hi)
+
+    (dc "Start at the bottom of the population table")
+    (LDY 0)
+    (TYA)
+    (CMP.IZY :pop "Any symbols at this length?")
+    (BEQ :fetch-bit)
+    (dc "We have some symbols- does the accumulator hold one?")
+
+    (
+
+    
+    (dc "Increment the index")
+    
+    
+    
+    
+    
+    
+    
+
+    
+    
+    
 
 ;;turn a vector of symbols back into a string
 ;;we won't need to do this on the 6502 as the symbol

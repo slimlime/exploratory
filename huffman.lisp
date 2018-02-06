@@ -54,17 +54,21 @@
 (defun huffman-population (table)
   (let* ((max-len (apply #'max (mapcar #'second table)))
 	 (pop (make-array max-len)))
-    (loop for i from 0 to (1- max-len) do
-	 (setf (aref pop i) (list 0 nil)))
+    (loop for i from (1- max-len) downto 0 do
+	 (setf (aref pop i) (list 0 nil nil)))
     (let ((index 0))
       (dolist (p table)
-	(let ((len (1- (second p))))
+	(let* ((len (1- (second p)))
+	       (e (aref pop len)))
 	  ;;increment pop count
-	  (incf (first (aref pop len)))
-	  (when (null (second (aref pop len)))	    
-	    ;;set lowest amount for this level
-	    (setf (second (aref pop len))
-		  (ash (third p) (- (second p) 16))))
+	  (incf (first e))
+	  ;(when (null (second (aref pop len)))	    
+	    ;;set highest amount for this level
+	    (setf (second e)
+		  (ash (third p) (- (second p) 16)))
+	    ;;now calculate an offset that can be subtracted
+	    ;;off the code to give the index.
+	    (setf (third e) (- (second e) index))
 	  (incf index))))
     pop))
 

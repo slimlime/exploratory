@@ -122,6 +122,11 @@
     ;;zero-page as the state is saved between invocations.
     ;;this saves callers from having to avoid collisions with
     ;;the general purpose D0 etc
+ 
+    ;;Pop table format
+
+    ;; empty-row 00 <- indicator byte
+    ;;           FF max-code-hi max-code lo offset-hi offset-lo
     
     (alias :ptr :huffman-ptr)
     (alias :pop :huffman-pop-table)
@@ -129,62 +134,88 @@
     (zp-b :acc-lo)
     (zp-b :next-byte)
     (zp-b :bits)
-    
-    ;;this variable is not stored up between invocs
-    ;;it tracks the depth in the 
-    (alias :len :D0)
 
-    (label :huffman-start nil)
-    (LDY 0)
-    (STY.ZP :len)
-    (STY.ZP :acc-hi)
-    (STY.ZP :acc-lo)
-    (LDA.IZY :ptr)
-    (STA.ZP :next-byte)
-    (inc16.zp :ptr)
-    (LDA 8)
+    (label :huffman-init nil)
+    (PHA)
+    (LDA 0)
+    (STA.ZP :len)
+    (STA.ZP :acc-hi)
+    (STA.ZP :acc-lo)
+    (LDA 1)
+    (dc "Set to 1, to imply we need a bit immediately")
     (STA.ZP :bits)
+    (PLA)
+    (RTS)
     
-    (dc "Fetch a bit")
+    (label :huffman-get nil)
+    (LDY #xFF "Start at zero, following the first INY")
     (label :fetch-bit)
     (DEC.ZP :bits)
     (BNE :got-bits)
     (dc "New byte required")
+    (dc "Save our pop table index")
+    (TYA)
+    (TAX)
     (LDY 0)
     (LDA.IZY :ptr)
     (STA.ZP :next-byte)
     (inc16.zp :ptr)
     (LDA 8)
     (STA.ZP :bits)
+    (dc "Restore the pop table index")
+    (TXA)
+    (TAY)
     (label :got-bits)
     (dc "Lets rotate a bit from the next byte")
     (dc "into the accumulator")
     (ASL.ZP :next-byte)
     (ROL.ZP :acc-lo)
     (ROL.ZP :acc-hi)
-
-    (dc "Start at the bottom of the population table")
-    (LDY 0)
-    (TYA)
-    (CMP.IZY :pop "Any symbols at this length?")
+    (INY)
+    (LDA.IZY :pop "Any symbols at this length?")
     (BEQ :fetch-bit)
+    (INY "Skip row indicator byte")
     (dc "We have some symbols- does the accumulator hold one?")
+    (dc "It does if the accumulator is less than the second entry")
+    (dc "in the pop table, so let us compare it.")
+    (LDA.IZY :pop)
+    (CMP.ZP :acc-hi)
+    (BMI :gt1 "acc-hi > max-code-hi")
+    (INY)
+    (LDA.IZY :pop)
+    (CMP.ZP :acc-lo)
+    (BMI :gt2 "acc-lo > max-code-lo")
+    (INY)
+    (dc "Now acc<=max-code, this means we have a symbol woo!")
+    (dc "To get the symbol index we subtract the offset")
+    (SEC)
+    (LDA.ZP :acc-lo)
+    (SBC.IZY :pop)
+    (TAX)
+    (INY)
+    (LDA.ZP :acc-hi)
+    (SBC.IZY :pop)
+    (dc "Return to caller with index-hi in A and index-lo in X")
+    (dc "How nice for them. They can probably use LD?.ABX or something.")
+    (RTS)
+    (dc "Skip rest of row and get next bit")
+    (label :gt1)
+    (INY "Skip max-code lo")
+    (label :gt2)
+    (INY "Skip offset hi")
+    (dc "Don't skip the last byte in the row; we'll do that in fetch")
+    (BNE :fetch-bit)))
 
-    (
-
-    
-    (dc "Increment the index")
-    
-    
-    
-    
-    
-    
-    
-
-    
-    
-    
+(defun pop-table (label huffman-table description)
+  "Create a huffman population table"
+  (label label)
+  (dc description)
+  (let ((len 0))
+    (loop for p across (huffman-population huffman-table) do
+	 (dc (format nil "~a symbols of length ~a" (first p) (incf len)))
+	 (if (> 0 (first p))
+	     (db nil #xff (hi (second p)) (lo (second p)) (hi (third p)) (lo (third p)))
+	     (db nil #x00)))))
 
 ;;turn a vector of symbols back into a string
 ;;we won't need to do this on the 6502 as the symbol

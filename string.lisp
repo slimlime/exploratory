@@ -111,7 +111,17 @@
 		   (setf acc 0)
 		   (return)))))))
     (assert nil nil "Blew past eos for ~a, got ~a" vec out)))
-    
+
+;;turn a vector of symbols back into a string
+;;we won't need to do this on the 6502 as the symbol
+;;indices will be used as indices into typeface data
+(defun symbols-string (table-vec symbols)
+  (let ((str (make-string (length symbols))))
+    (loop for s in symbols
+       for i from 0 to (1- (length symbols)) do
+	 (setf (char str i) (first (aref table-vec s))))
+    str))
+
 (defun huffman-encoding-test ()
   (reset-symbol-table)
   (process-string "The cat sat on")
@@ -130,9 +140,17 @@
 	    total))
   (let* ((table (build-huffman-string-table *freq-table*))
 	 (lookup (build-huffman-bit-pattern-lookup table)))
-    (print-huffman table)
+    ;;(print-huffman table)
     (assert (equalp (huffman-encode-string lookup "the mat") #(106 33 162 182 0)))
-    (assert (equalp (huffman-encode-string lookup " ") #(0)))
-    (assert (equalp (huffman-encode-string lookup "    ") #(0)))))
+    (assert (equalp (huffman-encode-string lookup " ") #(48)))
+    (assert (equalp (huffman-encode-string lookup "sssssss") #(181 173 107 90 216)))
+    (assert (equalp (huffman-encode-string lookup "    ") #(0 192)))
+    ;;roundtrip all strings
+    (let ((pop (huffman-population table)))
+      (setf table (coerce table 'vector))
+      (maphash #'(lambda (s _) (declare (ignore _))
+			 (assert
+			  (equal s (symbols-string table (huffman-decode-string pop 11 (huffman-encode-string lookup s))))))
+	       *processed-strings*))))
 
 (huffman-encoding-test)

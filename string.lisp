@@ -86,7 +86,8 @@
 	(next (aref vec 0))
 	(pos 0)    ;;position in input- must be 1+ eos at end
 	(bits 8)
-	(out nil))
+	(out nil)
+	(index 0))
     (flet ((rol ()
 	     (when (= bits 0)
 	       (setf bits 8)
@@ -105,11 +106,13 @@
 		 ;;some symbols exist at this length
 		 (when (or (= i maxlen)
 			   (< (- acc (second p)) (first p)))
-		   (push (+ (third p) (- acc (second p))) out)
+		   (push (+ index (- acc (second p))) out)
+		   (setf index 0)
 		   (when (= (car out) eos)
 		     (return-from huffman-decode-string (nreverse out)))
 		   (setf acc 0)
-		   (return)))))))
+		   (return))
+		 (incf index (first p)))))))
     (assert nil nil "Blew past eos for ~a, got ~a" vec out)))
 
 ;;turn a vector of symbols back into a string

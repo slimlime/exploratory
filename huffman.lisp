@@ -55,16 +55,13 @@
   (let* ((max-len (apply #'max (mapcar #'second table)))
 	 (pop (make-array max-len)))
     (loop for i from 0 to (1- max-len) do
-	 (setf (aref pop i) (list 0 nil nil)))
+	 (setf (aref pop i) (list 0 nil)))
     (let ((index 0))
       (dolist (p table)
 	(let ((len (1- (second p))))
 	  ;;increment pop count
 	  (incf (first (aref pop len)))
-	  (when (null (second (aref pop len)))
-	    ;;set lowest index for this level
-	    (setf (third (aref pop len)) index)
-	    
+	  (when (null (second (aref pop len)))	    
 	    ;;set lowest amount for this level
 	    (setf (second (aref pop len))
 		  (ash (third p) (- (second p) 16))))

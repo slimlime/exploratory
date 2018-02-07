@@ -15,20 +15,43 @@
 (defparameter *monitor-buffer* nil)
 (defparameter *monitor-peek-fn* nil)
 (defparameter *monitor-poke-fn* nil)
+(defparameter *monitor-label-watches* nil)
 
 (defun hex (number)
   (format t "~4,'0X" number))
+
+;; TODO Add locals, which gets all the symbols in the namespace where
+;; we currently are
 
 (defun monitor-print ()
   (multiple-value-bind (buffer pc sp sr a x y)
       (funcall *monitor-get-state*)
     (let ((*compiler-buffer* buffer))
+      (when *monitor-label-watches*
+	(format t "-- Labels ---------------------------------------------------~%")
+	(dolist (watch *monitor-label-watches*)
+	  (let ((label (first watch))
+		(len (second watch)))
+	    (if (numberp label)
+		(format t "~4,'0X                    " label)
+		(format t "~24a" (fmt-label label t)))
+	    (if (resolves label)
+		(let ((addr (resolve label)))
+		  (hexdump-simple
+		   addr
+		   (if len
+		       len
+		       (aif (gethash addr *compiler-disassembler-hints*)
+			    (car it) ;;hint length
+			    ;;no hint? Assume 2 bytes
+			    2))))
+		(format t "????~%")))))
       (format t "-- Stack ----------------------------------------------------~%")
       (hexdump (+ sp #x101) 16)
       (when *monitor-watches*
-	(format t "-- Watches --------------------------------------------------~%"))
-      (dolist (a *monitor-watches*)
-	(hexdump (car a) (cdr a)))
+	(format t "-- Watches --------------------------------------------------~%")
+	(dolist (a *monitor-watches*)
+	  (hexdump (car a) (cdr a))))
       (format t "-- PC -------------------------------------------------------~%")
       (hexdump pc 32)
       (format t "-------------------------------------------------------------~%")
@@ -39,17 +62,31 @@
       (disassemble-6502 pc (+ pc *monitor-context-bytes*)))))
 
 (defun monitor-unwatch (addr)
-  ;todo monitor-watch forgets the original label, so if you
-  ;unwatch it later, it won't work if the address has changed
-  (setf *monitor-watches* 
-	(remove (resolve addr) *monitor-watches* :key #'car)))
+  (if (numberp addr)
+      (setf *monitor-watches* 
+	    (remove (resolve addr) *monitor-watches* :key #'car))
+      (setf *monitor-label-watches*
+	    (remove addr *monitor-label-watches* :key #'car))))
 
 (defun monitor-unwatch-all ()
   (setf *monitor-watches* nil))
 
-(defun monitor-watch (addr &optional (len 16))
+(defun monitor-watch (addr &optional (len 16 len-supplied-p))
   (monitor-unwatch addr)
-  (push (cons (resolve addr) len) *monitor-watches*))
+  (if (numberp addr)
+      (push (cons addr len) *monitor-watches*)
+      (push (list addr
+		  (if len-supplied-p
+		      len
+		      nil)) ;;we'll get the hint at the time we need it
+	    *monitor-label-watches*)))
+
+(defun monitor-watch-namespace (namespace)
+  (maphash #'(lambda (k v) (declare (ignore v))
+	       (when (equal (label-namespace k) namespace)
+		 (monitor-watch k)
+		 (format t "Watched ~a~%" (fmt-label k t))))
+	       *compiler-labels*))
 
 (defun monitor-step ()
   (funcall *monitor-step*)

@@ -100,6 +100,10 @@
   (assert-address add)
   (aref *compiler-buffer* add))
 
+(defun peek-addr (add)
+  (logior (peek-byte (lo-add add))
+          (ash (peek-byte (hi-add add)) 8)))
+  
 (defun peek-last-byte ()
   (peek-byte (1- *compiler-ptr*)))
 

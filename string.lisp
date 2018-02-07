@@ -1,14 +1,24 @@
 (defparameter *freq-table* nil)
 (defparameter *processed-strings* nil)
-(defparameter *compiled-strings* nil)
 (defparameter *string-table* nil)
 (defparameter *defined-strings* nil) ;;strings defined this pass
                                      ;;cleared when building string table
+(defparameter *charset* " !'`,-.0123456789?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
 
 ;;this string table is basically a hash look-up of strings
 ;;to addresses, which should be valid on the final pass
+
 (defparameter *string-table* nil)
 (defparameter *huffman-table* nil)
+(defparameter *huffman-lookup* nil)
+
+(defparameter *test-strings*
+  '("The cat sat on"
+    "the mat"
+    "and didn't like it it it one bit"
+    "The quick brown fox killed the lazy dog and ate his innards"
+    "Sing a song of sixpence, a pocket full of eyes"
+    "Shall I compare thee to a summer's ham?"))
 
 ;;TODO can probably save 256 bytes by packing the 'bits left' table
 ;;somewhere else. We could pack it in the lo byte of the prefix and
@@ -18,17 +28,18 @@
   (format nil "~a~a" str #\nul))
 
 (defun process-string (str)
-  (setf str (append-eos str))
   (setf (gethash str *processed-strings*) t)
+  (setf str (append-eos str))
   (loop for c across str do
        (incf (gethash c *freq-table*))))
   
-(defun reset-symbol-table ()
-  (setf *compiled-strings* nil)
+(defun reset-strings ()
   (setf *processed-strings* (make-hash-table :test 'equal))
   (setf *freq-table* (make-hash-table :test 'equal))
   (setf *string-table* (make-hash-table :test 'equal))
   (setf *defined-strings* (make-hash-table :test 'equal))
+  (setf *huffman-table* nil)
+  (setf *huffman-lookup* nil)
   (loop for c across *charset* do
        (setf (gethash c *freq-table*) 0))
   (setf (gethash #\Nul *freq-table*) 0))
@@ -112,43 +123,32 @@
 		   (return)))))))
     (assert nil nil "Blew past eos for ~a, got ~a" vec out)))
 
+(defun huffman-init ()
+  (LDX 1)
+  (STX.ZP :huffman-bits))
+
 (defun huffman-decoder ()
+
+  (zp-w :huffman-pop-table)
+  (zp-w :huffman-ptr)
+  (zp-b :huffman-bits)
+  
   (with-namespace :decoder
-    ;;these two parameters must be set
-    (zp-w :huffman-pop-table)
-    (zp-w :huffman-ptr)
-
-    ;;for convenience the decoder gets reserved space in the
-    ;;zero-page as the state is saved between invocations.
-    ;;this saves callers from having to avoid collisions with
-    ;;the general purpose D0 etc
- 
-    ;;Pop table format
-
-    ;; empty-row 00 <- indicator byte
-    ;;           FF max-code-hi max-code lo offset-hi offset-lo
-    
+    ;;these three parameters must be set
+    ;;bits must be set to one
     (alias :ptr :huffman-ptr)
     (alias :pop :huffman-pop-table)
+    (alias :bits :huffman-bits)
+
     (zp-b :acc-hi)
     (zp-b :acc-lo)
     (zp-b :next-byte)
-    (zp-b :bits)
 
-    (label :huffman-init nil)
-    (PHA)
-    (LDA 0)
-    (STA.ZP :len)
-    (STA.ZP :acc-hi)
-    (STA.ZP :acc-lo)
-    (LDA 1)
-    (dc "Set to 1, to imply we need a bit immediately")
-    (STA.ZP :bits)
-    (PLA)
-    (RTS)
-    
-    (label :huffman-get nil)
-    (LDY #xFF "Start at zero, following the first INY")
+    (label :huffman-next nil)
+    (LDY 0)
+    (STY.ZP :acc-hi)
+    (STY.ZP :acc-lo)
+    (DEY "Start at zero in pop table, following the first INY")
     (label :fetch-bit)
     (DEC.ZP :bits)
     (BNE :got-bits)
@@ -191,20 +191,20 @@
     (dc "which has kindly been pre-computed in the pop table")
     (SEC)
     (LDA.ZP :acc-lo)
-    (SBC.IZY :pop)
+    (SBC.IZY :pop "- offset lo")
     (TAX)
     (INY)
     (LDA.ZP :acc-hi)
-    (SBC.IZY :pop)
+    (SBC.IZY :pop "- offset hi")
     (dc "Return to caller with index-hi in A and index-lo in X")
     (dc "How nice for them. They can probably use LD?.ABX or something.")
     (RTS)
     (dc "Skip rest of row and get next bit")
     (label :gt1)
-    (INY "Skip max-code lo")
+    (INY)
     (label :gt2)
-    (INY "Skip offset hi")
-    (dc "Don't skip the last byte in the row; we'll do that in fetch")
+    (INY)
+    (INY)
     (BNE :fetch-bit)))
 
 (defun pop-table (label huffman-table description)
@@ -214,8 +214,9 @@
   (let ((len 0))
     (loop for p across (huffman-population huffman-table) do
 	 (dc (format nil "~a symbols of length ~a" (first p) (incf len)))
-	 (if (> 0 (first p))
-	     (db nil #xff (hi (second p)) (lo (second p)) (hi (third p)) (lo (third p)))
+	 (dc (format nil "Max Code: ~4,'0X Offset: ~4,'0X" (second p) (third p)))
+	 (if (> (first p) 0)
+	     (db nil #xff (hi (second p)) (lo (second p)) (lo (third p)) (hi (third p)))
 	     (db nil #x00)))))
 
 ;;turn a vector of symbols back into a string
@@ -229,13 +230,8 @@
     str))
 
 (defun huffman-encoding-test ()
-  (reset-symbol-table)
-  (process-string "The cat sat on")
-  (process-string "the mat")
-  (process-string "and didn't like it it it one bit")
-  (process-string "The quick brown fox killed the lazy dog and ate his innards")
-  (process-string "Sing a song of sixpence, a pocket full of eyes")
-  (process-string "Shall I compare thee to a summer's ham?")
+  (reset-strings)
+  (mapc #'process-string *test-strings*)
   (let ((total 0))
     (maphash #'(lambda (s _) (declare (ignore _))
 		       (incf total) ;;nul
@@ -256,8 +252,161 @@
       (setf table (coerce table 'vector))
       (maphash #'(lambda (s _) (declare (ignore _))
 			 (assert
-			  (equal s (symbols-string table (huffman-decode-string pop 11 (huffman-encode-string lookup s))))))
+			  (equal (append-eos s)
+				 (symbols-string table (huffman-decode-string pop 11 (huffman-encode-string lookup s))))))
 	       *processed-strings*))))
 
 (huffman-encoding-test)
+
+(defun dcs (label str)
+  "Define compressed string and inline it here"
+  (if *huffman-lookup*
+      ;;if the string table is built, emit the string and supply
+      ;;the label
+      (progn
+	(when label
+	  (label label))
+	(let* ((data (huffman-encode-string *huffman-lookup* str))
+	       (len (length data)))
+	  (add-hint len (format nil "DCS '~a' (~a->~a)" str (length str) len))
+	  (setf (gethash str *string-table*) *compiler-ptr*)
+	  (loop for byte across data do
+	       (push-byte byte))))
+      ;;in the first pass, add the string to the table
+      (progn
+	(unless (gethash str *defined-strings*)
+	  (process-string str))
+	(setf (gethash str *string-table*) *compiler-ptr*)))
+  ;;ensure that a string is inlined only once per pass
+  (setf (gethash str *defined-strings*) t)
+  (values))
+
+(defun dstr (str)
+  (aif (gethash str *string-table*)
+       it
+       (progn
+	 (setf (gethash str *string-table* nil) 0)
+	 0)))
+
+;;;this must be called last, after the last use of dcs/dstr
+;;;this hack means we don't have to reinitialise a hash set
+;;;on each pass
+(defun string-table ()  
+  (dc "String Table")
+  (maphash #'(lambda (str _)
+	       (declare (ignorable _))
+	       (unless (gethash str *defined-strings*)
+		 (dcs nil str)))
+	   *string-table*)
+  (clrhash *defined-strings*)
+
+  ;;all strings will have been processed so lets create the huffman table
+
+  (setf *huffman-table* (build-huffman-string-table *freq-table*))
+  (setf *huffman-lookup* (build-huffman-bit-pattern-lookup *huffman-table*))
+
+  (pop-table :string-pop-table *huffman-table* "General strings huffman population"))
+
+(defun eos-index ()
+  (position #\Nul *huffman-table* :key #'car))
+
+(defun string-test (string)
+  (org #x600)
+
+  (dcs "the mat" "the mat")
+  
+  (label :start)
+  
+  (sta16.zp string :huffman-ptr)
+  (sta16.zp :string-pop-table :huffman-pop-table)
+  
+  (huffman-init)
+  (label :another)
+  (JSR :huffman-next)
+  (LDY.ZP :output-string-index)
+  (TXA)
+  (STA.ABY :str-buffer)
+  (INC.ZP :output-string-index)
+  (CMP (nil->0 (eos-index)))
+  (BNE :another)
+  (BRK)
+
+  (zp-b :output-string-index 0)
+  
+  ;; define some encoded strings, labelled with themselves
+
+  (mapc #'(lambda (s) (dcs s s)) *test-strings*)
+
+  (dw :str-buffer 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+                  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
+
+  (huffman-decoder)
+  
+  (string-table)
+  
+  (label :end))
+
+(defun compile-string-test (&optional (string :test-str))
+  (reset-compiler)
+  (reset-strings)
+  
+  (flet ((pass ()
+	   (string-test string)))
+    
+    ;; pass 1, get strings
+    
+    (pass)
+    
+    ;; pass 2, build table, intern strings
+        
+    (pass)
+    
+    ;; pass 3, resolve all labels
+    
+    (setf *compiler-final-pass* t)
+    
+    (pass)))
+
+(defun test-decoder ()
+  
+  ; compile the program, *compiled-strings* will
+  ; then contain a list of all its strings
+  ; we can use it to recompile a test application
+  ; and run it to make sure all the strings
+  ; can be recovered in 6502
+
+  (compile-string-test "the mat")
+  
+  (let ((huffvec (coerce *huffman-table* 'vector))
+	(strings nil))
+    (maphash #'(lambda (k v) (declare (ignore v)) (push k strings))
+	     *processed-strings*)
+
+    (dolist (str strings)
+
+      (compile-string-test (gethash str *string-table*))
+      (monitor-reset #x600)
+      (monitor-run :print nil)
+      
+      (let ((*compiler-buffer* (monitor-buffer)))
+	(let ((output 
+	       (symbols-string huffvec
+			       (coerce
+				(subseq *compiler-buffer*
+					(resolve :str-buffer)
+					(position (eos-index) *compiler-buffer* :start (resolve :str-buffer)))
+				'list))))
+	  ;;we must check that the huffman-ptr is left on the last byte + 1
+
+	  (assert (= (+ (resolve str) (length (huffman-encode-string *huffman-lookup* str)))
+		     (peek-addr :huffman-ptr)))
+	  
+	  ;;(format t "before=~a after=~a enclen=~a str=~a~%"
+	;;	  (resolve str)
+	;;	  (peek-addr :huffman-ptr)
+	;;	  (length (huffman-encode-string *huffman-lookup* str))
+	;;	  str)
+	  (assert (equal output str)))))))
+
+(test-decoder)
 

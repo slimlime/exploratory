@@ -23,6 +23,8 @@
 ;; TODO Add locals, which gets all the symbols in the namespace where
 ;; we currently are
 
+;; TODO using multiple-value-bind to get the properties is horrid
+
 (defun monitor-print ()
   (multiple-value-bind (buffer pc sp sr a x y)
       (funcall *monitor-get-state*)
@@ -134,6 +136,20 @@
 (defun monitor-poke (address byte)
   (funcall *monitor-poke-fn* address byte))
 
+(defun monitor-cc ()
+  (multiple-value-bind (buffer pc sp sr a x y cc)
+      (funcall *monitor-get-state* nil)
+    (declare (ignore buffer pc sp sr a x y))
+    cc))
+
+(defun monitor-time-fn (fn)
+  (let ((cc (monitor-cc)))
+    (funcall fn)
+    (format t "Cycles:~d~%" (- (monitor-cc) cc))))
+
+(defmacro monitor-time (&body body)
+  `(monitor-time-fn #'(lambda () ,@body)))
+
 (defun monitor-setup-for-cl-6502 (buffer org)
   ;temporary binding to cl-6502
   (setf *monitor-buffer* #'(lambda () (cl-6502:get-range 0)))
@@ -169,3 +185,4 @@
 
 (defun monitor-setpc (addr)
   (setf (6502:cpu-pc cl-6502:*cpu*) (resolve addr)))
+

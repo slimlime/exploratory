@@ -18,7 +18,8 @@
     "and didn't like it it it one bit"
     "The quick brown fox killed the lazy dog and ate his innards"
     "Sing a song of sixpence, a pocket full of eyes"
-    "Shall I compare thee to a summer's ham?"))
+    "Shall I compare thee to a summer's ham?"
+    "ZYGOTIC MONKEdshs89efuhwehrdjsdsaddshdhdsdoasdiuashdiasdaY"))
 
 ;;TODO can probably save 256 bytes by packing the 'bits left' table
 ;;somewhere else. We could pack it in the lo byte of the prefix and
@@ -213,8 +214,9 @@
   (dc description)
   (let ((len 0))
     (loop for p across (huffman-population huffman-table) do
-	 (dc (format nil "~a symbols of length ~a" (first p) (incf len)))
-	 (dc (format nil "Max Code: ~4,'0X Offset: ~4,'0X" (second p) (third p)))
+	 (dc (format nil "f(~d)=~2d Max:~4,'0X Del:~4,'0X"
+		     (incf len) (first p) (second p) (third p))
+	     t)
 	 (if (> (first p) 0)
 	     (db nil #xff (hi (second p)) (lo (second p)) (lo (third p)) (hi (third p)))
 	     (db nil #x00)))))
@@ -376,16 +378,15 @@
   ; can be recovered in 6502
 
   (compile-string-test "the mat")
-  
+
   (let ((huffvec (coerce *huffman-table* 'vector))
 	(strings nil))
     (maphash #'(lambda (k v) (declare (ignore v)) (push k strings))
 	     *processed-strings*)
 
     (dolist (str strings)
-
       (compile-string-test (gethash str *string-table*))
-      (monitor-reset #x600)
+      (monitor-reset :start)
       (monitor-run :print nil)
       
       (let ((*compiler-buffer* (monitor-buffer)))
@@ -398,14 +399,16 @@
 				'list))))
 	  ;;we must check that the huffman-ptr is left on the last byte + 1
 
+	  ;(format t "str='~a'~%" str)
+	  
 	  (assert (= (+ (resolve str) (length (huffman-encode-string *huffman-lookup* str)))
 		     (peek-addr :huffman-ptr)))
 	  
-	  ;;(format t "before=~a after=~a enclen=~a str=~a~%"
+	;;(format t "before=~a after=~a enclen=~a"
 	;;	  (resolve str)
 	;;	  (peek-addr :huffman-ptr)
 	;;	  (length (huffman-encode-string *huffman-lookup* str))
-	;;	  str)
+	;;	  )
 	  (assert (equal output str)))))))
 
 (test-decoder)

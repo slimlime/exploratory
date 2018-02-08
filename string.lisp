@@ -18,8 +18,7 @@
     "and didn't like it it it one bit"
     "The quick brown fox killed the lazy dog and ate his innards"
     "Sing a song of sixpence, a pocket full of eyes"
-    "Shall I compare thee to a summer's ham?"
-    "ZYGOTIC MONKEdshs89efuhwehrdjsdsaddshdhdsdoasdiuashdiasdaY"))
+    "Shall I compare thee to a summer's ham?"))
 
 ;;TODO can probably save 256 bytes by packing the 'bits left' table
 ;;somewhere else. We could pack it in the lo byte of the prefix and
@@ -339,9 +338,8 @@
 
   (mapc #'(lambda (s) (dcs s s)) *test-strings*)
 
-  (dw :str-buffer 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-                  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
-
+  (dbs :str-buffer 256)
+       
   (huffman-decoder)
   
   (string-table)

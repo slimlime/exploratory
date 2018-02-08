@@ -63,14 +63,18 @@
 
 ;;TODO break-on should be able to match an unqualified label
 (defun monitor-run (&key (break-on 'BRK) (max-cycles 1000000) (print t))
-  (multiple-value-bind (buffer pc sp sr a x y)
+  (multiple-value-bind (buffer pc sp sr a x y cc)
       (funcall *monitor-get-state*)
     (declare (ignore sp pc sr a x y))
-    (let ((*compiler-buffer* buffer))
-      (loop for i from 1 to max-cycles do
-	   (multiple-value-bind (buffer pc sp sr a x y)
+    (let ((*compiler-buffer* buffer)
+	  (start-cycles cc)
+	  (total-cycles 0))
+      (do ()
+	  ((> total-cycles max-cycles))
+	(multiple-value-bind (buffer pc sp sr a x y cc)
 	       (funcall *monitor-get-state* nil)
 	     (declare (ignore buffer sp sr a x y))
+	     (setf total-cycles (- cc start-cycles))
 	     ;;THIS IS USING THE COMPILER BUFFER IT SHOULD PROBABLY
 	     ;;LOOK INTO THE 6502 BUFFER...
 	     (let ((op (gethash (aref *compiler-buffer* pc)
@@ -80,8 +84,9 @@
 			 (and op (eq break-on (car op))))
 		 (return)))
 	     (funcall *monitor-step*)))
-	   (when print
-	     (monitor-print)))))
+      (when print
+	(format t "Cycles:~a~%" total-cycles)
+	(monitor-print)))))
 
 (defun monitor-buffer ()
   (funcall *monitor-buffer*))
@@ -116,7 +121,8 @@
 					(6502:cpu-sr cl-6502:*cpu*)
 					(6502:cpu-ar cl-6502:*cpu*)
 					(6502:cpu-xr cl-6502:*cpu*)
-					(6502:cpu-yr cl-6502:*cpu*)))))
+					(6502:cpu-yr cl-6502:*cpu*)
+					(6502:cpu-cc cl-6502:*cpu*)))))
 
 (defparameter *monitor-reset* #'monitor-setup-for-cl-6502)
 

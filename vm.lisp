@@ -340,9 +340,10 @@ incorrect branch offsets elsewhere
   (cpy16.zp :vm-pc '(:typeset-cs . :str))
   (LDA lines)
   (JSR :print-message)
-  (dc "Now advance the vm-pc to after the string")
-  (cpy16.zp '(:typeset-cs . :str) :vm-pc )
-  (inc16.zp :vm-pc)
+  (dc "The string printer should have left the pointer")
+  (dc "on the byte immediately following the string")
+  (dc "So we will resume there")
+  (cpy16.zp '(:typeset-cs . :str) :vm-pc)
   (RTS))
 
 ;;;

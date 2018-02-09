@@ -42,7 +42,8 @@
   (setf *huffman-lookup* nil)
   (loop for c across *charset* do
        (setf (gethash c *freq-table*) 0))
-  (setf (gethash #\Nul *freq-table*) 0))
+  (setf (gethash #\Nul *freq-table*) 0)
+  (setf (gethash #\Newline *freq-table*) 0))
 
 (defun build-huffman-string-table (freqs)
   (let ((l))
@@ -310,6 +311,9 @@
 
 (defun eos-index ()
   (position #\Nul *huffman-table* :key #'car))
+
+(defun eol-index ()
+  (position #\Newline *huffman-table* :key #'car))
 
 (defun string-test (string)
   (org #x600)

@@ -12,158 +12,79 @@
     
   (zp-w :font)
 
-  (when *symbol-table*
-
-    (let ((first-two-char nil)
-	  (first-three-char nil))
-    
-      (loop for i from (1- (length *symbol-table*)) downto 0 do
-	   (let ((sym (aref *symbol-table* i)))
-	     (when (= (length sym) 3)
-	       (setf first-three-char i))
-	     (when (= (length sym) 2)
-	       (setf first-two-char i))))
-
-      (with-namespace :typeset-cs
-
-	(alias :sym :D2)
-	(alias :str :A2)
-	(alias :tmp-raster :A3)
-
-	(label :typeset-cs nil)
-	(LDA 0)
-	(STA.ZP '(:typeset . :shift))
-	(STA.ZP '(:typeset . :prev-width))
-	(label :typeset-cs-continue nil)
-	(cpy16.zp '(:typeset . :raster) :tmp-raster)
-	(JMP :first)
-	(label :next)
-	(INC.ZP (lo-add :str))
-	(BNE :first)
-	(INC.ZP (hi-add :str))
-	(BEQ :done "Gone off the edge of the map")
-	(label :typeset-cs-cont-test nil) ;don't reset shift position
-	(label :first)
-	(LDY 0)
-	(LDA.IZY :str)
-	(BEQ :done)
-	(CMP first-three-char)
-	(BCC :2char)
-	(STA.ZP :sym)
-	(TAX)
-	(dc "Get the first character from the three character table")
-	(dc "note that the address to :3ch-0 is offet, so that we")
-	(dc "can use the value in A without subtracting")
-	(LDA.ABX (- (resolve :3ch-0) first-three-char))
-	(JSR :emit)
-	(LDX.ZP :sym)
-	(LDA.ABX (- (resolve :3ch-1) first-three-char))
-	(JSR :emit)
-	(LDX.ZP :sym)
-	(LDA.ABX (- (resolve :3ch-2) first-three-char))
- 	(dc "The third character might be EOS")
-	(BEQ :done)
-	(JSR :emit)
-	(JMP :next)
-	(label :2char)
-	(CMP first-two-char)
-	(BCC :1char)
-	(STA.ZP :sym)
-	(TAX)
-	(LDA.ABX (- (resolve :2ch-0) first-two-char))
-	(JSR :emit)
-	(LDX.ZP :sym)
-	(LDA.ABX (- (resolve :2ch-1) first-two-char))
-	(dc "The second character might be EOS")
-	(BEQ :done)
-	(label :1char)
-	(JSR :emit)
-	(JMP :next)
-	(label :emit)
-	(CMP 1)
-	(BEQ :newline)
-	(dc "Look up address of character data")
-	(dc "table is offset by two as EOS=0 NEWLINE=1")
-	(TAX)
-	(LDA.ABX (- (resolve :1ch-lo) 2))
-	(CLC)
-	(dc "Add the offset of the font")
-	(ADC.ZP (lo-add :font))
-	(STA.ZP (lo-add '(:typeset . :char)))	
-	(LDA.ABX (- (resolve :1ch-hi) 2))
-	(ADC.ZP (hi-add :font))
-	(STA.ZP (hi-add '(:typeset . :char)))
-	(JMP :typeset)
-	(label :newline)
-	(dc "Carry is clear from the cmp 1")
-	(LDA (lo (1- (* 40 (1+ *font-height*)))))
-	(ADC.ZP (lo-add :tmp-raster))
-	(STA.ZP (lo-add :tmp-raster))
-	(STA.ZP (lo-add '(:typeset . :raster)))
-	(LDA (hi (1- (* 40 (1+ *font-height*)))))
-	(ADC.ZP (hi-add :tmp-raster))
-	(STA.ZP (hi-add :tmp-raster))
-	(STA.ZP (hi-add '(:typeset . :raster)))
-	(LDA 0)
-	(STA.ZP '(:typeset . :shift))
-	(STA.ZP '(:typeset . :prev-width))
-	(label :done)
-	(RTS)
-
-	(dc "Three character string table split into three")
-	(dc "so that each character can be retrieved by indexing")
-	(dc "without multiplication")
-
-	(flet ((dtbl (label start end char-pos)
-		 (let ((bytes (list label)))
-		   ;;label is the first argument to db, followed by the bytes
-		   (loop for i from start to end do
-			(let ((sym (aref *symbol-table* i)))
-			  (push (position (string (char sym char-pos))
-					  *symbol-table* :test 'equal)
-				bytes)))
-		   (apply #'db (nreverse bytes)))))
-
-	  (dtbl :3ch-0 first-three-char 255 0)
-	  (dtbl :3ch-1 first-three-char 255 1)
-	  (dtbl :3ch-2 first-three-char 255 2)
-    
-	  (dc "Two character string table")
-
-	  (dtbl :2ch-0 first-two-char (1- first-three-char) 0)
-	  (dtbl :2ch-1 first-two-char (1- first-three-char) 1))
+  (with-namespace :typeset-cs
+    (alias :sym :D2)
+    (alias :tmp-raster :A3)
+    (alias :str :huffman-ptr)
+    (label :typeset-cs nil)
+    (LDA 0)
+    (STA.ZP '(:typeset . :shift))
+    (STA.ZP '(:typeset . :prev-width))
+    (label :typeset-cs-continue nil)
+    (LDA 1)
+    (STA.ZP :huffman-bits "Initialise Huffman decoder")
+    ;;debateable whether we need an entry point here to
+    ;;dodge the huffman reset.
+    (cpy16.zp '(:typeset . :raster) :tmp-raster)
+    (label :next)
+    (JSR :huffman-next)
+    (CPX (nil->0 (eos-index)))
+    (BEQ :done)
+    (CPX (nil->0 (eol-index)))
+    (BEQ :newline)
+    (LDA.ABX :lo-char-offsets)
+    (CLC)
+    (ADC.ZP (lo-add :font))
+    (STA.ZP (lo-add '(:typeset . :char)))
+    (LDA.ABX :hi-char-offsets)
+    (ADC.ZP (hi-add :font))
+    (STA.ZP (hi-add '(:typeset . :char)))
+    (JSR :typeset)
+    (JMP :next)
+    (label :newline)
+    (LDA 0)
+    (STA.ZP '(:typeset . :shift))
+    (STA.ZP '(:typeset . :prev-width))
+    (SEC)
+    (LDA (lo (1- (* 40 (1+ *font-height*)))))
+    (ADC.ZP (lo-add :tmp-raster))
+    (STA.ZP (lo-add :tmp-raster))
+    (STA.ZP (lo-add '(:typeset . :raster)))
+    (LDA (hi (1- (* 40 (1+ *font-height*)))))
+    (ADC.ZP (hi-add :tmp-raster))
+    (STA.ZP (hi-add :tmp-raster))
+    (STA.ZP (hi-add '(:typeset . :raster)))
+    (BNE :next)
+    (label :done)
+    (RTS))
   
-	(dc "Addresses for the character data table in two tables")
-	(dc "hi-byte and lo-byte")
-      	
-	(let ((lo (list :1ch-lo))
-	      (hi (list :1ch-hi)))
-	  (loop for i from 2 to (1- first-two-char) do
-	       ;start at 2 as 0 is EOS and 1 is NEWLINE
-	       (let* ((c (char (aref *symbol-table* i) 0))
-		      (label (cons :present c)))
-		 
-		 ;;compiler check that characters in the other two typefaces are present
-		 
-		 (resolve (cons :past c))
-		 (resolve (cons :future c))
+  (dc "Character offset table")
 
-		 (when (and *compiler-debug* 
-			    *compiler-final-pass*)
-		   (format t "~4,'0X ~4,'0X ~c~%" (resolve label)
-			   (resolve '(:font . :present))
-			   c))
-
-		 ;;store the relative offset into the font, this means of course
-		 ;;that the characters in the font are in the same order
-		 (setf label (- (resolve label)
-				(resolve '(:font . :present))))
-		 		 
-		 (push (lo label) lo)
-		 (push (hi label) hi)))
-
-	  (apply #'db (nreverse lo))
-	  (apply #'db (nreverse hi))))))
+  (when *huffman-table*
+    (let ((lo (list :lo-char-offsets))
+	  (hi (list :hi-char-offsets)))
+      (dolist (e *huffman-table*)
+	(let ((c (car e)))
+	  (if (or (eq c #\Newline)
+		  (eq c #\Nul))
+	      (progn
+		;;no character data for these, but we still need an entry
+		;;better a gap here than a gap in the font table
+		(push 0 lo)
+		(push 0 hi))
+	      (progn  
+		;;check that we actually have the typeface data
+		;;for this character
+		(resolve (cons :present c))
+		(resolve (cons :past c))
+		(resolve (cons :future c))
+		;;store the relative offset into the font
+		(let ((offset (- (resolve (cons :present c))
+				 (resolve '(:font . :present)))))
+		  (push (lo offset) lo)
+		  (push (hi offset) hi))))))
+      (apply #'db (nreverse lo))
+      (apply #'db (nreverse hi))))
   
   (label :typeset)
   
@@ -262,7 +183,6 @@
 (defun live-row (i)
   (+ 3 (* (+ i 13) *line-height*)))
 
-
 ;;; TODO
 ;;; The control flow and size of the code here is a bit rubbish
 ;;; the memcpy, memset and sta16 could be worked out from a table
@@ -335,33 +255,32 @@
 ;;for elsewhere
 (defun build (pass)
   (funcall pass)
-  (build-symbol-table)
   (funcall pass)
   (setf *compiler-final-pass* t)
   (funcall pass))
 
 (defun odyssey ()
   (reset-compiler)
-  (reset-symbol-table)
+  (reset-strings)
   (let ((font :past))
     (flet ((pass ()
 	     (zeropage)	     
 	     (org #x600)
+	     (label :start)
 	     (CLD)
 	     (label :render-test2)
-   
 	     (sta16.zp :str '(:typeset-cs . :str))
 	     (sta16.zp (cons :font font) :font)
 	     (sta16.zp #x8000 '(:typeset . :raster))
-
+	     (sta16.zp :string-pop-table :huffman-pop-table)
 	     (JSR :typeset-cs)
-
 	     (BRK)
-
 	     (typeset)
-	     (font-data)
-
-	     (dcs :str (justify *odyssey* :width (font-width font)))))
+	     (dcs :str (justify *odyssey* :width (font-width font)))
+	     (huffman-decoder)
+	     (string-table)
+	     (label :end)
+	     (font-data)))
       (build #'pass))) 
   
   (monitor-reset #x600)
@@ -373,7 +292,7 @@
   ;;Test an OBOE error where the M is being overwritten, presumably by the
   ;;thing that clears the next position.
   (reset-compiler)
-  (reset-symbol-table)
+  (reset-strings)
 
   (flet ((pass ()
 	   (zeropage)
@@ -410,7 +329,7 @@
 (defun render-test4 ()
 
   (reset-compiler)
-  (reset-symbol-table)
+  (reset-strings)
 
   (flet ((pass ()
 	   (zeropage)
@@ -446,7 +365,7 @@ slime.")))
 
 (defun render-test2 ()
   (reset-compiler)
-  (reset-symbol-table)
+  (reset-strings)
 
   (flet ((pass ()
 	   (zeropage)
@@ -509,7 +428,7 @@ slime.")))
 (defun render-test ()
   
   (reset-compiler)
-  (reset-symbol-table)
+  (reset-strings)
   
   (flet ((pass ()
 	   (zeropage)

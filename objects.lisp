@@ -423,6 +423,7 @@ standard object display name e.g. 'A golden apple.'"
     (assert (eq found expected-found))
     (assert (eq duplicate expected-duplicate))))
 
+(font-data)
 (reset-object-model)
 (reset-parser)
 

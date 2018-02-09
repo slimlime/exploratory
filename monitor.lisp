@@ -16,6 +16,28 @@
 (defparameter *monitor-peek-fn* nil)
 (defparameter *monitor-poke-fn* nil)
 (defparameter *monitor-label-watches* nil)
+(defparameter *monitor-profile* nil)
+
+(defun monitor-reset-profile ()
+  (setf *monitor-profile* (make-hash-table)))
+
+(monitor-reset-profile)
+
+(defun monitor-profile-address (addr cycles)
+  (if (gethash addr *monitor-profile*)
+      (incf (gethash addr *monitor-profile*))
+      (setf (gethash addr *monitor-profile*) cycles)))
+
+(defun monitor-dump-profile (&optional (top 4) (context 5))
+  (let ((profile nil))
+    (maphash #'(lambda (addr cycles) (push (cons addr cycles) profile))
+	     *monitor-profile*)
+    (loop for e in (sort profile #'> :key #'cdr)
+	 for _ from 1 to top do
+	 (format t "Address:~4,'0X Total Cycles:~6d~%" (car e) (cdr e))
+	 (format t "|------------------------------~%")
+	 (disassemble-6502 (car e) (+ (car e) context 5))
+	 (terpri))))
 
 (defun hex (number)
   (format t "~4,'0X" number))
@@ -102,6 +124,7 @@
 
 ;;TODO break-on should be able to match an unqualified label
 (defun monitor-run (&key (break-on 'BRK) (max-cycles 2000000) (print t))
+  (monitor-reset-profile)
   (multiple-value-bind (buffer pc sp sr a x y cc)
       (funcall *monitor-get-state*)
     (declare (ignore sp pc sr a x y))
@@ -122,7 +145,9 @@
 	       (when (or (= pc (resolve break-on :no-assert t))
 			 (and op (eq break-on (car op))))
 		 (return)))
-	     (funcall *monitor-step*)))
+	     (let ((step-cycles (monitor-cc)))
+	       (funcall *monitor-step*)
+	       (monitor-profile-address pc (- (monitor-cc) step-cycles)))))
       (when print
 	(format t "Cycles:~a~%" total-cycles)
 	(monitor-print)))))

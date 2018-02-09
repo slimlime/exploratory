@@ -334,14 +334,13 @@
 (defun build-parse-word-test (pass)
   (funcall pass)
   (setf *word-table-built* t)
-  (build-symbol-table)
   (funcall pass)
   (setf *compiler-final-pass* t)
   (funcall pass))
 
 (defun parse-word-test (word)
   (reset-compiler)
-  (reset-symbol-table)
+  (reset-strings)
   
   (flet ((pass ()
 	   (zeropage)	     
@@ -447,7 +446,7 @@
 
 (defun parse-words-tester (input &key (break-on 'brk))
   (reset-compiler)
-  (reset-symbol-table)
+  (reset-strings)
   
   (flet ((pass ()
 	   (zeropage)	     

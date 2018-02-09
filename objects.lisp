@@ -344,13 +344,28 @@ standard object display name e.g. 'A golden apple.'"
 
 ;;test finding object id
 
+(defun test-object-definitions ()
+  (defplace :ur)
+  (defplace :nippur)
+  (defplace :babylon)
+  
+  (defobject "MARDUK STATUE" "A bronze statue" :ur nil)
+  (defobject "STONE STATUE" "A stone statue" :ur nil)
+  (defobject "GINGER BISCUIT" "A tasty snack" :ur nil)
+  (defobject "ENTRAILS" "Animal guts" :nippur nil)
+  (defobject "POCKET FLUFF" "Lovely pocket fluff" :inventory nil)
+  (defobject "OBSIDIAN CUBE" "Black cube" :nowhere nil)
+  (defobject "CAT FLUFF" "Cat fluff" :babylon nil))	   
+
 (defun object-tester (name-id adj-id current-place)
   (reset-compiler)
-  (reset-symbol-table)
+  (reset-strings)
   (font-data)
   (reset-compiler)
+  (reset-object-model)
+  (reset-parser)
+	   
   (flet ((pass ()
-					;(format t "Pass ~a~%" (incf p))
 	   (zeropage)	     
 	   (org #x600)
 	   (CLD)
@@ -368,15 +383,17 @@ standard object display name e.g. 'A golden apple.'"
 	   (JSR :find-object-index)
 	   
 	   (BRK)
-	   
+
+	   (test-object-definitions)
+
 	   (object-table)
 	   (string-table)
+	   (huffman-decoder)
 	   
 	   (label :end)
 	   
 	   (font-data)))
     (pass)
-    (build-symbol-table)
     (setf *word-table-built* t)
     
     (pass)
@@ -408,19 +425,8 @@ standard object display name e.g. 'A golden apple.'"
 
 (reset-object-model)
 (reset-parser)
-(font-data)
 
-(defplace :ur)
-(defplace :nippur)
-(defplace :babylon)
-
-(defobject "MARDUK STATUE" "A bronze statue" :ur nil)
-(defobject "STONE STATUE" "A stone statue" :ur nil)
-(defobject "GINGER BISCUIT" "A tasty snack" :ur nil)
-(defobject "ENTRAILS" "Animal guts" :nippur nil)
-(defobject "POCKET FLUFF" "Lovely pocket fluff" :inventory nil)
-(defobject "OBSIDIAN CUBE" "Black cube" :nowhere nil)
-(defobject "CAT FLUFF" "Cat fluff" :babylon nil)
+(test-object-definitions)
 
 (test-object-find "MARDUK" "STATUE" :ur :found :unique)
 (test-object-find "STONE" "STATUE" :ur :found :unique)

@@ -101,7 +101,7 @@
        (monitor-step)))
 
 ;;TODO break-on should be able to match an unqualified label
-(defun monitor-run (&key (break-on 'BRK) (max-cycles 1000000) (print t))
+(defun monitor-run (&key (break-on 'BRK) (max-cycles 2000000) (print t))
   (multiple-value-bind (buffer pc sp sr a x y cc)
       (funcall *monitor-get-state*)
     (declare (ignore sp pc sr a x y))

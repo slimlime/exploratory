@@ -6,7 +6,7 @@
     (reset-image-cache))
   
   (reset-compiler)
-  (reset-symbol-table)
+  (reset-strings)
   (reset-bits)
   (reset-parser)
   (reset-object-model)
@@ -28,6 +28,7 @@
 	   (label :start)
 	   (cls #x10)
 	   (sta16.zp (cons :font :present) :font)
+	   (sta16.zp :string-pop-table :huffman-pop-table)
 	   
 	   (JSR :vm-enter)
 	   (vm-nav initial-location)
@@ -74,7 +75,7 @@
 	     (dispatcher))
 	   (measure-size "String Table"
 	     (string-table))
-	   
+	   (huffman-decoder)
 	   (image-decompressor)
 	   (label :end)
 	   ;font data is pretty boring so stick it here
@@ -82,8 +83,6 @@
 	     (font-data))))
     
     (pass)
-    (build-symbol-table)
-    ;;TODO This is BORING
     (setf *word-table-built* t)
     ;;penultimate pass to ensure everything got a go and the structure
     ;;hasn't changed

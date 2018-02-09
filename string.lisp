@@ -51,6 +51,7 @@
 		 (when (> f 0)
 		   (push (list c f) l)))
 	     freqs)
+    (assert l nil "The frequency table was empty")
     (huffman l)))
 
 (defun build-huffman-bit-pattern-lookup (table)
@@ -303,7 +304,6 @@
   (clrhash *defined-strings*)
 
   ;;all strings will have been processed so lets create the huffman table
-
   (setf *huffman-table* (build-huffman-string-table *freq-table*))
   (setf *huffman-lookup* (build-huffman-bit-pattern-lookup *huffman-table*))
 

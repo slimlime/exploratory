@@ -335,7 +335,7 @@
     
 (defun draw-test ()
   (reset-compiler)
-  (reset-symbol-table)
+  (reset-strings)
   (let ((font :present))
     (flet ((pass ()
 	     (zeropage)	     

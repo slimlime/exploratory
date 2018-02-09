@@ -125,106 +125,7 @@
 		   (return)))))))
     (assert nil nil "Blew past eos for ~a, got ~a" vec out)))
 
-(defun huffman-init ()
-  (LDX 1)
-  (STX.ZP :huffman-bits))
-
-(defun huffman-decoder ()
-
-  (zp-w :huffman-pop-table)
-  (zp-w :huffman-ptr)
-  (zp-b :huffman-bits)
-  
-  (with-namespace :decoder
-    ;;these three parameters must be set
-    ;;bits must be set to one
-    (alias :ptr :huffman-ptr)
-    (alias :pop :huffman-pop-table)
-    (alias :bits :huffman-bits)
-
-    (zp-b :acc-hi)
-    (zp-b :acc-lo)
-    (zp-b :next-byte)
-
-    (label :huffman-next nil)
-    (LDY 0)
-    (STY.ZP :acc-hi)
-    (STY.ZP :acc-lo)
-    (DEY "Start at zero in pop table, following the first INY")
-    (label :fetch-bit)
-    (DEC.ZP :bits)
-    (BNE :got-bits)
-    (dc "New byte required")
-    (dc "Save our pop table index")
-    (TYA)
-    (TAX)
-    (LDY 0)
-    (LDA.IZY :ptr)
-    (STA.ZP :next-byte)
-    (inc16.zp :ptr)
-    (LDA 8)
-    (STA.ZP :bits)
-    (dc "Restore the pop table index")
-    (TXA)
-    (TAY)
-    (label :got-bits)
-    (dc "Lets rotate a bit from the next byte")
-    (dc "into the accumulator")
-    (ASL.ZP :next-byte)
-    (ROL.ZP :acc-lo)
-    (ROL.ZP :acc-hi)
-    (INY)
-    (LDA.IZY :pop "Any symbols at this length?")
-    (BEQ :fetch-bit)
-    (INY "Skip row indicator byte")
-    (dc "We have some symbols- does the accumulator hold one?")
-    (dc "It does if the accumulator is less than the max-code")
-    (dc "for codes of this length. So let's compare it.")
-    (LDA.IZY :pop)
-    (CMP.ZP :acc-hi)
-    (BMI :gt1 "acc-hi > max-code(len)-hi")
-    (INY)
-    (LDA.IZY :pop)
-    (CMP.ZP :acc-lo)
-    (BMI :gt2 "acc-lo > max-code(len)-lo")
-    (INY)
-    (dc "Now acc<=max-code(len), this means we have a symbol woo!")
-    (dc "To get the symbol index we subtract the offset")
-    (dc "which has kindly been pre-computed in the pop table")
-    (SEC)
-    (LDA.ZP :acc-lo)
-    (SBC.IZY :pop "- offset lo")
-    (TAX)
-    (INY)
-    (LDA.ZP :acc-hi)
-    (SBC.IZY :pop "- offset hi")
-    (dc "Return to caller with index-hi in A and index-lo in X")
-    (dc "How nice for them. They can probably use LD?.ABX or something.")
-    (RTS)
-    (dc "Skip rest of row and get next bit")
-    (label :gt1)
-    (INY)
-    (label :gt2)
-    (INY)
-    (INY)
-    (BNE :fetch-bit)))
-
-(defun pop-table (label huffman-table description)
-  "Create a huffman population table"
-  (label label)
-  (dc description)
-  (let ((len 0))
-    (loop for p across (huffman-population huffman-table) do
-	 (dc (format nil "f(~d)=~2d Max:~4,'0X Del:~4,'0X"
-		     (incf len) (first p) (second p) (third p))
-	     t)
-	 (if (> (first p) 0)
-	     (db nil #xff (hi (second p)) (lo (second p)) (lo (third p)) (hi (third p)))
-	     (db nil #x00)))))
-
 ;;turn a vector of symbols back into a string
-;;we won't need to do this on the 6502 as the symbol
-;;indices will be used as indices into typeface data
 (defun symbols-string (table-vec symbols)
   (let ((str (make-string (length symbols))))
     (loop for s in symbols
@@ -307,7 +208,7 @@
   (setf *huffman-table* (build-huffman-string-table *freq-table*))
   (setf *huffman-lookup* (build-huffman-bit-pattern-lookup *huffman-table*))
 
-  (pop-table :string-pop-table *huffman-table* "General strings huffman population"))
+  (huffman-pop-table :string-pop-table *huffman-table* "General strings huffman population"))
 
 (defun eos-index ()
   (position #\Nul *huffman-table* :key #'car))
@@ -324,8 +225,8 @@
   
   (sta16.zp string :huffman-ptr)
   (sta16.zp :string-pop-table :huffman-pop-table)
-  
-  (huffman-init)
+  (LDX 1)
+  (STX.ZP :huffman-bits)
   (label :another)
   (JSR :huffman-next)
   (LDY.ZP :output-string-index)

@@ -1,3 +1,45 @@
+## 9/2/2018 Huffman a go-go
+
+So the game has been ported to use Huffman encoding for the strings rather than the Tunstall table of common two and three letter symbols. Let us see what effect this has had,
+
+~~~~
+CL-USER> (run-simple-game)
+Dungeon Cell size 2951
+Corridor size 1881
+Frazbolg's Closet size 1322
+Object Table size 154
+Dispatcher size 337
+String Table size 813
+Fonts size 2321
+Build size 13681
+Cycles:548029
+~~~~
+
+And the Huffman encoded version,
+
+~~~~
+CL-USER> (run-simple-game)
+Dungeon Cell size 3146
+Corridor size 1928
+Frazbolg's Closet size 1322
+Object Table size 154
+Dispatcher size 337
+String Table size 912
+Fonts size 2321
+Build size 13548
+Cycles:651045
+~~~~
+
+So, worse on every metric except one, total build size. Build size has been reduced as we no longer need to store the Tunstall table. I can't say I'm not slightly disappointed but we now have our ducks in a line for the massive gainz I have been thinking about, namely,
+
+- Better image compression
+- Common word dictionary
+- Higher order prediction
+
+### Cycle Proficiency
+
+I have added the 6502 cycle time to the monitor- now I can see just how long each operation is taking. To render the dungeon cell location, image and text included is taking about 650ms (assuming a 1Mhz processor). As far as I remember this is quick for an 8 bit adventure game. Input responses are much quicker at approximately 100ms.
+
 ## 7/2/2018 Efficient Huffman Decoding in 8 bits
 
 After wading through Wikipedia and various other online resources I have finally managed to implement a Huffman code decoder in 6502.

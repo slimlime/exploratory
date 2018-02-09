@@ -156,7 +156,7 @@
     (dc "Shift the bit pattern across by the offset")
     (dc "and OR it with the screen")
     (label :shift-right)
-    (BNE 0)
+    (BNE 0 "Self modified branch")
     (LSR)
     (LSR)
     (LSR)
@@ -172,7 +172,7 @@
     (dc "Get the bit pattern again")
     (LDA.IZY :char)
     (label :shift-left)
-    (BNE 0);;note, can char be 0?
+    (BNE 0 "Self modified branch")
     (ASL)
     (ASL)
     (ASL)

@@ -82,6 +82,8 @@
 	      (third p)
 	      (ash (third p) (- (second p) 16))))))
 
+;;note the commented out entry is the high offset; for less than 256 symbols we don't care
+;;what that value is
 (defun huffman-pop-table (label huffman-table description)
   "Create a huffman population table"
   (label label)
@@ -92,7 +94,7 @@
 		     (incf len) (first p) (second p) (third p))
 	     t)
 	 (if (> (first p) 0)
-	     (db nil #xff (hi (second p)) (lo (second p)) (lo (third p)) (hi (third p)))
+	     (db nil #xff (hi (second p)) (lo (second p)) (lo (third p)) #|(hi (third p))|#)
 	     (db nil #x00)))))
 
 (defun huffman-decoder ()
@@ -164,9 +166,10 @@
     (LDA.ZP :acc-lo)
     (SBC.IZY :pop "- offset lo")
     (TAX)
-    (INY)
-    (LDA.ZP :acc-hi)
-    (SBC.IZY :pop "- offset hi")
+    ;commented out as we don't have more than 256 symbols
+    ;(INY)
+    ;(LDA.ZP :acc-hi)
+    ;(SBC.IZY :pop "- offset hi")
     (dc "Return to caller with index-hi in A and index-lo in X")
     (dc "How nice for them. They can probably use LD?.ABX or something.")
     (RTS)
@@ -175,5 +178,5 @@
     (INY)
     (label :gt2)
     (INY)
-    (INY)
+    ;(INY) ;commented out as we don't have more than 256 symbols
     (BNE :fetch-bit)))

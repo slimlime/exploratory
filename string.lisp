@@ -1,5 +1,4 @@
 (defparameter *freq-table* nil)
-(defparameter *processed-strings* nil)
 (defparameter *string-table* nil)
 (defparameter *defined-strings* nil) ;;strings defined this pass
                                      ;;cleared when building string table
@@ -28,13 +27,11 @@
   (format nil "~a~a" str #\nul))
 
 (defun process-string (str)
-  (setf (gethash str *processed-strings*) t)
   (setf str (append-eos str))
   (loop for c across str do
        (incf (gethash c *freq-table*))))
   
 (defun reset-strings ()
-  (setf *processed-strings* (make-hash-table :test 'equal))
   (setf *freq-table* (make-hash-table :test 'equal))
   (setf *string-table* (make-hash-table :test 'equal))
   (setf *defined-strings* (make-hash-table :test 'equal))
@@ -137,13 +134,9 @@
   (reset-strings)
   (mapc #'process-string *test-strings*)
   (let ((total 0))
-    (maphash #'(lambda (s _) (declare (ignore _))
-		       (incf total) ;;nul
-		       (incf total (length s)))
-	     *processed-strings*)  
-    (format nil "~a strings for ~a characters.~%"
-	    (hash-table-count *processed-strings*)
-	    total))
+    (dolist (s *test-strings*)
+      (incf total) ;;nul
+      (incf total (length s)))
   (let* ((table (build-huffman-string-table *freq-table*))
 	 (lookup (build-huffman-bit-pattern-lookup table)))
     ;;(print-huffman table)
@@ -154,11 +147,9 @@
     ;;roundtrip all strings
     (let ((pop (huffman-population table)))
       (setf table (coerce table 'vector))
-      (maphash #'(lambda (s _) (declare (ignore _))
-			 (assert
-			  (equal (append-eos s)
-				 (symbols-string table (huffman-decode-string pop 11 (huffman-encode-string lookup s))))))
-	       *processed-strings*))))
+      (dolist (s *test-strings*)
+	(assert (equal (append-eos s)
+		       (symbols-string table (huffman-decode-string pop 11 (huffman-encode-string lookup s))))))))))
 
 (huffman-encoding-test)
 
@@ -177,10 +168,7 @@
 	  (loop for byte across data do
 	       (push-byte byte))))
       ;;in the first pass, add the string to the table
-      (progn
-	(unless (gethash str *defined-strings*)
-	  (process-string str))
-	(setf (gethash str *string-table*) *compiler-ptr*)))
+      (setf (gethash str *string-table*) *compiler-ptr*))
   ;;ensure that a string is inlined only once per pass
   (setf (gethash str *defined-strings*) t)
   (values))
@@ -197,18 +185,22 @@
 ;;;on each pass
 (defun string-table ()  
   (dc "String Table")
-  (maphash #'(lambda (str _)
-	       (declare (ignorable _))
-	       (unless (gethash str *defined-strings*)
-		 (dcs nil str)))
-	   *string-table*)
+  ;;Get the strings that need to be inlined at the end
+  (let ((additions nil))
+    (dohashkeys (str *string-table*)
+      (unless (gethash str *defined-strings*)
+	(push str additions)))
+    (dolist (str additions)
+      (dcs nil str)))
   (clrhash *defined-strings*)
-
-  ;;all strings will have been processed so lets create the huffman table
+  ;;Now process them for frequency analysis
+  (dohashkeys (str *string-table*)
+    (process-string str))
   (setf *huffman-table* (build-huffman-string-table *freq-table*))
   (setf *huffman-lookup* (build-huffman-bit-pattern-lookup *huffman-table*))
-
-  (huffman-pop-table :string-pop-table *huffman-table* "General strings huffman population"))
+  (huffman-pop-table :string-pop-table
+		     *huffman-table*
+		     "General strings huffman population"))
 
 (defun eos-index ()
   (position #\Nul *huffman-table* :key #'car))
@@ -218,8 +210,8 @@
 
 (defun string-test (string)
   (org #x600)
-
-  (dcs "the mat" "the mat")
+y
+  (assert string nil "String was empty")
   
   (label :start)
   
@@ -273,25 +265,13 @@
     (pass)))
 
 (defun test-decoder ()
-  
-  ; compile the program, *compiled-strings* will
-  ; then contain a list of all its strings
-  ; we can use it to recompile a test application
-  ; and run it to make sure all the strings
-  ; can be recovered in 6502
-
+  ;;6502 string decode
   (compile-string-test "the mat")
-
-  (let ((huffvec (coerce *huffman-table* 'vector))
-	(strings nil))
-    (maphash #'(lambda (k v) (declare (ignore v)) (push k strings))
-	     *processed-strings*)
-
-    (dolist (str strings)
-      (compile-string-test (gethash str *string-table*))
+  (let ((huffvec (coerce *huffman-table* 'vector)))
+    (dohashkeys (str *string-table*)
+      (compile-string-test str)
       (monitor-reset :start)
       (monitor-run :print nil)
-      
       (let ((*compiler-buffer* (monitor-buffer)))
 	(let ((output 
 	       (symbols-string huffvec
@@ -301,17 +281,13 @@
 					(position (eos-index) *compiler-buffer* :start (resolve :str-buffer)))
 				'list))))
 	  ;;we must check that the huffman-ptr is left on the last byte + 1
-
-	  ;(format t "str='~a'~%" str)
-	  
-	  (assert (= (+ (resolve str) (length (huffman-encode-string *huffman-lookup* str)))
-		     (peek-addr :huffman-ptr)))
-	  
-	;;(format t "before=~a after=~a enclen=~a"
-	;;	  (resolve str)
-	;;	  (peek-addr :huffman-ptr)
-	;;	  (length (huffman-encode-string *huffman-lookup* str))
-	;;	  )
+	  ;;or it will mess up things that rely on it, i.e. the VM print commands
+	  (assert (= (+ (resolve str)
+			(length (huffman-encode-string *huffman-lookup* str)))
+		     (peek-addr :huffman-ptr))
+		  nil "Pointer not in right place for '~a' Expected ~4,'0X was ~4,'0X"
+		  str (peek-addr :huffman-ptr) (+ (resolve str)
+			 (length (huffman-encode-string *huffman-lookup* str))))
 	  (assert (equal output str)))))))
 
 (test-decoder)

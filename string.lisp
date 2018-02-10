@@ -210,7 +210,7 @@
 
 (defun string-test (string)
   (org #x600)
-y
+
   (assert string nil "String was empty")
   
   (label :start)

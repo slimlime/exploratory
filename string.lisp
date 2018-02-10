@@ -220,6 +220,13 @@
 		    #'(lambda (,var)
 			,@body)))
 
+(defun estimate-bits (f)
+  (loop for e in *huffman-table* do
+       (let ((fs (gethash (first e) *freq-table*)))
+	 (if (> f fs)
+	     (return-from estimate-bits (second e)))))
+  (second (car (last *huffman-table*))))
+
 (defun analyse-string-table (&key (sort #'>) (key #'seventh) (top 32))
   (let ((matches (make-hash-table :test 'equal)))
     (do-hash-keys (str *string-table*)
@@ -270,7 +277,7 @@
 		   (sl (* l f))
 		   (slh (* lh f)))
 	      (push (list s f sl lh (round slh) (/ (* 8.0 lh) l)
-			  (round (- slh (* 1.5 f))))
+			  (round (- slh (* (/ (estimate-bits f) 8.0) f))))
 		    output)))
 	  (setf output (subseq (sort output sort :key key) 0 (min (length output) top)))
 	  (let ((totals nil))

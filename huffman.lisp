@@ -72,7 +72,7 @@
 	  (incf index))))
     pop))
 
-(defun print-huffman (pattern)
+(defun dump-huffman (pattern)
   (let ((i -1))
     (dolist (p pattern)
       (format t "~3d ~a len:~3a bits:~16,'0b ~a~%"

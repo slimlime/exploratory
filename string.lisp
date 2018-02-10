@@ -19,29 +19,53 @@
     "Sing a song of sixpence, a pocket full of eyes"
     "Shall I compare thee to a summer's ham?"))
 
-;;TODO can probably save 256 bytes by packing the 'bits left' table
-;;somewhere else. We could pack it in the lo byte of the prefix and
-;;and it off, if all the symbols have codes < 12 bits. 
-
 (defun append-eos (str)
   (format nil "~a~a" str #\nul))
 
-(defun process-string (str)
-  (setf str (append-eos str))
-  (loop for c across str do
-       (incf (gethash c *freq-table*))))
-  
-(defun reset-strings ()
+(defun fmt-str (str &optional (spaces t))
+  (when (characterp str)
+    (setf str (format nil "~a" str)))
+  (let ((s (make-string (length str))))
+    (loop for c across str
+       for i from 0 do
+	 (if (and spaces (char= c #\  ))
+	     (setf c #\_)
+	     (if (char= c #\Newline)
+		 (setf c #\↵)
+		 (when (char= c #\Nul)
+		   (setf c #\¶))))
+	 (setf (char s i) c))
+       s))
+
+(defun reset-frequency-table ()
   (setf *freq-table* (make-hash-table :test 'equal))
-  (setf *string-table* (make-hash-table :test 'equal))
-  (setf *defined-strings* (make-hash-table :test 'equal))
-  (setf *huffman-table* nil)
-  (setf *huffman-lookup* nil)
   (loop for c across *charset* do
        (setf (gethash c *freq-table*) 0))
   (setf (gethash #\Nul *freq-table*) 0)
   (setf (gethash #\Newline *freq-table*) 0))
 
+(defun dump-frequency-table ()
+  (let ((col 0)
+	(items nil))
+    (do-hashtable (k v *freq-table*)
+      (push (cons k v) items))
+    (dolist (f (sort items #'> :key #'cdr))
+      (format t "~a ~6d | " (fmt-str (car f)) (cdr f))
+      (when (= (incf col) 8)
+	(terpri)
+	(setf col 0)))))
+
+(defun process-string (str)
+  (setf str (append-eos str))
+  (loop for c across str do
+       (incf (gethash c *freq-table*))))
+
+(defun reset-strings ()
+  (setf *string-table* (make-hash-table :test 'equal))
+  (setf *defined-strings* (make-hash-table :test 'equal))
+  (setf *huffman-table* nil)
+  (setf *huffman-lookup* nil))
+  
 (defun build-huffman-string-table (freqs)
   (let ((l))
     (maphash #'(lambda (c f)
@@ -60,8 +84,10 @@
       (setf (gethash (first e) lookup) e))
     lookup))
 
-(defun huffman-encode-string (lookup str)
-  (setf str (append-eos str))
+(defun huffman-encode-string (lookup str &key (no-eos nil))
+  "Returns the huffman encoded string and the length in bits"
+  (unless no-eos
+    (setf str (append-eos str)))
   (let ((vec (make-array (length str)
 			 :fill-pointer 0
 			 :adjustable t
@@ -85,8 +111,8 @@
 	(when (> bits 0)
 	      (emit))
 	(when (> bits 0)
-	      (emit))))
-    vec))
+	  (emit)))
+      (values vec (+ (* 8 (length vec)) bits)))))
 
 ;;decode a string using an input vector and a huffman population
 ;;count. Done in the manner it will have to be implmented in 6502
@@ -132,6 +158,7 @@
 
 (defun huffman-encoding-test ()
   (reset-strings)
+  (reset-frequency-table)
   (mapc #'process-string *test-strings*)
   (let ((total 0))
     (dolist (s *test-strings*)
@@ -180,6 +207,86 @@
 	 (setf (gethash str *string-table* nil) 0)
 	 0)))
 
+(defun subsequences (str min max fn)
+  (let* ((len (length str))
+	 (end (- len min)))
+    (loop for i from 0 to end do
+	 ;;oboemabo, oboemabo
+	 (loop for j from (+ i min) to (min len (+ i min max -2)) do
+	      (funcall fn (subseq str i j))))))
+
+(defmacro do-subsequences ((var str min max) &body body)
+  `(subsequences ,str ,min ,max
+		    #'(lambda (,var)
+			,@body)))
+
+(defun analyse-string-table (&key (sort #'>) (key #'seventh) (top 32))
+  (let ((matches (make-hash-table :test 'equal)))
+    (do-hash-keys (str *string-table*)
+      ;;build a hash table of all word frequencies
+      (do-subsequences (sub (append-eos str) 2 16)
+	(if (gethash sub matches)
+	    (incf (gethash sub matches))
+	    (setf (gethash sub matches) 1))))
+    ;;we want only full English words
+    (let ((words (make-hash-table :test 'equal)))
+      (do-hash-keys (sub matches)
+	(when (and (= (count #\  sub) 2)
+		   (char= (char sub 0) #\ )
+		   (char= (char sub (1- (length sub))) #\ ))
+	  (setf (gethash (subseq sub 1 (1- (length sub))) words) t)))
+      ;;now get a better estimate of the word frequencies
+      (let ((all nil))
+	(do-hash-keys (str words)
+	  (let ((ftot 0))
+	    (aif (gethash (format nil " ~a." str) matches) (incf ftot it))
+	    (aif (gethash (format nil " ~a," str) matches) (incf ftot it))
+	    (aif (gethash (format nil " ~a " str) matches) (incf ftot it))
+	    (aif (gethash (format nil " ~a~a" str #\Newline) matches) (incf ftot it))
+	    (when (> ftot 2)
+	      (push (cons (format nil " ~a" str) ftot) all))))
+	(flet ((addstr (str)
+		 (aif (gethash str matches)
+		      (push (cons str it) all))))
+	  ;;and some interesting digraphs
+	  (addstr (format nil "~a~a" #\. #\Nul))
+	  (addstr (format nil "~a~a" #\. #\Newline))
+	  (addstr (format nil "~a~a" #\  #\Newline))
+	  (addstr "...")
+	  (addstr ". ")
+	  (addstr ", "))
+	(format t "+------------------+------+------+------+------+------+---------+~%")
+	(format t "| Word             |    f |  ΣfL |   Lh |  ΣLh |  b/c | Δd(est) |~%")
+	(format t "+------------------+------+------+------+------+------+---------+~%")
+	(let ((output nil))
+	  (dolist (e all)
+	    (let* ((s (fmt-str (car e)))
+		   (f (cdr e))
+		   (l (length (car e)))
+		   (lh (multiple-value-bind (_ len)
+			   (huffman-encode-string *huffman-lookup* (car e) :no-eos t)
+			 (declare (ignore _))
+			 (/ len 8.0)))
+		   (sl (* l f))
+		   (slh (* lh f)))
+	      (push (list s f sl lh (round slh) (/ (* 8.0 lh) l)
+			  (round (- slh (* 1.5 f))))
+		    output)))
+	  (setf output (subseq (sort output sort :key key) 0 (min (length output) top)))
+	  (let ((totals nil))
+	    (loop for col from (1- (length (first output))) downto 0 do
+		 (if (numberp (nth col (first output)))
+		     (push (round (reduce #'+ output :key #'(lambda (row) (nth col row)))) totals)
+		     (push "Total" totals)))
+	    
+	    (loop for row in output do
+		 (apply #'format t "| ~16a | ~4d | ~4d | ~2,2f | ~4d | ~2,2f |    ~4d |~%"
+			row))
+	    (apply #'format t "| ~16a | ~4d | ~4d | ~4d | ~4d | ~4d |    ~4d |~%"
+		   totals))
+	  ))))
+  (format t "+------------------+------+------+------+------+------+---------+~%"))
+			    
 ;;;this must be called last, after the last use of dcs/dstr
 ;;;this hack means we don't have to reinitialise a hash set
 ;;;on each pass
@@ -193,8 +300,9 @@
     (dolist (str additions)
       (dcs nil str)))
   (clrhash *defined-strings*)
+  (reset-frequency-table)
   ;;Now process them for frequency analysis
-  (dohashkeys (str *string-table*)
+  (do-hash-keys (str *string-table*)
     (process-string str))
   (setf *huffman-table* (build-huffman-string-table *freq-table*))
   (setf *huffman-lookup* (build-huffman-bit-pattern-lookup *huffman-table*))
@@ -268,7 +376,7 @@
   ;;6502 string decode
   (compile-string-test "the mat")
   (let ((huffvec (coerce *huffman-table* 'vector)))
-    (dohashkeys (str *string-table*)
+    (do-hash-keys (str *string-table*)
       (compile-string-test str)
       (monitor-reset :start)
       (monitor-run :print nil)

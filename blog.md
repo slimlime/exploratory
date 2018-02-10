@@ -1,3 +1,82 @@
+## 10/2/2018 More unrolling and some nice analysis
+
+Shaving off some ops here and there has resulted in an improvement over where we started. Optimizing is also a bit like data compression. There's always some cycles to be had somewhere, and it will send you absolutely mad looking for them.
+
+~~~~
+Cycles:537029
+~~~~
+
+There's no getting away from it, variable width kerned typefaces are expensive to do on 8-bit. Having said that I do like the fact that my screen of text renders quicker in an emulated environment on a Celeron running LISP (a supposedly slow language) inside emacs, with a screen driver in a separate process, *faster* than a webpage appears on a Core i7 Mac Mini. Progress is not all it is cracked up to be. On a BBC Micro at 2Mhz, it would be so fast it would travel backward in time.
+
+All the time is spent here, in the typesetter. The profiler has proved its worth and is probably now useless as all the top entries will be here.
+
+~~~~
+CL-USER> (monitor-dump-profile)
+Address:234D Total Cycles:  1624
+|------------------------------
+          TYPESET:GO 234D B100     LDA ($00),Y ;Get the bit pattern
+                     ;Just jump to the next screen byte and blat it
+                     ;if the bit pattern is empty
+                     234F F02C     BEQ $237D ;TYPESET:SKIP-CLEAR 
+                     ;Shift the bit pattern across by the offset
+                     ;and OR it with the screen
+ TYPESET:SHIFT-RIGHT 2351 D000     BNE $2353
+                     2353 4A       LSR
+                     2354 4A       LSR
+                     2355 4A       LSR
+                     2356 4A       LSR
+                     2357 4A       LSR
+		     ...
+~~~~
+
+### More text compression stuff
+
+I am beginning to wonder precisely why I shifed to Huffman, but here are some juicy tables from the string analysis. I have two ideas.
+
+- Secondary prediction
+- Dictionary
+
+~~~~
+CL-USER> (dump-frequency-table)
+_    753 | e    466 | o    381 | t    287 | a    282 | n    271 | i    258 | r    248 | 
+s    232 | h    200 | l    183 | u    146 | d    141 | .    122 | c    107 | y     99 | 
+g     97 | ¶     96 | m     79 | ↵     78 | f     77 | k     72 | p     68 | w     51 | 
+b     51 | Y     35 | ,     35 | T     31 | v     24 | !     19 | A     16 | '     16 | 
+I     14 | ?     14 | -     14 | O     12 | z     10 | M     10 | R      9 | P      8 | 
+N      8 | W      7 | H      7 | S      6 | L      6 | G      6 | F      6 | E      6 | 
+C      5 | B      4 | x      3 | U      3 | D      3 | j      2 | K      2 | Z      1 | 
+V      1 | `      1 | q      0 | X      0 | Q      0 | J      0 | 9      0 | 8      0 | 
+7      0 | 6      0 | 5      0 | 4      0 | 3      0 | 2      0 | 1      0 | 0      0 | 
+~~~~
+
+And here is some analysis of word frequencies. I wonder what effect it will have. It's clear that some words
+have a frequency over and above what is suggested by the individual character frequencies. It is those
+words that will pay most dividend I imagine. The right hand column is an estimate to see what byte savings
+are possible if (and this is a big guess) these entire words can be encoded in a 12 bit symbol in the Huffman
+tree. As always massive gainz are just over the horizon. If I have to switch back to Tunstall because everything
+I have done is slower and more bloated despite the fact that it should work better in theory...
+
+~~~~
+CL-USER> (analyse-string-table :top 10)
++------------------+------+------+------+------+------+---------+
+| Word             |    f |  ΣfL |   Lh |  ΣLh |  b/c | Δd(est) |
++------------------+------+------+------+------+------+---------+
+| _the             |   42 |  168 | 2.00 |   84 | 4.00 |      21 |
+| _door            |   17 |   85 | 2.50 |   42 | 4.00 |      17 |
+| _already         |    6 |   48 | 4.38 |   26 | 4.38 |      17 |
+| _biscuit         |    5 |   40 | 4.63 |   23 | 4.63 |      16 |
+| _you             |   18 |   72 | 2.25 |   40 | 4.50 |      14 |
+| _your            |   10 |   50 | 2.75 |   28 | 4.40 |      12 |
+| _finger          |    5 |   35 | 3.88 |   19 | 4.43 |      12 |
+| _something       |    3 |   30 | 5.50 |   16 | 4.40 |      12 |
+| _imaginary       |    3 |   30 | 5.63 |   17 | 4.50 |      12 |
+| _that            |   11 |   55 | 2.50 |   28 | 4.00 |      11 |
+| Total            |  120 |  613 |   36 |  323 |   43 |     144 |
++------------------+------+------+------+------+------+---------+
+~~~~
+
+Columms, word frequency, total byte count, huffman code length, total byte count when huffman coded, bits per character and estimated improvement if word is treated as a symbol.
+
 ## 9/2/2018 Unrolling
 
 Due to the fact that the previous 'improvement' slowed things down somewhat, I decided to profile the code and see if there were any obvious performance bottlenecks. I added a simple profiler that looked for execution hotspots and looked at the output. No surprise the text rendering code was the biggest glutton for CPU. Since 6502 can only shift one bit at a time and I have variable bit width text, it is quite expensive to get even once character on screen.

@@ -15,20 +15,67 @@
 (defparameter *monitor-buffer* nil)
 (defparameter *monitor-peek-fn* nil)
 (defparameter *monitor-poke-fn* nil)
+(defparameter *monitor-label-watches* nil)
+(defparameter *monitor-profile* nil)
+
+(defun monitor-reset-profile ()
+  (setf *monitor-profile* (make-hash-table)))
+
+(monitor-reset-profile)
+
+(defun monitor-profile-address (addr cycles)
+  (if (gethash addr *monitor-profile*)
+      (incf (gethash addr *monitor-profile*))
+      (setf (gethash addr *monitor-profile*) cycles)))
+
+(defun monitor-dump-profile (&optional (top 4) (context 5))
+  (let ((profile nil))
+    (maphash #'(lambda (addr cycles) (push (cons addr cycles) profile))
+	     *monitor-profile*)
+    (loop for e in (sort profile #'> :key #'cdr)
+	 for _ from 1 to top do
+	 (format t "Address:~4,'0X Total Cycles:~6d~%" (car e) (cdr e))
+	 (format t "|------------------------------~%")
+	 (disassemble-6502 (car e) (+ (car e) context 5))
+	 (terpri))))
 
 (defun hex (number)
   (format t "~4,'0X" number))
+
+;; TODO Add locals, which gets all the symbols in the namespace where
+;; we currently are
+
+;; TODO using multiple-value-bind to get the properties is horrid
 
 (defun monitor-print ()
   (multiple-value-bind (buffer pc sp sr a x y)
       (funcall *monitor-get-state*)
     (let ((*compiler-buffer* buffer))
+      (when *monitor-label-watches*
+	(format t "-- Labels ---------------------------------------------------~%")
+	(dolist (watch *monitor-label-watches*)
+	  (let ((label (first watch))
+		(len (second watch)))
+	    (if (numberp label)
+		(format t "~4,'0X                    " label)
+		(format t "~24a" (fmt-label label t)))
+	    (if (resolves label)
+		(let ((addr (resolve label)))
+		  (hexdump-simple
+		   addr
+		   (if len
+		       len
+		       (aif (gethash addr *compiler-disassembler-hints*)
+			    (car it) ;;hint length
+			    ;;no hint? Assume 2 bytes
+			    2))))
+		(format t "????~%")))))
       (format t "-- Stack ----------------------------------------------------~%")
       (hexdump (+ sp #x101) 16)
       (when *monitor-watches*
-	(format t "-- Watches --------------------------------------------------~%"))
-      (dolist (a *monitor-watches*)
-	(hexdump (car a) (cdr a)))
+	(format t "-- Watches --------------------------------------------------~%")
+	(dolist (a *monitor-watches*)
+	  (hexdump (car a) (cdr a))))
       (format t "-- PC -------------------------------------------------------~%")
       (hexdump pc 32)
       (format t "-------------------------------------------------------------~%")
@@ -39,17 +86,31 @@
       (disassemble-6502 pc (+ pc *monitor-context-bytes*)))))
 
 (defun monitor-unwatch (addr)
-  ;todo monitor-watch forgets the original label, so if you
-  ;unwatch it later, it won't work if the address has changed
-  (setf *monitor-watches* 
-	(remove (resolve addr) *monitor-watches* :key #'car)))
+  (if (numberp addr)
+      (setf *monitor-watches* 
+	    (remove (resolve addr) *monitor-watches* :key #'car))
+      (setf *monitor-label-watches*
+	    (remove addr *monitor-label-watches* :key #'car))))
 
 (defun monitor-unwatch-all ()
   (setf *monitor-watches* nil))
 
-(defun monitor-watch (addr &optional (len 16))
+(defun monitor-watch (addr &optional (len 16 len-supplied-p))
   (monitor-unwatch addr)
-  (push (cons (resolve addr) len) *monitor-watches*))
+  (if (numberp addr)
+      (push (cons addr len) *monitor-watches*)
+      (push (list addr
+		  (if len-supplied-p
+		      len
+		      nil)) ;;we'll get the hint at the time we need it
+	    *monitor-label-watches*)))
+
+(defun monitor-watch-namespace (namespace)
+  (maphash #'(lambda (k v) (declare (ignore v))
+	       (when (equal (label-namespace k) namespace)
+		 (monitor-watch k)
+		 (format t "Watched ~a~%" (fmt-label k t))))
+	       *compiler-labels*))
 
 (defun monitor-step ()
   (funcall *monitor-step*)
@@ -62,7 +123,8 @@
        (monitor-step)))
 
 ;;TODO break-on should be able to match an unqualified label
-(defun monitor-run (&key (break-on 'BRK) (max-cycles 1000000) (print t))
+(defun monitor-run (&key (break-on 'BRK) (max-cycles 2000000) (print t))
+  (monitor-reset-profile)
   (multiple-value-bind (buffer pc sp sr a x y cc)
       (funcall *monitor-get-state*)
     (declare (ignore sp pc sr a x y))
@@ -83,7 +145,9 @@
 	       (when (or (= pc (resolve break-on :no-assert t))
 			 (and op (eq break-on (car op))))
 		 (return)))
-	     (funcall *monitor-step*)))
+	     (let ((step-cycles (monitor-cc)))
+	       (funcall *monitor-step*)
+	       (monitor-profile-address pc (- (monitor-cc) step-cycles)))))
       (when print
 	(format t "Cycles:~a~%" total-cycles)
 	(monitor-print)))))
@@ -96,6 +160,20 @@
 
 (defun monitor-poke (address byte)
   (funcall *monitor-poke-fn* address byte))
+
+(defun monitor-cc ()
+  (multiple-value-bind (buffer pc sp sr a x y cc)
+      (funcall *monitor-get-state* nil)
+    (declare (ignore buffer pc sp sr a x y))
+    cc))
+
+(defun monitor-time-fn (fn)
+  (let ((cc (monitor-cc)))
+    (funcall fn)
+    (format t "Cycles:~d~%" (- (monitor-cc) cc))))
+
+(defmacro monitor-time (&body body)
+  `(monitor-time-fn #'(lambda () ,@body)))
 
 (defun monitor-setup-for-cl-6502 (buffer org)
   ;temporary binding to cl-6502
@@ -132,3 +210,4 @@
 
 (defun monitor-setpc (addr)
   (setf (6502:cpu-pc cl-6502:*cpu*) (resolve addr)))
+

@@ -224,7 +224,7 @@
 (defun location-test ()
   
   (reset-compiler)
-  (reset-symbol-table)
+  (reset-strings)
   (reset-bits)
   (reset-parser)
 
@@ -271,8 +271,7 @@
 	     
 	     ))
       (pass)
-      (build-symbol-table)
-      
+
       (pass)
       (let ((end *compiler-ptr*))
 	(pass)

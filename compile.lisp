@@ -1,3 +1,4 @@
+
 ;; 6502 assembler library
 
 (defparameter *opcodes* (make-hash-table :test 'equal))
@@ -99,6 +100,10 @@
   (assert-address add)
   (aref *compiler-buffer* add))
 
+(defun peek-addr (add)
+  (logior (peek-byte (lo-add add))
+          (ash (peek-byte (hi-add add)) 8)))
+  
 (defun peek-last-byte ()
   (peek-byte (1- *compiler-ptr*)))
 
@@ -154,6 +159,21 @@
   (and
    (resolves label)
    (< (resolve label :no-assert t) 256)))
+
+(defun hexdump-simple (add len)
+  (assert-address add)
+  (flet ((peek (add)
+	   (if (< add 65536)
+	       (peek-byte add)
+	       0)))
+    (loop 
+       for i from add to (+ add (1- len))
+       for j from 1 do
+	 (format t "~2,'0X" (peek i))
+	 (when (zerop (rem j 2))
+	   (format t " ")))
+    (terpri))
+  (values))
 
 (defun hexdump (add &optional (len 32))
   (unless (numberp add)
@@ -471,7 +491,6 @@
 				namespace))
 		 (format t "~a -> ~4,'0X~%" (fmt-label k t) v)))
 	       *compiler-labels*))
-
 
 ;; 6502 instructions by mode
 

@@ -1,3 +1,59 @@
+## 9/2/2018 Unrolling
+
+Due to the fact that the previous 'improvement' slowed things down somewhat, I decided to profile the code and see if there were any obvious performance bottlenecks. I added a simple profiler that looked for execution hotspots and looked at the output. No surprise the text rendering code was the biggest glutton for CPU. Since 6502 can only shift one bit at a time and I have variable bit width text, it is quite expensive to get even once character on screen.
+
+Code like this executes for every single line of every single character rendered to the screen. That's a lot.
+
+~~~~
+	;each character
+	LDX.ZP :shift
+	...
+	;each row of each character
+:rotate ASL
+        DEX
+        BNE :rotate
+~~~~
+
+A self-modifying code trick can be used to unroll this loop and get the right number of shifts without having to pay the 5 cycles for the DEX and the BNE.
+
+~~~~
+	;each character
+	LDA.ZP :shift
+	EOR #XFF
+	ADC #X9
+	STA.AB :rotate + 1
+	...
+	;each row of each character
+:rotate BNE XX --+
+	ASL      |
+        ASL      |
+	ASL      |
+	ASL <----+
+	ASL
+	ASL
+	ASL
+	ASL
+~~~~
+
+5 cycles doesn't sound like a lot, it's only 5 micro-seconds at 1Mhz, but in all it saved about 80 milliseconds when rendering the dungeon room.
+
+Another more straightfoward unrolling of loops has been added to the memset and memcpy routines. Additionally the Huffman decoder has had the hi byte of the offset removed. Since we have less than 256 symbols, it isn't necessary as the result always fits into the lo byte. Total savings, > 100ms. Not quite back to where we were, but almost.
+
+~~~~
+CL-USER> (run-simple-game)
+Dungeon Cell size 3146
+Corridor size 1928
+Frazbolg's Closet size 1322
+Object Table size 154
+Dispatcher size 337
+String Table size 902
+Fonts size 2321
+Build size 13721 (cf 13681)
+Cycles:550324 (cf 548029)
+~~~~
+
+100ms saving has cost us 40 bytes on the build size. Well worth it. Of course, I could have applied these improvements to the old version...
+
 ## 9/2/2018 Huffman a go-go
 
 So the game has been ported to use Huffman encoding for the strings rather than the Tunstall table of common two and three letter symbols. Let us see what effect this has had,

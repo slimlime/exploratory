@@ -1,4 +1,4 @@
-## 11/2/2018 Almost there
+## 11/2/2018 Context Dependent Huffman
 
 Soon the nightmare will be over and we will rise from the crushing depths of the entropy vortex that has sucked me beneath the waves, but we must press on, deeper into the abyss and take a look at context dependent Huffman coding. Huffman works by trying to match the probability of a letter with a code of proportionate length, more frequent symbols get shorter codes, less frequent ones get longer codes. We can improve our probabilities by using context. One such context is the first letter of a string. More often than not it will be a capital letter. Let us look at the frequency tables for the first letter of strings.
 

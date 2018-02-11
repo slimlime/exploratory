@@ -229,7 +229,8 @@
 		   (f (cdr e))
 		   (l (length (car e)))
 		   (lh (multiple-value-bind (_ len)
-			   (huffman-encode-string *first-letter-huffman-lookup* *huffman-lookup* (car e) :no-eos t)
+			   ;;note same table
+			   (huffman-encode-string *huffman-lookup* *huffman-lookup* (car e) :no-eos t)
 			 (declare (ignore _))
 			 (/ len 8.0)))
 		   (sl (* l f))

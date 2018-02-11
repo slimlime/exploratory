@@ -1,24 +1,15 @@
-(defun ninsert (o l)
-  (let ((p nil))
-    (do ()
-	((or (null l)
-	     (< (second o) (second (car l)))))
-      (setf p l)
-      (setf l (cdr l)))
-    (if (consp p) (setf (cdr p) (cons o l)) nil)))
-
-;;doesn't work for odd number of entries!
-
 (defun huffman1 (symbols)
   (let ((q (sort (copy-list symbols) #'< :key #'second))
 	(node nil))
     (do ()
-	((null q))
+	((null (cdr q)))
       (setf node (let ((n1 (pop q))
 		       (n2 (pop q)))
 		   (list (list (first n1) (first n2))
 			 (+ (second n1) (second n2)))))
-      (ninsert node q))
+      (push node q)
+      ;;Eugh. Should really use two lists and push to the back
+      (setf q (sort q #'< :key #'second)))
     node))
 
 ;;; Build a canonical form huffman table
@@ -47,6 +38,9 @@
 	  (setf prev-length (second p)))
 	(setf (third p) (ash code (- 16 (second p))))))
     patterns))
+
+;;test 'edge' case
+(huffman '((#\L 1) (#\C 1) (#\B 1) (#\A 11)))
 
 ;;; Return a vector containing the populations of each
 ;;; level of a huffman table, e.g. how many symbols of

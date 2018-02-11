@@ -168,6 +168,7 @@
 ;;puting it into the string table
 (defun justify-response (message messages)
   (when *compiler-final-pass*
+    (warn-if-not-punctuated message)
     (dolist (str messages)
       (warn-if-not-punctuated str)))
   (let* ((text

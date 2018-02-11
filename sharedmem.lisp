@@ -43,3 +43,9 @@
 ;       or make memory driver in emulator access this directly
   (loop for i from 0 to (1- *buffer-length*) do
        (setmem i (aref src i))))
+
+(defun clrmem ()
+  (unless *buffer-sap*
+    (map-memory))
+  (loop for i from 0 to (1- *buffer-length*) do
+       (setmem i 0)))

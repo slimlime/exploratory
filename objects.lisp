@@ -52,7 +52,8 @@
 
 (defun ends-with-punctuation (string)
   (let ((char (char string (1- (length string)))))
-    (or (char= char #\.)
+    (or (char= char #\')
+	(char= char #\.)
 	(char= char #\!)
 	(char= char #\?))))
 

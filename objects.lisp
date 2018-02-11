@@ -388,6 +388,7 @@ standard object display name e.g. 'A golden apple.'"
 	   (test-object-definitions)
 
 	   (object-table)
+
 	   (string-table)
 	   (huffman-decoder)
 	   

@@ -167,6 +167,7 @@
     (LDA.IZY :char)
     (label :shift-left)
     (BNE 0)
+    ;;todo splitting :go into two functions depending on size of shift might save 20ms
     (ASL)
     (ASL)
     (ASL)
@@ -293,7 +294,7 @@
 	     (sta16.zp :str '(:typeset-cs . :str))
 	     (sta16.zp (cons :font font) :font)
 	     (sta16.zp #x8000 '(:typeset . :raster))
-	     (sta16.zp :string-pop-table :huffman-pop-table)
+	     (sta16.zp :string-huffman-tables :huffman-pop-table)
 	     (JSR :typeset-cs)
 	     (BRK)
 	     (typeset)

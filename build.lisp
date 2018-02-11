@@ -28,7 +28,7 @@
 	   (label :start)
 	   (cls #x10)
 	   (sta16.zp (cons :font :present) :font)
-	   (sta16.zp :string-pop-table :huffman-pop-table)
+	   (sta16.zp :string-huffman-tables :huffman-pop-table)
 	   
 	   (JSR :vm-enter)
 	   (vm-nav initial-location)

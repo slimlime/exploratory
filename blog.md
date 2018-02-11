@@ -1,3 +1,74 @@
+## 11/2/2018 Almost there
+
+Soon the nightmare will be over and we will rise from the crushing depths of the entropy vortex that has sucked me beneath the waves, but we must press on, deeper into the abyss and look at context dependent Huffman coding. Huffman works by trying to match the probability of a letter with a code of proportionate length, more frequent symbols get shorter codes, less frequent ones get longer codes. We can improve our probabilities by using context. One such context is the first letter of a string. More often than not it will be a capital letter. Let us look at the frequency tables for the first letter of strings.
+
+~~~~
+CL-USER> (dump-frequency-table *letter-freqs*)
+_    753 | e    466 | o    381 | t    287 | a    282 | n    271 | i    258 | r    248 | 
+s    232 | h    200 | l    183 | u    146 | d    141 | .    124 | c    107 | y     99 | 
+g     97 | ¶     96 | m     79 | ↵     78 | f     77 | k     72 | p     68 | w     51 | 
+b     51 | ,     35 | v     24 | !     19 | '     16 | ?     14 | -     14 | Y     12 | 
+O     11 | z     10 | R      9 | T      6 | P      6 | N      6 | M      6 | L      6 | 
+I      5 | G      5 | E      5 | A      5 | C      4 | B      4 | x      3 | W      3 | 
+U      3 | S      3 | H      3 | j      2 | K      2 | F      2 | D      2 | Z      1 | 
+V      1 | `      1 | q      0 | X      0 | Q      0 | J      0 | 9      0 | 8      0 | 
+7      0 | 6      0 | 5      0 | 4      0 | 3      0 | 2      0 | 1      0 | 0      0 | 
+CL-USER> (dump-frequency-table *first-letter-freqs*)
+T     25 | Y     23 | A     11 | I      9 | W      4 | M      4 | H      4 | F      4 | 
+S      3 | P      2 | N      2 | O      1 | G      1 | E      1 | D      1 | C      1 | 
+~~~~
+
+So we can see that capital T is not very common in the middle of a string, but is the most common letter for the start of a string. If we simply used the probabilities from the top table, we would be using a very long code for T at the start of the string even though we *know* that it is very common in this context. What a waste of bits! To get around that we simply generate two Huffman tables. As we have seen earlier, they are very cheap to store, requiring only 4 bytes* to store per level in the tree.
+
+Here are the codes for the 'first letters'.
+
+~~~~
+  0 T len:2   bits:0000000000000000 0
+  1 Y len:2   bits:0100000000000000 1
+  2 A len:3   bits:1000000000000000 4
+  3 I len:3   bits:1010000000000000 5
+  4 M len:5   bits:1100000000000000 24
+~~~~
+
+and the corresponding codes for in the middle of a sentence,
+
+~~~~
+ 35 T len:10  bits:1111110000000000 1008
+~~~~
+
+I don't know about you, but I'm not leaving 8 bits on the table for anyone!
+
+Of course, in the second table T has a different index, so we need a look-up table to convert from 0->35. This is only as expensive as the size of the other table, which as you can see only has 16 entries. This is what it looks like encoded,
+
+*the earlier post had an extra byte, the hi-byte of the delta. Since we have less than 256 symbols, this is not required.
+
+~~~~
+                     ;First letters
+       FIRST-LETTERS 3140 00       DB $00    ;f(1)= 0 Max:NIL Del:NIL
+                     3141 FF000100 DB $FF, $00, $01, $00 ;f(2)= 2 Max:0001 Del:0000
+                     3145 FF000502 DB $FF, $00, $05, $02 ;f(3)= 2 Max:0005 Del:0002
+                     3149 00       DB $00    ;f(4)= 0 Max:NIL Del:NIL
+                     314A FF001D14 DB $FF, $00, $1D, $14 ;f(5)= 6 Max:001D Del:0014
+                     314E FF003D32 DB $FF, $00, $3D, $32 ;f(6)= 2 Max:003D Del:0032
+                     3152 FF007F70 DB $FF, $00, $7F, $70 ;f(7)= 4 Max:007F Del:0070
+                     ;General letters
+     GENERAL-LETTERS 3156 00       DB $00    ;f(1)= 0 Max:NIL Del:NIL
+                     3157 00       DB $00    ;f(2)= 0 Max:NIL Del:NIL
+                     3158 FF000100 DB $FF, $00, $01, $00 ;f(3)= 2 Max:0001 Del:0000
+                     315C FF000902 DB $FF, $00, $09, $02 ;f(4)= 6 Max:0009 Del:0002
+                     3160 FF00180C DB $FF, $00, $18, $0C ;f(5)= 5 Max:0018 Del:000C
+                     3164 FF003B25 DB $FF, $00, $3B, $25 ;f(6)=10 Max:003B Del:0025
+                     3168 FF007A61 DB $FF, $00, $7A, $61 ;f(7)= 3 Max:007A Del:0061
+                     316C FF00F8DC DB $FF, $00, $F8, $DC ;f(8)= 3 Max:00F8 Del:00DC
+                     3170 FF01F7D5 DB $FF, $01, $F7, $D5 ;f(9)= 6 Max:01F7 Del:01D5
+                     3174 FF03FACD DB $FF, $03, $FA, $CD ;f(10)=11 Max:03FA Del:03CD
+                     3178 FF07FEC8 DB $FF, $07, $FE, $C8 ;f(11)= 9 Max:07FE Del:07C8
+                     317C FF0FFEC7 DB $FF, $0F, $FE, $C7 ;f(12)= 1 Max:0FFE Del:0FC7
+                     3180 FF1FFFC6 DB $FF, $1F, $FF, $C6 ;f(13)= 2 Max:1FFF Del:1FC6
+                     ;A lookup of first letters to general letter index
+FIRST-LETTER-INDEXES 3184 231F2A.. DB $23, $1F, $2A, $29, $27, $30, $36, $31, $32, $24, $25, $2D, $28, $20, $35, $2B
+~~~~
+
 ## 10/2/2018 More unrolling and some nice analysis
 
 Shaving off some ops here and there has resulted in an improvement over where we started. Optimizing is also a bit like data compression. There's always some cycles to be had somewhere, and it will send you absolutely mad looking for them.

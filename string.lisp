@@ -1,4 +1,5 @@
-(defparameter *freq-table* nil)
+(defparameter *letter-freqs* (make-hash-table :test 'equal))
+(defparameter *first-letter-freqs* (make-hash-table :test 'equal))
 (defparameter *string-table* nil)
 (defparameter *defined-strings* nil) ;;strings defined this pass
                                      ;;cleared when building string table
@@ -10,14 +11,18 @@
 (defparameter *string-table* nil)
 (defparameter *huffman-table* nil)
 (defparameter *huffman-lookup* nil)
+(defparameter *first-letter-huffman-lookup* nil)
+(defparameter *first-letter-huffman-table* nil)
 
 (defparameter *test-strings*
   '("The cat sat on"
     "the mat"
     "and didn't like it it it one bit"
-    "The quick brown fox killed the lazy dog and ate his innards"
+    "The quick brown fox killed The lazy dog and ate his innards"
     "Sing a song of sixpence, a pocket full of eyes"
-    "Shall I compare thee to a summer's ham?"))
+    "Shall I compare thee to a Summer's ham?"))
+
+;;note the capitals in the test strings, just to make the test function easier
 
 (defun append-eos (str)
   (format nil "~a~a" str #\nul))
@@ -37,17 +42,21 @@
 	 (setf (char s i) c))
        s))
 
-(defun reset-frequency-table ()
-  (setf *freq-table* (make-hash-table :test 'equal))
+(defun init-frequency-table (freqs)
+  (clrhash freqs)
   (loop for c across *charset* do
-       (setf (gethash c *freq-table*) 0))
-  (setf (gethash #\Nul *freq-table*) 0)
-  (setf (gethash #\Newline *freq-table*) 0))
+       (setf (gethash c freqs) 0))
+  (setf (gethash #\Nul freqs) 0)
+  (setf (gethash #\Newline freqs) 0))
 
-(defun dump-frequency-table ()
+(defun reset-frequency-tables ()
+  (init-frequency-table *letter-freqs*)
+  (init-frequency-table *first-letter-freqs*))
+
+(defun dump-frequency-table (freqs)
   (let ((col 0)
 	(items nil))
-    (do-hashtable (k v *freq-table*)
+    (do-hashtable (k v freqs)
       (push (cons k v) items))
     (dolist (f (sort items #'> :key #'cdr))
       (format t "~a ~6d | " (fmt-str (car f)) (cdr f))
@@ -57,14 +66,17 @@
 
 (defun process-string (str)
   (setf str (append-eos str))
-  (loop for c across str do
-       (incf (gethash c *freq-table*))))
+  (incf (gethash (char str 0) *first-letter-freqs*))
+  (loop for i from 1 to (1- (length str)) do
+       (incf (gethash (char str i) *letter-freqs*))))
 
 (defun reset-strings ()
   (setf *string-table* (make-hash-table :test 'equal))
   (setf *defined-strings* (make-hash-table :test 'equal))
   (setf *huffman-table* nil)
-  (setf *huffman-lookup* nil))
+  (setf *huffman-lookup* nil)
+  (setf *first-letter-huffman-table* nil)
+  (setf *first-letter-huffman-lookup* nil))
   
 (defun build-huffman-string-table (freqs)
   (let ((l))
@@ -84,7 +96,7 @@
       (setf (gethash (first e) lookup) e))
     lookup))
 
-(defun huffman-encode-string (lookup str &key (no-eos nil))
+(defun huffman-encode-string (first-letter-lookup lookup str &key (no-eos nil))
   "Returns the huffman encoded string and the length in bits"
   (unless no-eos
     (setf str (append-eos str)))
@@ -98,8 +110,11 @@
 	       (vector-push-extend (ash word -16) vec)
 	       (setf word (logand #xffff00 (ash word 8)))
 	       (decf bits 8)))
-	(loop for c across str do
-	     (let ((e (gethash c lookup)))
+	(loop for c across str
+	     for j from 0 do
+	     (let ((e (gethash c (if (zerop j)
+				     first-letter-lookup
+				     lookup))))
 	       (assert e nil "character ~a not in lookup" c)
 	       ;;shift the bit patter to the right so it would be at the
 	       ;;24 bit position if the word buffer were empty
@@ -114,40 +129,6 @@
 	  (emit)))
       (values vec (+ (* 8 (length vec)) bits)))))
 
-;;decode a string using an input vector and a huffman population
-;;count. Done in the manner it will have to be implmented in 6502
-(defun huffman-decode-string (pop eos vec)
-  (let ((maxlen (1- (length pop))) 
-	(acc 0)    ;;accumulator- 16 bit?
-	(next (aref vec 0))
-	(pos 0)    ;;position in input- must be 1+ eos at end
-	(bits 8)
-	(out nil))
-    (flet ((rol ()
-	     (when (= bits 0)
-	       (setf bits 8)
-	       (incf pos)
-	       (setf next (aref vec pos)))
-	     (setf next (ash next 1))
-	     (setf acc (logior (ash acc 1) (if (>= next 256) 1 0)))
-	     (setf next (logand #xff next))
-	     (decf bits)))
-      (do ()
-	  ((= pos (length vec)))
-	(loop for i from 0 to maxlen do
-	     (let ((p (aref pop i)))
-	       (rol)
-	       (when (> (first p) 0)
-		 ;;some symbols exist at this length
-		 (when (or (= i maxlen)
-			   (<= acc (second p)))
-		   (push (- acc (third p)) out)
-		   (when (= (car out) eos)
-		     (return-from huffman-decode-string (nreverse out)))
-		   (setf acc 0)
-		   (return)))))))
-    (assert nil nil "Blew past eos for ~a, got ~a" vec out)))
-
 ;;turn a vector of symbols back into a string
 (defun symbols-string (table-vec symbols)
   (let ((str (make-string (length symbols))))
@@ -155,30 +136,6 @@
        for i from 0 to (1- (length symbols)) do
 	 (setf (char str i) (first (aref table-vec s))))
     str))
-
-(defun huffman-encoding-test ()
-  (reset-strings)
-  (reset-frequency-table)
-  (mapc #'process-string *test-strings*)
-  (let ((total 0))
-    (dolist (s *test-strings*)
-      (incf total) ;;nul
-      (incf total (length s)))
-  (let* ((table (build-huffman-string-table *freq-table*))
-	 (lookup (build-huffman-bit-pattern-lookup table)))
-    ;;(print-huffman table)
-    ;(assert (equalp (huffman-encode-string lookup "the mat") #(106 33 162 182 0)))
-    ;(assert (equalp (huffman-encode-string lookup " ") #(48)))
-    ;(assert (equalp (huffman-encode-string lookup "sssssss") #(181 173 107 90 216)))
-    ;(assert (equalp (huffman-encode-string lookup "    ") #(0 192)))
-    ;;roundtrip all strings
-    (let ((pop (huffman-population table)))
-      (setf table (coerce table 'vector))
-      (dolist (s *test-strings*)
-	(assert (equal (append-eos s)
-		       (symbols-string table (huffman-decode-string pop 11 (huffman-encode-string lookup s))))))))))
-
-(huffman-encoding-test)
 
 (defun dcs (label str)
   "Define compressed string and inline it here"
@@ -188,7 +145,7 @@
       (progn
 	(when label
 	  (label label))
-	(let* ((data (huffman-encode-string *huffman-lookup* str))
+	(let* ((data (huffman-encode-string *first-letter-huffman-lookup* *huffman-lookup* str))
 	       (len (length data)))
 	  (add-hint len (format nil "DCS '~a' (~a->~a)" str (length str) len))
 	  (setf (gethash str *string-table*) *compiler-ptr*)
@@ -220,9 +177,9 @@
 		    #'(lambda (,var)
 			,@body)))
 
-(defun estimate-bits (f)
+(defun estimate-bits (f freqs)
   (loop for e in *huffman-table* do
-       (let ((fs (gethash (first e) *freq-table*)))
+       (let ((fs (gethash (first e) freqs)))
 	 (if (> f fs)
 	     (return-from estimate-bits (second e)))))
   (second (car (last *huffman-table*))))
@@ -271,13 +228,13 @@
 		   (f (cdr e))
 		   (l (length (car e)))
 		   (lh (multiple-value-bind (_ len)
-			   (huffman-encode-string *huffman-lookup* (car e) :no-eos t)
+			   (huffman-encode-string *first-letter-huffman-lookup* *huffman-lookup* (car e) :no-eos t)
 			 (declare (ignore _))
 			 (/ len 8.0)))
 		   (sl (* l f))
 		   (slh (* lh f)))
 	      (push (list s f sl lh (round slh) (/ (* 8.0 lh) l)
-			  (round (- slh (* (/ (estimate-bits f) 8.0) f))))
+			  (round (- slh (* (/ (estimate-bits f *letter-freqs*) 8.0) f))))
 		    output)))
 	  (setf output (subseq (sort output sort :key key) 0 (min (length output) top)))
 	  (let ((totals nil))
@@ -307,15 +264,22 @@
     (dolist (str additions)
       (dcs nil str)))
   (clrhash *defined-strings*)
-  (reset-frequency-table)
+  (reset-frequency-tables)
   ;;Now process them for frequency analysis
   (do-hash-keys (str *string-table*)
-    (process-string str))
-  (setf *huffman-table* (build-huffman-string-table *freq-table*))
+    (process-string str))  
+  (setf *first-letter-huffman-table* (build-huffman-string-table *first-letter-freqs*))
+  (setf *first-letter-huffman-lookup* (build-huffman-bit-pattern-lookup *first-letter-huffman-table*))
+  (setf *huffman-table* (build-huffman-string-table *letter-freqs*))
   (setf *huffman-lookup* (build-huffman-bit-pattern-lookup *huffman-table*))
-  (huffman-pop-table :string-pop-table
+
+  (huffman-pop-table :first-letters	     
+		     *first-letter-huffman-table*
+		     "First letters")
+  
+  (huffman-pop-table :general-letters
 		     *huffman-table*
-		     "General strings huffman population"))
+		     "General letters"))
 
 (defun eos-index ()
   (position #\Nul *huffman-table* :key #'car))
@@ -329,20 +293,36 @@
   (assert string nil "String was empty")
   
   (label :start)
+
+  ;;initialise the huffman decoder with the "first letters" table
+  ;;get the first letter, translate it into general letter index
+  ;;reset the population table to "general letters"
+  ;;get the reset
   
   (sta16.zp string :huffman-ptr)
-  (sta16.zp :string-pop-table :huffman-pop-table)
+  (sta16.zp :first-letters :huffman-pop-table)
   (LDX 1)
   (STX.ZP :huffman-bits)
+  (JSR :huffman-next)
+  (sta16.zp :general-letters :huffman-pop-table)
+  (LDA.ABX :first-letter-indexes)
+  (JMP :output)
   (label :another)
   (JSR :huffman-next)
-  (LDY.ZP :output-string-index)
   (TXA)
+  (label :output)
+  (LDY.ZP :output-string-index)
   (STA.ABY :str-buffer)
   (INC.ZP :output-string-index)
   (CMP (nil->0 (eos-index)))
   (BNE :another)
   (BRK)
+ 
+  (apply #'db :first-letter-indexes
+	 (if *huffman-table*
+	     (mapcar #'(lambda (e) (position (car e) *huffman-table* :key #'car))
+		     *first-letter-huffman-table*)
+	     (list 0)))
 
   (zp-b :output-string-index 0)
   
@@ -398,12 +378,12 @@
 	  ;;we must check that the huffman-ptr is left on the last byte + 1
 	  ;;or it will mess up things that rely on it, i.e. the VM print commands
 	  (assert (= (+ (resolve str)
-			(length (huffman-encode-string *huffman-lookup* str)))
+			(length (huffman-encode-string *first-letter-huffman-lookup* *huffman-lookup* str)))
 		     (peek-addr :huffman-ptr))
 		  nil "Pointer not in right place for '~a' Expected ~4,'0X was ~4,'0X"
 		  str (peek-addr :huffman-ptr) (+ (resolve str)
-			 (length (huffman-encode-string *huffman-lookup* str))))
+			 (length (huffman-encode-string *first-letter-huffman-lookup* *huffman-lookup* str))))
 	  (assert (equal output str)))))))
 
-(test-decoder)
+;(test-decoder)
 

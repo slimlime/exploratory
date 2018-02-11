@@ -20,14 +20,21 @@
     (LDA 0)
     (STA.ZP '(:typeset . :shift))
     (STA.ZP '(:typeset . :prev-width))
-    (label :typeset-cs-continue nil)
+    (label :typeset-cs-continue nil) ;;but with a new string
+    (dc "Initialise Huffman decoder for 'first' letters")
+    (sta16.zp :first-letters :huffman-pop-table)
     (LDA 1)
-    (STA.ZP :huffman-bits "Initialise Huffman decoder")
-    ;;debateable whether we need an entry point here to
-    ;;dodge the huffman reset.
+    (STA.ZP :huffman-bits)
     (cpy16.zp '(:typeset . :raster) :tmp-raster)
+    ;;TODO make a huffman-init?
+    (JSR :huffman-next)
+    (LDX 46)
+    (dc "Now we want normal letters from the decoder")
+    (sta16.zp :general-letters :huffman-pop-table)
+    (JMP :emit)
     (label :next)
     (JSR :huffman-next)
+    (label :emit)
     (CPX (nil->0 (eos-index)))
     (BEQ :done)
     (CPX (nil->0 (eol-index)))
@@ -294,7 +301,6 @@
 	     (sta16.zp :str '(:typeset-cs . :str))
 	     (sta16.zp (cons :font font) :font)
 	     (sta16.zp #x8000 '(:typeset . :raster))
-	     (sta16.zp :string-huffman-tables :huffman-pop-table)
 	     (JSR :typeset-cs)
 	     (BRK)
 	     (typeset)

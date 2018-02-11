@@ -42,7 +42,7 @@
 
     (defobject "SHINY KEY" "It's a key, man." :nowhere nil 
       (verb 'EAT (respond "You eat the key. Much, much later, it re-emerges."))
-      (verb 'TURN (respond "You turn the key. Nothing happens")))
+      (verb 'TURN (respond "You turn the key. Nothing happens.")))
     
     (defobject "INEDIBLE SLOP" "A balanced soup of entrails, small amphibian parts and mandibles. Ooh! Garlic croutons!" :nowhere "Some inedible slop."
       (verb 'EAT
@@ -269,7 +269,7 @@ preventing closed-minded mortals from seeing what is really there.")
 	(when-in-place this here (delegate-action))
 	(if-in-place this :nowhere
 		     (respond "Fine. You take the imaginary biscuit. Happy now?")
-		     (respond "Ha! You lost your imaginary biscuit"))
+		     (respond "Ha! You lost your imaginary biscuit."))
 	(move-object this here)))
     
     (action '(ENTER CELL)

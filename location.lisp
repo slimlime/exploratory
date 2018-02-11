@@ -111,7 +111,7 @@
     (LDA.IZY :loc)
     (STA.ZP (hi-add :str))
     (sta16.zp (scradd 0 0) '(:typeset . :raster))
-    (JSR :typeset-cs)
+    ;;(JSR :typeset-cs)
     (dc "Get the left column for the title fleuron")
     (LDY 2)
     (LDA.IZY :loc)

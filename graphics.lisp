@@ -28,10 +28,11 @@
     (cpy16.zp '(:typeset . :raster) :tmp-raster)
     ;;TODO make a huffman-init?
     (JSR :huffman-next)
-    (LDX 46)
+    (LDA.ABX :first-letter-indexes)
+    (TAX)
     (dc "Now we want normal letters from the decoder")
     (sta16.zp :general-letters :huffman-pop-table)
-    (JMP :emit)
+    (JMP :emit);;not strictly necessary to check for eos and newline here
     (label :next)
     (JSR :huffman-next)
     (label :emit)

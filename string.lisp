@@ -121,7 +121,8 @@
 	       (setf word (logior word (ash (third e) (- 8 bits))))
 	       ;;now add on the number of bits
 	       (incf bits (second e))
-	       (when (>= bits 8)
+	       (do ()
+		   ((< bits 8))
 		 (emit))))
 	(when (> bits 0)
 	      (emit))
@@ -279,7 +280,14 @@
   
   (huffman-pop-table :general-letters
 		     *huffman-table*
-		     "General letters"))
+		     "General letters")
+
+  (dc "A lookup of first letters to general letter index")
+  (apply #'db :first-letter-indexes
+	 (if *huffman-table*
+	     (mapcar #'(lambda (e) (position (car e) *huffman-table* :key #'car))
+		     *first-letter-huffman-table*)
+	     (list 0))))
 
 (defun eos-index ()
   (position #\Nul *huffman-table* :key #'car))
@@ -317,12 +325,6 @@
   (CMP (nil->0 (eos-index)))
   (BNE :another)
   (BRK)
- 
-  (apply #'db :first-letter-indexes
-	 (if *huffman-table*
-	     (mapcar #'(lambda (e) (position (car e) *huffman-table* :key #'car))
-		     *first-letter-huffman-table*)
-	     (list 0)))
 
   (zp-b :output-string-index 0)
   

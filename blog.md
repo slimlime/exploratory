@@ -1,6 +1,6 @@
 ## 11/2/2018 Almost there
 
-Soon the nightmare will be over and we will rise from the crushing depths of the entropy vortex that has sucked me beneath the waves, but we must press on, deeper into the abyss and look at context dependent Huffman coding. Huffman works by trying to match the probability of a letter with a code of proportionate length, more frequent symbols get shorter codes, less frequent ones get longer codes. We can improve our probabilities by using context. One such context is the first letter of a string. More often than not it will be a capital letter. Let us look at the frequency tables for the first letter of strings.
+Soon the nightmare will be over and we will rise from the crushing depths of the entropy vortex that has sucked me beneath the waves, but we must press on, deeper into the abyss and take a look at context dependent Huffman coding. Huffman works by trying to match the probability of a letter with a code of proportionate length, more frequent symbols get shorter codes, less frequent ones get longer codes. We can improve our probabilities by using context. One such context is the first letter of a string. More often than not it will be a capital letter. Let us look at the frequency tables for the first letter of strings.
 
 ~~~~
 CL-USER> (dump-frequency-table *letter-freqs*)
@@ -68,6 +68,30 @@ Of course, in the second table T has a different index, so we need a look-up tab
                      ;A lookup of first letters to general letter index
 FIRST-LETTER-INDEXES 3184 231F2A.. DB $23, $1F, $2A, $29, $27, $30, $36, $31, $32, $24, $25, $2D, $28, $20, $35, $2B
 ~~~~
+
+So where does this leave us?
+
+~~~~
+CL-USER> (run-simple-game)
+Dungeon Cell size 3103
+Corridor size 1917
+Frazbolg's Closet size 1321
+Build size 13705
+Cycles:536200
+~~~~~
+
+Compared with this, before the self imposed nightmare began,
+
+~~~~
+CL-USER> (run-simple-game)
+Dungeon Cell size 2951
+Corridor size 1881
+Frazbolg's Closet size 1322
+Build size 13681
+Cycles:548029
+~~~~
+
+So faster and only 24 bytes bigger. More importantly, we are 50 bytes away in the Dungeon Cell. The other two rooms have actually shrunk. As we add extra rooms it is this delta that is important. Additionally, because we haven't started to exploit the higher order entropy there is a lot more headroom... that's what I keep telling myself anyway.
 
 ## 10/2/2018 More unrolling and some nice analysis
 

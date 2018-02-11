@@ -13,6 +13,7 @@
 (defparameter *huffman-lookup* nil)
 (defparameter *first-letter-huffman-lookup* nil)
 (defparameter *first-letter-huffman-table* nil)
+(defparameter *word-dictionary* #())
 
 (defparameter *test-strings*
   '("The cat sat on"
@@ -63,12 +64,6 @@
       (when (= (incf col) 8)
 	(terpri)
 	(setf col 0)))))
-
-(defun process-string (str)
-  (setf str (append-eos str))
-  (incf (gethash (char str 0) *first-letter-freqs*))
-  (loop for i from 1 to (1- (length str)) do
-       (incf (gethash (char str i) *letter-freqs*))))
 
 (defun reset-strings ()
   (setf *string-table* (make-hash-table :test 'equal))
@@ -138,6 +133,29 @@
 	 (setf (char str i) (first (aref table-vec s))))
     str))
 
+(defun greedy-replace1 (str table emit)
+  (let ((strend (1- (length str))))
+    (funcall emit nil (char str 0))
+    (loop for i from 1 to strend do
+	 (tagbody
+	    (loop for j from 0 to (1- (length table)) do
+		 (let ((word (aref table j)))
+		   (when (and (<= (+ i -1 (length word)) strend)
+			      (equal word (subseq str i (+ i (length word)))))
+		     (funcall emit j word)
+		     (incf i (1- (length word)))
+		     (go :next))))
+	    (funcall emit nil (char str i))
+	    :next))))
+
+(defun str-encode (str table)
+  (setf str (append-eos str))
+  (let ((s (make-array 0 :fill-pointer 0 :element-type 'standard-char :adjustable t)))
+    (greedy-replace1 str table
+		     #'(lambda (i c)
+			       (vector-push-extend (if i #\0 c) s)))
+    s))
+
 (defun dcs (label str)
   "Define compressed string and inline it here"
   (if *huffman-lookup*
@@ -146,7 +164,8 @@
       (progn
 	(when label
 	  (label label))
-	(let* ((data (huffman-encode-string *first-letter-huffman-lookup* *huffman-lookup* str))
+	(let* ((data (huffman-encode-string *first-letter-huffman-lookup* *huffman-lookup*
+					    (str-encode str *word-dictionary*)))
 	       (len (length data)))
 	  (add-hint len (format nil "DCS '~a' (~a->~a)" str (length str) len))
 	  (setf (gethash str *string-table*) *compiler-ptr*)
@@ -252,7 +271,12 @@
 		   totals))
 	  ))))
   (format t "+------------------+------+------+------+------+------+---------+~%"))
-			    
+
+(defun count-frequencies (str)
+  (incf (gethash (char str 0) *first-letter-freqs*))
+  (loop for i from 1 to (1- (length str)) do
+       (incf (gethash (char str i) *letter-freqs*))))
+
 ;;;this must be called last, after the last use of dcs/dstr
 ;;;this hack means we don't have to reinitialise a hash set
 ;;;on each pass
@@ -269,7 +293,15 @@
   (reset-frequency-tables)
   ;;Now process them for frequency analysis
   (do-hash-keys (str *string-table*)
-    (process-string str))  
+    (count-frequencies (str-encode str *word-dictionary*)))
+
+  ;;This hack ensures that if any chars in the first letters table
+  ;;is missing from the gen pop it gets added. This is to ensure
+  ;;some of the tests pass where they don't define many strings
+  (do-hash-keys (str *string-table*)
+    (if (zerop (gethash (char str 0) *letter-freqs*))
+      (setf (gethash (char str 0) *letter-freqs*) 1)))
+  
   (setf *first-letter-huffman-table* (build-huffman-string-table *first-letter-freqs*))
   (setf *first-letter-huffman-lookup* (build-huffman-bit-pattern-lookup *first-letter-huffman-table*))
   (setf *huffman-table* (build-huffman-string-table *letter-freqs*))

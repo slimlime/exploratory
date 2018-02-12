@@ -13,9 +13,26 @@
 (defparameter *huffman-lookup* nil)
 (defparameter *first-letter-huffman-lookup* nil)
 (defparameter *first-letter-huffman-table* nil)
-(defparameter *blergh* (format nil ".~a" #\Nul))
-(defparameter *word-dictionary* #(nil " the" " door" " of" " you" " biscuit" " already" " your" " finger" " that" " imaginary" " something" ", " " and" " slime" " You" " is" " in" " from" " keyhole" " don't" " know" " goblin" " appears" "er " "ing "))
-(setf (aref *word-dictionary* 0) *blergh*)
+
+(defparameter *word-dictionary* (coerce (list "in" (format nil ".~a" #\Nul)
+					      "e "
+					      "he"
+					      "th"
+					      "he "
+					      " th"
+					      "ou"
+					      "ing"
+					      "You"
+					      " t"
+					      "The"
+					      "ng"
+					      "re"
+					      " you"
+					      " a"
+					      "s "
+					      "ou "
+					      "The door")
+					'vector))
 (defparameter *test-strings*
   '("The cat sat on"
     "the mat"
@@ -214,64 +231,46 @@
 	    (incf (gethash sub matches))
 	    (setf (gethash sub matches) 1))))
     ;;we want only full English words
-    (let ((words (make-hash-table :test 'equal)))
-      (do-hash-keys (sub matches)
-	(when (and (= (count #\  sub) 2)
-		   (char= (char sub 0) #\ )
-		   (char= (char sub (1- (length sub))) #\ ))
-	  (setf (gethash (subseq sub 1 (1- (length sub))) words) t)))
-      ;;now get a better estimate of the word frequencies
-      (let ((all nil))
-	(do-hash-keys (str words)
-	  (let ((ftot 0))
-	    (aif (gethash (format nil " ~a." str) matches) (incf ftot it))
-	    (aif (gethash (format nil " ~a," str) matches) (incf ftot it))
-	    (aif (gethash (format nil " ~a " str) matches) (incf ftot it))
-	    (aif (gethash (format nil " ~a~a" str #\Newline) matches) (incf ftot it))
-	    (when (> ftot 2)
-	      (push (cons (format nil " ~a" str) ftot) all))))
-	(flet ((addstr (str)
-		 (aif (gethash str matches)
-		      (push (cons str it) all))))
-	  ;;and some interesting digraphs
-	  (addstr (format nil "~a~a" #\. #\Nul))
-	  (addstr (format nil "~a~a" #\. #\Newline))
-	  (addstr (format nil "~a~a" #\  #\Newline))
-	  (addstr "...")
-	  (addstr ". ")
-	  (addstr ", "))
-	(format t "+------------------+------+------+------+------+------+---------+~%")
-	(format t "| Word             |    f |  ΣfL |   Lh |  ΣLh |  b/c | Δd(est) |~%")
-	(format t "+------------------+------+------+------+------+------+---------+~%")
-	(let ((output nil))
-	  (dolist (e all)
-	    (let* ((s (fmt-str (car e)))
-		   (f (cdr e))
-		   (l (length (car e)))
-		   (lh (multiple-value-bind (_ len)
-			   ;;note same table
-			   (huffman-encode-string *huffman-lookup* *huffman-lookup* (car e) :no-eos t)
-			 (declare (ignore _))
-			 (/ len 8.0)))
-		   (sl (* l f))
-		   (slh (* lh f)))
-	      (push (list s f sl lh (round slh) (/ (* 8.0 lh) l)
-			  (round (- slh (* (/ (estimate-bits f *letter-freqs*) 8.0) f))))
-		    output)))
-	  (setf output (subseq (sort output sort :key key) 0 (min (length output) top)))
-	  (let ((totals nil))
-	    (loop for col from (1- (length (first output))) downto 0 do
-		 (if (numberp (nth col (first output)))
-		     (push (round (reduce #'+ output :key #'(lambda (row) (nth col row)))) totals)
-		     (push "Total" totals)))
-	    
-	    (loop for row in output do
-		 (apply #'format t "| ~16a | ~4d | ~4d | ~2,2f | ~4d | ~2,2f |    ~4d |~%"
-			row))
-	    (apply #'format t "| ~16a | ~4d | ~4d | ~4d | ~4d | ~4d |    ~4d |~%"
-		   totals))
-	  ))))
-  (format t "+------------------+------+------+------+------+------+---------+~%"))
+    (let ((all nil))
+      (do-hashtable (sub f matches)
+	(when (> f 3)
+	  (push (cons sub f) all)))
+      (format t "+------------------+------+------+------+------+------+---------+~%")
+      (format t "| Word             |    f |  ΣfL |   Lh |  ΣLh |  b/c | Δd(est) |~%")
+      (format t "+------------------+------+------+------+------+------+---------+~%")
+      (let ((output nil))
+	(dolist (e all)
+	  (let* ((s (fmt-str (car e)))
+		 (f (cdr e))
+		 (l (length (car e)))
+		 (lh (multiple-value-bind (_ len)
+			 ;;note same table
+			 (huffman-encode-string *huffman-lookup* *huffman-lookup* (car e) :no-eos t)
+		       (declare (ignore _))
+		       (/ len 8.0)))
+		 (sl (* l f))
+		 (slh (* lh f)))
+	    (push (list s f sl lh (round slh) (/ (* 8.0 lh) l)
+			(round (- slh (* (/ (estimate-bits f *letter-freqs*) 8.0) f))))
+		  output)))
+	(setf output (subseq (sort output sort :key key) 0 (min (length output) top)))
+	(let ((totals nil))
+	  (loop for col from (1- (length (first output))) downto 0 do
+	       (if (numberp (nth col (first output)))
+		   (push (round (reduce #'+ output :key #'(lambda (row) (nth col row)))) totals)
+		   (push "Total" totals)))
+	  
+	  (loop for row in output do
+	       (apply #'format t "| ~16a | ~4d | ~4d | ~2,2f | ~4d | ~2,2f |    ~4d |~%"
+		      row))
+	  (apply #'format t "| ~16a | ~4d | ~4d | ~4d | ~4d | ~4d |    ~4d |~%"
+		 totals))
+	(terpri)
+	(loop for row in output do
+	     (format t "\"~a\" " (first row)))
+	(terpri)
+	))))
+(format t "+------------------+------+------+------+------+------+---------+~%"))
 
 (defun count-frequencies (str)
   (incf (gethash (char str 0) *first-letter-freqs*))

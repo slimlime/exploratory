@@ -13,8 +13,9 @@
 (defparameter *huffman-lookup* nil)
 (defparameter *first-letter-huffman-lookup* nil)
 (defparameter *first-letter-huffman-table* nil)
-(defparameter *word-dictionary* #())
-
+(defparameter *blergh* (format nil ".~a" #\Nul))
+(defparameter *word-dictionary* #(nil " the" " door" " of" " you" " biscuit" " already" " your" " finger" " that" " imaginary" " something" ", " " and" " slime" " You" " is" " in" " from" " keyhole" " don't" " know" " goblin" " appears" "er " "ing "))
+(setf (aref *word-dictionary* 0) *blergh*)
 (defparameter *test-strings*
   '("The cat sat on"
     "the mat"
@@ -153,7 +154,7 @@
   (let ((s (make-array 0 :fill-pointer 0 :element-type 'standard-char :adjustable t)))
     (greedy-replace1 str table
 		     #'(lambda (i c)
-			       (vector-push-extend (if i #\0 c) s)))
+			       (vector-push-extend (if i (code-char (+ i (char-code #\A))) c) s)))
     s))
 
 (defun dcs (label str)
@@ -165,7 +166,7 @@
 	(when label
 	  (label label))
 	(let* ((data (huffman-encode-string *first-letter-huffman-lookup* *huffman-lookup*
-					    (str-encode str *word-dictionary*)))
+					    (str-encode str *word-dictionary*) :no-eos t))
 	       (len (length data)))
 	  (add-hint len (format nil "DCS '~a' (~a->~a)" str (length str) len))
 	  (setf (gethash str *string-table*) *compiler-ptr*)
@@ -291,22 +292,39 @@
       (dcs nil str)))
   (clrhash *defined-strings*)
   (reset-frequency-tables)
-  ;;Now process them for frequency analysis
-  (do-hash-keys (str *string-table*)
-    (count-frequencies (str-encode str *word-dictionary*)))
 
-  ;;This hack ensures that if any chars in the first letters table
-  ;;is missing from the gen pop it gets added. This is to ensure
-  ;;some of the tests pass where they don't define many strings
-  (do-hash-keys (str *string-table*)
-    (if (zerop (gethash (char str 0) *letter-freqs*))
+  (let ((uncompressed-size 0))
+    ;;Now process them for frequency analysis
+    (do-hash-keys (str *string-table*)
+      (incf uncompressed-size (length str))
+      (count-frequencies (str-encode str *word-dictionary*)))
+
+    ;;This hack ensures that if any chars in the first letters table
+    ;;is missing from the gen pop it gets added. This is to ensure
+    ;;some of the tests pass where they don't define many strings
+    (do-hash-keys (str *string-table*)
+      (if (zerop (gethash (char str 0) *letter-freqs*))
       (setf (gethash (char str 0) *letter-freqs*) 1)))
-  
-  (setf *first-letter-huffman-table* (build-huffman-string-table *first-letter-freqs*))
-  (setf *first-letter-huffman-lookup* (build-huffman-bit-pattern-lookup *first-letter-huffman-table*))
-  (setf *huffman-table* (build-huffman-string-table *letter-freqs*))
-  (setf *huffman-lookup* (build-huffman-bit-pattern-lookup *huffman-table*))
+    (setf *first-letter-huffman-table* (build-huffman-string-table *first-letter-freqs*))
+    (setf *first-letter-huffman-lookup* (build-huffman-bit-pattern-lookup *first-letter-huffman-table*))
+    (setf *huffman-table* (build-huffman-string-table *letter-freqs*))
+    (setf *huffman-lookup* (build-huffman-bit-pattern-lookup *huffman-table*))
+    
+    ;; A bit wasteful, but let's compress all the strings and see how long they
+    ;; are.
 
+    (when *compiler-final-pass*
+      (let ((compressed-size 0))
+	;;Now process them for frequency analysis
+	(do-hash-keys (str *string-table*)
+	  (incf compressed-size (length (huffman-encode-string *first-letter-huffman-lookup*
+							       *huffman-lookup*
+							       (str-encode str *word-dictionary*)
+							       :no-eos t))))
+	  (format t "Strings ~a -> ~a (~d%)~%" uncompressed-size compressed-size
+		  (round (/ compressed-size uncompressed-size 0.01))))))
+  
+  
   (huffman-pop-table :first-letters	     
 		     *first-letter-huffman-table*
 		     "First letters")

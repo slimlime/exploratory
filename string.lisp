@@ -147,12 +147,13 @@
 	    (funcall emit nil (char str i))
 	    :next))))
 
+
 (defun str-encode (str table)
   (setf str (append-eos str))
-  (let ((s (make-array 0 :fill-pointer 0 :element-type 'standard-char :adjustable t)))
+  (let ((s (make-array 0 :fill-pointer 0 :element-type 'extended-char :adjustable t)))
     (greedy-replace1 str table
 		     #'(lambda (i c)
-			       (vector-push-extend (if i (code-char (+ i (char-code #\A))) c) s)))
+			 (vector-push-extend (if i (code-char (+ i 256)) c) s)))
     s))
 
 (defun dcs (label str)
@@ -253,13 +254,6 @@
 	))))
 (format t "+------------------+------+------+------+------+------+---------+~%")
 
-(defun str-encode (str table)
-  (setf str (append-eos str))
-  (let ((s (make-array 0 :fill-pointer 0 :element-type 'extended-char :adjustable t)))
-    (greedy-replace1 str table
-		     #'(lambda (i c)
-			 (vector-push-extend (if i (code-char (+ i 256)) c) s)))
-    s))
 
 (defun count-frequencies (str)
   (loop for c across str do
@@ -298,7 +292,8 @@
 		(setf best-size compressed-size)
 		(setf best-word sub)))))
       (setf (aref dict (1- (length dict))) best-word)
-      (values dict best-size))))
+      (format t "~4d ~a~%" best-size dict)
+      dict)))
 
 (defun try-bestest ()
   (let ((words #()))

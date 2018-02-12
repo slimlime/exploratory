@@ -35,7 +35,7 @@
     (loop for c across str
        for i from 0 do
 	 (if (and spaces (char= c #\  ))
-	     (setf c #\_)
+	     (setf c #\ )
 	     (if (char= c #\Newline)
 		 (setf c #\↵)
 		 (when (char= c #\Nul)
@@ -251,8 +251,8 @@
 	(loop for row in output do
 	     (format t "\"~a\" " (first row)))
 	(terpri)
-	))))
-(format t "+------------------+------+------+------+------+------+---------+~%")
+	)))
+  (format t "+------------------+------+------+------+------+------+---------+~%"))
 
 
 (defun count-frequencies (str)
@@ -292,13 +292,13 @@
 		(setf best-size compressed-size)
 		(setf best-word sub)))))
       (setf (aref dict (1- (length dict))) best-word)
-      (format t "~4d ~a~%" best-size dict)
+      (format t "~4d ~s~%" best-size dict)
       dict)))
 
 (defun try-bestest ()
   (let ((words #()))
     (dotimes (_ (- 256 71))
-      (print (setf words (try-best words))))))
+      (setf words (try-best words)))))
       
     
 
@@ -309,7 +309,7 @@
   (dc "String Table")
   ;;Get the strings that need to be inlined at the end
   (let ((additions nil))
-    (dohashkeys (str *string-table*)
+    (do-hash-keys (str *string-table*)
       (unless (gethash str *defined-strings*)
 	(push str additions)))
     (dolist (str additions)
@@ -347,7 +347,6 @@
 							       :no-eos t))))
 	  (format t "Strings ~a -> ~a (~d%)~%" uncompressed-size compressed-size
 		  (round (/ compressed-size uncompressed-size 0.01))))))
-  
   
   (huffman-pop-table :first-letters	     
 		     *first-letter-huffman-table*

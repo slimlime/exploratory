@@ -122,6 +122,12 @@
   (loop while (char= (read-char) #\Newline) do
        (monitor-step)))
 
+(defun monitor-cc ()
+  (multiple-value-bind (buffer pc sp sr a x y cc)
+      (funcall *monitor-get-state* nil)
+    (declare (ignore buffer pc sp sr a x y))
+    cc))
+
 ;;TODO break-on should be able to match an unqualified label
 (defun monitor-run (&key (break-on 'BRK) (max-cycles 2000000) (print t))
   (monitor-reset-profile)
@@ -161,11 +167,7 @@
 (defun monitor-poke (address byte)
   (funcall *monitor-poke-fn* address byte))
 
-(defun monitor-cc ()
-  (multiple-value-bind (buffer pc sp sr a x y cc)
-      (funcall *monitor-get-state* nil)
-    (declare (ignore buffer pc sp sr a x y))
-    cc))
+
 
 (defun monitor-time-fn (fn)
   (let ((cc (monitor-cc)))

@@ -1,3 +1,40 @@
+## 12/2/2018 Brute Force
+
+So the very upsetting lesson to learn is that all the work I did on the Huffman encoder and decoder on compressing the strings has not gained me anything. After a *lot* of fiddly experimentation I have come to the following conclusion.
+
+- Tunstall table is very good. Not including the cost of the table (which is fixed and so can be amortized) it gets about 55% compression. LZW, which I would use if we were compressing one big body of text gets about 50%.
+- Huffman coding alone gets down to about 59%
+- Tunstall is a mix of low order and higher order entropy (it considers digraphs and trigraphs)
+- Huffman coding cares not for digraphs and trigraphs
+
+Rather than be defeated, I decided to add a dictionary. Each word will be a symbol that Huffman can code for in the output, with a code of length proportional to its frequency. But what words to choose. The fiddly experimentation I was talking about was trying to do an analysis of the string data, and all its substrings to get an idea of what would make a good word for the dictionary.
+
+For example, `the` is very common and so is `e_` as lots of words end in `e`. But so does `the`; if we include `e ` as a symbol and greedily encode for that, then `the` becomes a lot less frequent.
+
+It turns out that ` the`, `the` and `the ` are all excellent choices, but that `e_` is not. A period followed by an end of string marker is also very common. My gut feeling is that the best choices will be
+
+- Substrings which are common
+- Substrings which are long
+- Substrings which occur more frequently than their constituent parts would suggest
+
+Rather than go any further with the experimentation (I tried to get a colleague to talk me out of it, but he just mumbled into his Mornflakes) I decided to let computers do what they do best and set to work on a *greedy* brute force search.
+
+- Find ALL substrings in the input data
+- For each substring in turn, susbtitute the substring in the input data with a new symbol
+- Do the frequency analysis and Huffman encoding on this data
+- Note down the size if it is an improvement on the previous substring
+- Keep going....
+
+Then, run again, but this time substituting not only each new substring, but the best ones from the previous runs. This way we greedily add the best words to the dictionary and don't have to worry about which is the particular variant of `is open` `s ope` ` open` is the best one to choose.
+
+This algorithm ran for about 5 minutes on my laptop, then spat out a single word surrounded by two spaces `the`. Success! More importantly it shaved off nearly 100 bytes! The algorithm kept running on Marceline for about four hours and spat out the following. (Later I reproduced it on Nyarlathotep in about 30 minutes)
+
+` the ` `.¶` ` you` `You ` `The ` `ing` `door is ` `biscuit` `already ` ` of` `lock` `something ` `I don't` ` that` `have` `here is` `close` `keyhole` `slime` ` and ` `in` `goblin` `door` `green ` `ound` `You` `↵the` `ke` `!¶` ` from` ` in the ` ` finger` ` know` `ck` `?¶` `ent` `There` `all` `floor` `ill` ` a key` `h! ` ` is already` ` are ` ` what` `appe` `wall` ` cell` `, ` `Not` `open.` `...¶` `ow` `at the` `'s ` ` w` `...` `ou are` `n't` `finger ` ` M` `? ` `ears` `mag` `tak` `ng ` `don't` ` have` 
+
+The list is *almost* something a human being would put together. I wouldn't know; I can feel my brain being crushed on the surface of a black hole and re-emitted in the form of thermalised Hawking radiation.
+
+Here's the critical number- 2397, or 47% I count this as victory over the forces of entropy. A saving of just about two full memory pages!
+
 ## 11/2/2018 Context Dependent Huffman
 
 Soon the nightmare will be over and we will rise from the crushing depths of the entropy vortex that has sucked me beneath the waves, but we must press on, deeper into the abyss and take a look at context dependent Huffman coding. Huffman works by trying to match the probability of a letter with a code of proportionate length, more frequent symbols get shorter codes, less frequent ones get longer codes. We can improve our probabilities by using context. One such context is the first letter of a string. More often than not it will be a capital letter. Let us look at the frequency tables for the first letter of strings.
@@ -91,7 +128,7 @@ Build size 13681
 Cycles:548029
 ~~~~
 
-So faster and only 24 bytes bigger. More importantly, we are 50 bytes away in the Dungeon Cell. The other two rooms have actually shrunk. As we add extra rooms it is this delta that is important. Additionally, because we haven't started to exploit the higher order entropy there is a lot more headroom... that's what I keep telling myself anyway.
+So faster and only 24 bytes bigger. More importantly, we are ~~50~~ 150 bytes away in the Dungeon Cell. The other two rooms have actually shrunk. As we add extra rooms it is this delta that is important. Additionally, because we haven't started to exploit the higher order entropy there is a lot more headroom... that's what I keep telling myself anyway.
 
 ## 10/2/2018 More unrolling and some nice analysis
 

@@ -13,26 +13,8 @@
 (defparameter *huffman-lookup* nil)
 (defparameter *first-letter-huffman-lookup* nil)
 (defparameter *first-letter-huffman-table* nil)
-
-(defparameter *word-dictionary* (coerce (list "in" (format nil ".~a" #\Nul)
-					      "e "
-					      "he"
-					      "th"
-					      "he "
-					      " th"
-					      "ou"
-					      "ing"
-					      "You"
-					      " t"
-					      "The"
-					      "ng"
-					      "re"
-					      " you"
-					      " a"
-					      "s "
-					      "ou "
-					      "The door")
-					'vector))
+(defparameter *word-dictionary* #())
+				  
 (defparameter *test-strings*
   '("The cat sat on"
     "the mat"
@@ -153,8 +135,7 @@
 
 (defun greedy-replace1 (str table emit)
   (let ((strend (1- (length str))))
-    (funcall emit nil (char str 0))
-    (loop for i from 1 to strend do
+    (loop for i from 0 to strend do
 	 (tagbody
 	    (loop for j from 0 to (1- (length table)) do
 		 (let ((word (aref table j)))
@@ -236,7 +217,7 @@
 	(when (> f 3)
 	  (push (cons sub f) all)))
       (format t "+------------------+------+------+------+------+------+---------+~%")
-      (format t "| Word             |    f |  ΣfL |   Lh |  ΣLh |  b/c | Δd(est) |~%")
+      (format t "| Word             |    f |  ΣfL |   Lh |  ΣLh |  b/c |       Δ |~%")
       (format t "+------------------+------+------+------+------+------+---------+~%")
       (let ((output nil))
 	(dolist (e all)
@@ -251,7 +232,7 @@
 		 (sl (* l f))
 		 (slh (* lh f)))
 	    (push (list s f sl lh (round slh) (/ (* 8.0 lh) l)
-			(round (- slh (* (/ (estimate-bits f *letter-freqs*) 8.0) f))))
+			(round 1))
 		  output)))
 	(setf output (subseq (sort output sort :key key) 0 (min (length output) top)))
 	(let ((totals nil))
@@ -270,12 +251,61 @@
 	     (format t "\"~a\" " (first row)))
 	(terpri)
 	))))
-(format t "+------------------+------+------+------+------+------+---------+~%"))
+(format t "+------------------+------+------+------+------+------+---------+~%")
+
+(defun str-encode (str table)
+  (setf str (append-eos str))
+  (let ((s (make-array 0 :fill-pointer 0 :element-type 'extended-char :adjustable t)))
+    (greedy-replace1 str table
+		     #'(lambda (i c)
+			 (vector-push-extend (if i (code-char (+ i 256)) c) s)))
+    s))
 
 (defun count-frequencies (str)
-  (incf (gethash (char str 0) *first-letter-freqs*))
-  (loop for i from 1 to (1- (length str)) do
-       (incf (gethash (char str i) *letter-freqs*))))
+  (loop for c across str do
+       (if (gethash c *letter-freqs*)
+	   (incf (gethash c *letter-freqs*))
+	   (setf (gethash c *letter-freqs*) 1))))
+
+(defun try-best (table)
+  (let ((matches (make-hash-table :test 'equal))
+	(best-size 100000)
+	(best-word nil))
+    (do-hash-keys (str *string-table*)
+      (do-subsequences (sub (append-eos str) 2 16)
+	(if (gethash sub matches)
+	    (incf (gethash sub matches))
+	    (setf (gethash sub matches) 1))))
+    (let ((dict (make-array (1+ (length table)))))
+      (loop for word across table
+	 for i from 0 do
+	   (setf (aref dict i) word))
+      (do-hashtable (sub f matches)
+	  (when (> f 3)
+	    (setf (aref dict (1- (length dict))) sub)
+	    (reset-frequency-tables)
+	    (do-hash-keys (str *string-table*)
+	      (count-frequencies (str-encode str dict)))
+	    (setf *huffman-table* (build-huffman-string-table *letter-freqs*))
+	    (setf *huffman-lookup* (build-huffman-bit-pattern-lookup *huffman-table*))	    
+	    (let ((compressed-size 0))
+	      (do-hash-keys (str *string-table*)
+		(incf compressed-size (length (huffman-encode-string *huffman-lookup*
+								     *huffman-lookup*
+								     (str-encode str dict)
+								     :no-eos t))))
+	      (when (< compressed-size best-size)
+		(setf best-size compressed-size)
+		(setf best-word sub)))))
+      (setf (aref dict (1- (length dict))) best-word)
+      (values dict best-size))))
+
+(defun try-bestest ()
+  (let ((words #()))
+    (dotimes (_ (- 256 71))
+      (print (setf words (try-best words))))))
+      
+    
 
 ;;;this must be called last, after the last use of dcs/dstr
 ;;;this hack means we don't have to reinitialise a hash set

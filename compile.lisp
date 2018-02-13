@@ -100,10 +100,6 @@
   (assert-address add)
   (aref *compiler-buffer* add))
 
-(defun peek-addr (add)
-  (logior (peek-byte (lo-add add))
-          (ash (peek-byte (hi-add add)) 8)))
-  
 (defun peek-last-byte ()
   (peek-byte (1- *compiler-ptr*)))
 
@@ -396,6 +392,10 @@
   (unless (numberp addr)
     (dc (format nil "~a + 1" (fmt-label addr t)) t))
   (1+ (resolve addr)))
+
+(defun peek-addr (add)
+  (logior (peek-byte (lo-add add))
+          (ash (peek-byte (hi-add add)) 8)))
 
 ;todo remove byte/word as not really setting it and also clashes
 ;if it appears once in the program, could assemble a zero page

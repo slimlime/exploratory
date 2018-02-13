@@ -98,7 +98,6 @@
 
 (defun encode (lookup dictionary str)
   (setf str (pre-encode dictionary str))
-  (print str)
   (let ((vec (make-array (length str)
 			 :fill-pointer 0
 			 :adjustable t
@@ -258,6 +257,13 @@
 		  (length (encode lookup dictionary str))))
 	  (format t "Strings ~a -> ~a (~d%)~%" uncompressed-size compressed-size
 		  (round (/ compressed-size uncompressed-size 0.01)))))
+      
+      ;;May dig out the first letter huffman table as a title case thing
+    
+      (label :dictionary)
+      (loop for word across dictionary do
+	   (ds (cons :word word) word))
+      
       ;;  (huffman-pop-table :first-letters	     
       ;;		     *first-letter-huffman-table*
       ;;		     "First letters")
@@ -287,6 +293,7 @@
   (sta16.zp :general-letters :huffman-pop-table)
   (label :another)
   (JSR :huffman-next)
+  
   (TXA)
   (label :output)
   (LDY.ZP :output-string-index)
@@ -296,6 +303,31 @@
   (BNE :another)
   (BRK)
 
+  ;;this is a clone of what is in the graphics.lisp file
+  ;;it obviously doesn't contain character data and there
+  ;;will have to be some way of deciding if it is a character
+  ;;or a dictionary word.
+  (when *huffman-table*
+    (let ((lo (list :lo-char-offsets))
+	  (hi (list :hi-char-offsets)))
+      (dolist (e *huffman-table*)
+	(let ((c (car e)))
+	  (if (or (eq c #\Newline)
+		  (eq c #\Nul))
+	      (progn
+		(push 0 lo)
+		(push 0 hi))
+	      (let ((code (char-code c)))
+		(if (> code 255) ;symbol not word
+		    (push-address (resolve (cons :word
+					(aref dictionary (- code 256)))))
+		    (progn
+		      ;;typeface data will go here
+		      (push 1 lo)
+		      (push 1 hi)))))))
+      (apply #'db (nreverse lo))
+      (apply #'db (nreverse hi))))
+  
   (zp-b :output-string-index 0)
   
   ;; define some encoded strings, labelled with themselves

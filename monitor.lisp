@@ -10,7 +10,7 @@
 (defparameter *monitor-step* nil)
 ;;function to return values containing pc, sp, sr, a, x, y
 (defparameter *monitor-get-state* nil)
-(defparameter *monitor-context-bytes* 8)
+(defparameter *monitor-context-bytes* 16)
 (defparameter *monitor-watches* nil)
 (defparameter *monitor-buffer* nil)
 (defparameter *monitor-peek-fn* nil)
@@ -116,17 +116,17 @@
   (funcall *monitor-step*)
   (monitor-print))
 
-(defun monitor-go ()
-  (monitor-print)
-  (format t "Press RETURN to step, anthing else followed by RETURN to quit~%")
-  (loop while (char= (read-char) #\Newline) do
-       (monitor-step)))
-
 (defun monitor-cc ()
   (multiple-value-bind (buffer pc sp sr a x y cc)
       (funcall *monitor-get-state* nil)
     (declare (ignore buffer pc sp sr a x y))
     cc))
+
+(defun monitor-pc ()
+  (multiple-value-bind (buffer pc sp sr a x y cc)
+      (funcall *monitor-get-state* nil)
+    (declare (ignore buffer cc sp sr a x y))
+    pc))
 
 ;;TODO break-on should be able to match an unqualified label
 (defun monitor-run (&key (break-on 'BRK) (max-cycles 2000000) (print t))
@@ -158,6 +158,26 @@
 	(format t "Cycles:~a~%" total-cycles)
 	(monitor-print)))))
 
+(defun monitor-go ()
+  (monitor-print)
+  (tagbody
+   :prompt
+     (format t "Ret=Step q=Quit label/address=Run o=Skip 3~%")
+     (let ((line (read-line)))
+       (if (equal "o" line)
+	   ;;TODO, can we detect dereferencing functions?
+	   ;;TODO use case
+	   (monitor-run :break-on (+ 3 (monitor-pc)))
+	   (if (equal "q" line)
+	       (return-from monitor-go (values))
+	       (if (equal "" line)
+		   (monitor-step)
+		   (let ((exp (with-input-from-string (s line) (read s))))
+		     (if (resolves exp)
+			 (monitor-run :break-on exp)
+			 (format t "~a is not a valid address.~%" exp)))))))
+       (go :prompt)))
+
 (defun monitor-buffer ()
   (funcall *monitor-buffer*))
 
@@ -166,8 +186,6 @@
 
 (defun monitor-poke (address byte)
   (funcall *monitor-poke-fn* address byte))
-
-
 
 (defun monitor-time-fn (fn)
   (let ((cc (monitor-cc)))

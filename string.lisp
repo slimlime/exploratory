@@ -12,14 +12,6 @@
 ;;this string table is basically a hash look-up of strings
 ;;to addresses, which should be valid on the final pass
 
-(defparameter *test-strings*
-  '("The cat sat on"
-    "the mat"
-    "and didn't like it it it one bit"
-    "The quick brown fox killed the lazy dog and ate his innards"
-    "Sing a song of sixpence, a pocket full of eyes"
-    "Shall I compare thee to a summer's ham?"))
-
 (defun append-eos (str)
   (format nil "~a~a" str #\nul))
 
@@ -224,6 +216,8 @@
 	    (return-from create-dictionary dictionary)
 	    (setf dictionary new-dictionary))))))
 
+(defparameter *end-of-word* #xff)
+
 ;;;this must be called last, after the last use of dcs/dstr
 ;;;this hack means we don't have to reinitialise a hash set
 ;;;on each pass.
@@ -243,13 +237,18 @@
     (do-hash-keys (str *string-table*)
       (incf uncompressed-size (length str))
       (count-frequencies (pre-encode dictionary str) freqs))
+    ;;Ensure each character is represented at least once in
+    ;;the table.
+    (loop for c across *charset* do
+	 (unless (gethash c freqs)
+	   (setf (gethash c freqs) 0.00001)))
     (let* ((table (build-huffman-string-table freqs))
 	   (lookup (build-huffman-bit-pattern-lookup table)))
       (setf *huffman-lookup* lookup)
       (setf *huffman-table* table)
       (setf *word-dictionary* dictionary)
       ;; A bit wasteful, but let's compress all the strings and see how long they
-      ;; are.
+      ;; are
       (when *compiler-final-pass*
 	(let ((compressed-size 0))
 	  (do-hash-keys (str *string-table*)
@@ -257,12 +256,18 @@
 		  (length (encode lookup dictionary str))))
 	  (format t "Strings ~a -> ~a (~d%)~%" uncompressed-size compressed-size
 		  (round (/ compressed-size uncompressed-size 0.01)))))
-      
-      ;;May dig out the first letter huffman table as a title case thing
-    
-      (label :dictionary)
+      ;;let's hope we don't get this
+      (assert (/= 0 (eos-index)) nil "EOS index cannot be 0 as it conflicts with the end of dictionary word terminator")
       (loop for word across dictionary do
-	   (ds (cons :word word) word))
+	   (label word :word)
+	   (let ((word-data nil))
+	     (loop for c across word do
+		  (let ((index (position c *huffman-table* :key #'first)))
+		    (assert index nil "'~a' was not found in the huffman table" c)
+		    (push index word-data)))
+	     (push *end-of-word* word-data)
+	     (apply #'db nil (nreverse word-data))))
+      (label :dictionary-end)
       
       ;;  (huffman-pop-table :first-letters	     
       ;;		     *first-letter-huffman-table*
@@ -270,6 +275,9 @@
       (huffman-pop-table :general-letters
 			 table
 			 "General letters"))))
+        
+  ;;May dig out the first letter huffman table as a title case thing
+  
     ;;  (dc "A lookup of first letters to general letter index")
     ;;  (apply #'db :first-letter-indexes
     ;;	 (if *huffman-table*
@@ -280,33 +288,7 @@
 (defun eos-index () (position #\Nul *huffman-table* :key #'car))
 (defun eol-index () (position #\Newline *huffman-table* :key #'car))
 
-(defun string-test (string dictionary)
-  (org #x600)
-
-  (assert string nil "String was empty")
-  
-  (label :start)
-  
-  (sta16.zp string :huffman-ptr)
-  (LDX 1)
-  (STX.ZP :huffman-bits)
-  (sta16.zp :general-letters :huffman-pop-table)
-  (label :another)
-  (JSR :huffman-next)
-  
-  (TXA)
-  (label :output)
-  (LDY.ZP :output-string-index)
-  (STA.ABY :str-buffer)
-  (INC.ZP :output-string-index)
-  (CMP (nil->0 (eos-index)))
-  (BNE :another)
-  (BRK)
-
-  ;;this is a clone of what is in the graphics.lisp file
-  ;;it obviously doesn't contain character data and there
-  ;;will have to be some way of deciding if it is a character
-  ;;or a dictionary word.
+(defun char-table (dictionary &optional (test-only nil))
   (when *huffman-table*
     (let ((lo (list :lo-char-offsets))
 	  (hi (list :hi-char-offsets)))
@@ -315,18 +297,90 @@
 	  (if (or (eq c #\Newline)
 		  (eq c #\Nul))
 	      (progn
+		;;no character data for these, but we still need an entry
+		;;better a gap here than a gap in the font table
 		(push 0 lo)
 		(push 0 hi))
 	      (let ((code (char-code c)))
-		(if (> code 255) ;symbol not word
-		    (push-address (resolve (cons :word
-					(aref dictionary (- code 256)))))
-		    (progn
-		      ;;typeface data will go here
-		      (push 1 lo)
-		      (push 1 hi)))))))
+		(if (> code 255) ;this is a word not a letter
+		    (let ((w (resolve (cons :word (aref dictionary (- code 256))))))
+		      (push (lo w) lo)
+		      (push (hi w) hi))
+		      (if test-only
+			  (progn
+			    ;;dummy test character address
+			    (push 0 lo)
+			    (push #xD0 hi))
+			  (progn
+			    ;;check that we actually have the typeface data
+			    ;;for this character
+			    (resolve (cons :present c))
+			    (resolve (cons :past c))
+			    (resolve (cons :future c))
+			    ;;store the relative offset into the font
+			    (let ((offset (- (resolve (cons :present c))
+					     (resolve '(:font . :present)))))
+			      (push (lo offset) lo)
+			      (push (hi offset) hi)))))))))
       (apply #'db (nreverse lo))
-      (apply #'db (nreverse hi))))
+      (apply #'db (nreverse hi)))))
+
+(defparameter *test-strings*
+  '("The quick brown fox killed the lazy dog and ate his innards"
+    "The cat sat on"
+    "the mat"
+    "and didn't like it it it one bit"
+    "Sing a song of sixpence, a pocket full of eyes"
+    "Shall I compare thee to a summer's ham?"))
+
+(defun string-test (string dictionary)
+  (org #x600)
+
+  (assert string nil "String was empty")
+  
+  (label :start)
+
+  (zp-w :ptr)
+  
+  (sta16.zp string :huffman-ptr)
+  (LDX 1)
+  (STX.ZP :huffman-bits)
+  (sta16.zp :general-letters :huffman-pop-table)
+  (label :another)
+  (JSR :huffman-next)
+  (CPX (nil->0 (eos-index)))
+  (BEQ :done)
+  (LDA.ABX :hi-char-offsets)
+  (CMP (1+ (hi :dictionary-end)))
+  (BLT :is-word)
+  (TXA)
+  (LDY.ZP :output-string-index)
+  (STA.ABY :str-buffer)
+  (INC.ZP :output-string-index)
+  (BNE :another)
+  (label :is-word)
+  (STA.ZP (hi-add :ptr))
+  (LDA.ABX :lo-char-offsets)
+  (STA.ZP (lo-add :ptr))
+  (LDY 0)
+  (label :next-char)
+  (LDX.ZP :output-string-index)
+  (LDA.IZY :ptr)
+  (CMP *end-of-word*)
+  (BEQ :another) ;;need assertion that eos is NOT 0, the word terminator
+  ;;can omit the null terminator if the last char is eos.
+  (CMP (nil->0 (eos-index)))
+  (BEQ :done)
+  (STA.ABX :str-buffer)
+  (INY)
+  (INC.ZP :output-string-index)
+  (BNE :next-char)
+
+  (label :done)
+  (BRK)
+
+  (char-table dictionary t)
+  
   
   (zp-b :output-string-index 0)
   
@@ -334,7 +388,7 @@
 
   (mapc #'(lambda (s) (dcs s s)) *test-strings*)
 
-  (dbs :str-buffer 256)
+  (dbs :str-buffer 256 #xff)
        
   (huffman-decoder)
   
@@ -371,14 +425,14 @@
       (compile-string-test str dictionary)
       (monitor-reset :start)
       (monitor-run :print nil)
-      (let ((*compiler-buffer* (monitor-buffer)))
-	(let ((output 
-	       (symbols-string huffvec
-			       (coerce
-				(subseq *compiler-buffer*
-					(resolve :str-buffer)
-					(position (eos-index) *compiler-buffer* :start (resolve :str-buffer)))
-				'list))))
+      (let* ((*compiler-buffer* (monitor-buffer))
+	     (buffer (subseq *compiler-buffer*
+			     (resolve :str-buffer)
+			     (position #xff *compiler-buffer*
+				       :start
+				       (resolve :str-buffer)))))
+	(assert (> (length buffer) 0) nil "Output string buffer was empty for '~a'" str)
+	(let ((output (symbols-string huffvec (coerce buffer 'list))))
 	  (assert (equal output str))
 	  ;;we must check that the huffman-ptr is left on the last byte + 1
 	  ;;or it will mess up things that rely on it, i.e. the VM print commands
@@ -389,5 +443,8 @@
 		  str (peek-addr :huffman-ptr) (+ (resolve str)
 			 (length (encode *huffman-lookup* dictionary str)))))))))
 
-;(test-decoder)
+(test-decoder)
+(test-decoder #("The"))
+(test-decoder #(" the "))
+(test-decoder #("mat"))
 

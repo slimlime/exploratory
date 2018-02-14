@@ -573,6 +573,14 @@
 (defun JMP (addr &optional comment) (JMP.AB addr comment))
 (defun JSR (addr &optional comment) (JSR.AB addr comment))
 
+(defun BLT (label &optional comment)
+  "Synonymous with BCC"
+  (BCC label comment))
+
+(defun BGE (label &optional comment)
+  "Synonymous with BCS"
+  (BCS label comment))
+
 ;; page agnostic addressing, provide an instruction of the form OP.* which
 ;; resolves to either zero page or absoulte depending on how the address resolves
 

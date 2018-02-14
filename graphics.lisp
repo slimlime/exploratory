@@ -21,21 +21,12 @@
     (STA.ZP '(:typeset . :shift))
     (STA.ZP '(:typeset . :prev-width))
     (label :typeset-cs-continue nil) ;;but with a new string
-    (dc "Initialise Huffman decoder for 'first' letters")
-    (sta16.zp :first-letters :huffman-pop-table)
+    (cpy16.zp '(:typeset . :raster) :tmp-raster)
+    (sta16.zp :general-letters :huffman-pop-table)
     (LDA 1)
     (STA.ZP :huffman-bits)
-    (cpy16.zp '(:typeset . :raster) :tmp-raster)
-    ;;TODO make a huffman-init?
-    (JSR :huffman-next)
-    (LDA.ABX :first-letter-indexes)
-    (TAX)
-    (dc "Now we want normal letters from the decoder")
-    (sta16.zp :general-letters :huffman-pop-table)
-    (JMP :emit);;not strictly necessary to check for eos and newline here
     (label :next)
     (JSR :huffman-next)
-    (label :emit)
     (CPX (nil->0 (eos-index)))
     (BEQ :done)
     (CPX (nil->0 (eol-index)))
@@ -65,34 +56,6 @@
     (BNE :next)
     (label :done)
     (RTS))
-  
-  (dc "Character offset table")
-
-  (when *huffman-table*
-    (let ((lo (list :lo-char-offsets))
-	  (hi (list :hi-char-offsets)))
-      (dolist (e *huffman-table*)
-	(let ((c (car e)))
-	  (if (or (eq c #\Newline)
-		  (eq c #\Nul))
-	      (progn
-		;;no character data for these, but we still need an entry
-		;;better a gap here than a gap in the font table
-		(push 0 lo)
-		(push 0 hi))
-	      (progn  
-		;;check that we actually have the typeface data
-		;;for this character
-		(resolve (cons :present c))
-		(resolve (cons :past c))
-		(resolve (cons :future c))
-		;;store the relative offset into the font
-		(let ((offset (- (resolve (cons :present c))
-				 (resolve '(:font . :present)))))
-		  (push (lo offset) lo)
-		  (push (hi offset) hi))))))
-      (apply #'db (nreverse lo))
-      (apply #'db (nreverse hi))))
   
   (label :typeset)
   
@@ -307,7 +270,7 @@
 	     (typeset)
 	     (dcs :str (justify *odyssey* :width (font-width font)))
 	     (huffman-decoder)
-	     (string-table)
+	     (string-table #(" the "))
 	     (label :end)
 	     (font-data)))
       (build #'pass))) 

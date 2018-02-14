@@ -221,7 +221,7 @@
 ;;;this must be called last, after the last use of dcs/dstr
 ;;;this hack means we don't have to reinitialise a hash set
 ;;;on each pass.
-(defun string-table (dictionary)
+(defun string-table (dictionary &optional (omit-font-data nil))
   (dc "String Table")
   ;;Get the strings that need to be inlined at the end
   (let ((additions nil))
@@ -268,45 +268,23 @@
 	     (push *end-of-word* word-data)
 	     (apply #'db nil (nreverse word-data))))
       (label :dictionary-end)
-      
-      ;;  (huffman-pop-table :first-letters	     
-      ;;		     *first-letter-huffman-table*
-      ;;		     "First letters")
-      (huffman-pop-table :general-letters
-			 table
-			 "General letters"))))
-        
-  ;;May dig out the first letter huffman table as a title case thing
-  
-    ;;  (dc "A lookup of first letters to general letter index")
-    ;;  (apply #'db :first-letter-indexes
-    ;;	 (if *huffman-table*
-    ;;	     (mapcar #'(lambda (e) (position (car e) *huffman-table* :key #'car))
-    ;;		     *first-letter-huffman-table*)
-    ;;	     (list 0))))
-    
-(defun eos-index () (position #\Nul *huffman-table* :key #'car))
-(defun eol-index () (position #\Newline *huffman-table* :key #'car))
-
-(defun char-table (dictionary &optional (test-only nil))
-  (when *huffman-table*
-    (let ((lo (list :lo-char-offsets))
-	  (hi (list :hi-char-offsets)))
-      (dolist (e *huffman-table*)
-	(let ((c (car e)))
-	  (if (or (eq c #\Newline)
-		  (eq c #\Nul))
-	      (progn
-		;;no character data for these, but we still need an entry
-		;;better a gap here than a gap in the font table
-		(push 0 lo)
-		(push 0 hi))
-	      (let ((code (char-code c)))
-		(if (> code 255) ;this is a word not a letter
-		    (let ((w (resolve (cons :word (aref dictionary (- code 256))))))
-		      (push (lo w) lo)
-		      (push (hi w) hi))
-		      (if test-only
+      (let ((lo (list :lo-char-offsets))
+	    (hi (list :hi-char-offsets)))
+	(dolist (e *huffman-table*)
+	  (let ((c (car e)))
+	    (if (or (eq c #\Newline)
+		    (eq c #\Nul))
+		(progn
+		  ;;no character data for these, but we still need an entry
+		  ;;better a gap here than a gap in the font table
+		  (push 0 lo)
+		  (push 0 hi))
+		(let ((code (char-code c)))
+		  (if (> code 255) ;this is a word not a letter
+		      (let ((w (resolve (cons :word (aref dictionary (- code 256))))))
+			(push (lo w) lo)
+			(push (hi w) hi))
+		      (if omit-font-data
 			  (progn
 			    ;;dummy test character address
 			    (push 0 lo)
@@ -322,8 +300,27 @@
 					     (resolve '(:font . :present)))))
 			      (push (lo offset) lo)
 			      (push (hi offset) hi)))))))))
-      (apply #'db (nreverse lo))
-      (apply #'db (nreverse hi)))))
+	(apply #'db (nreverse lo))
+	(apply #'db (nreverse hi)))
+      
+    ;;  (huffman-pop-table :first-letters	     
+    ;;		     *first-letter-huffman-table*
+    ;;		     "First letters")
+    (huffman-pop-table :general-letters
+		       table
+		       "General letters"))))
+
+  ;;May dig out the first letter huffman table as a title case thing
+  
+    ;;  (dc "A lookup of first letters to general letter index")
+    ;;  (apply #'db :first-letter-indexes
+    ;;	 (if *huffman-table*
+    ;;	     (mapcar #'(lambda (e) (position (car e) *huffman-table* :key #'car))
+    ;;		     *first-letter-huffman-table*)
+    ;;	     (list 0))))
+    
+(defun eos-index () (position #\Nul *huffman-table* :key #'car))
+(defun eol-index () (position #\Newline *huffman-table* :key #'car))
 
 (defparameter *test-strings*
   '("The quick brown fox killed the lazy dog and ate his innards"
@@ -378,9 +375,6 @@
 
   (label :done)
   (BRK)
-
-  (char-table dictionary t)
-  
   
   (zp-b :output-string-index 0)
   
@@ -392,7 +386,7 @@
        
   (huffman-decoder)
   
-  (string-table dictionary)
+  (string-table dictionary t)
   
   (label :end))
 

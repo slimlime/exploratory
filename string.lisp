@@ -250,11 +250,6 @@
     (do-hash-keys (str *string-table*)
       (incf uncompressed-size (length str))
       (count-frequencies (pre-encode dictionary str) freqs))
-    ;;Ensure each character is represented at least once in
-    ;;the table.
-    (loop for c across *charset* do
-	 (unless (gethash c freqs)
-	   (setf (gethash c freqs) 0.1)))
     (let* ((table (build-huffman-string-table freqs))
 	   (lookup (build-huffman-bit-pattern-lookup table)))
       (setf *huffman-lookup* lookup)
@@ -274,7 +269,11 @@
       (label :dictionary)
       (when *compiler-final-pass*
 	(assert (> (hi :dictionary) 2) nil "Dictionary must not be on page 0,1 or 2 as there is a comparison which relies on this when decoding"))
-      ;;TODO assert not on page 3 or lower
+      (let ((missing-chars nil))
+	(loop for c across *charset* do
+	     (unless (find c *huffman-table* :key #'first)
+	       (push (list c 0 nil) missing-chars)))
+	(setf *huffman-table* (append *huffman-table* missing-chars)))
       (loop for word across dictionary do
 	   (label word :word)
 	   (let ((word-data nil))

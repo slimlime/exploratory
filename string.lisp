@@ -205,6 +205,12 @@
       (setf (aref dict (1- (length dict))) best-word)
       ;;(format t "~4d ~s~%" best-size dict)
       dict)))
+;;TODO2 ensure that when we do create dictionary it takes
+;;into account word cost (i.e. 3 + len bytes)
+;;which is terminator byte and word address in index
+
+;;TODO1, try doing word substitution BEFORE compression.
+;;never know if that is a better idea.
 
 (defun create-dictionary (max-entries strings)
   (let ((dictionary #()))
@@ -221,7 +227,7 @@
 ;;;this must be called last, after the last use of dcs/dstr
 ;;;this hack means we don't have to reinitialise a hash set
 ;;;on each pass.
-(defun string-table (dictionary &optional (omit-font-data nil))
+(defun string-table (dictionary &optional (omit-font-data nil) (print nil))
   (dc "String Table")
   ;;Get the strings that need to be inlined at the end
   (let ((additions nil))
@@ -249,7 +255,7 @@
       (setf *word-dictionary* dictionary)
       ;; A bit wasteful, but let's compress all the strings and see how long they
       ;; are
-      (when *compiler-final-pass*
+      (when (and print *compiler-final-pass*)
 	(let ((compressed-size 0))
 	  (do-hash-keys (str *string-table*)
 	    (incf compressed-size
@@ -258,6 +264,8 @@
 		  (round (/ compressed-size uncompressed-size 0.01)))))
       ;;let's hope we don't get this
       (assert (/= 0 (eos-index)) nil "EOS index cannot be 0 as it conflicts with the end of dictionary word terminator")
+      (label :dictionary)
+      ;;TODO assert not on page 3 or lower
       (loop for word across dictionary do
 	   (label word :word)
 	   (let ((word-data nil))
@@ -267,7 +275,6 @@
 		    (push index word-data)))
 	     (push *end-of-word* word-data)
 	     (apply #'db nil (nreverse word-data))))
-      (label :dictionary-end)
       (let ((lo (list :lo-char-offsets))
 	    (hi (list :hi-char-offsets)))
 	(dolist (e *huffman-table*)
@@ -330,7 +337,7 @@
     "Sing a song of sixpence, a pocket full of eyes"
     "Shall I compare thee to a summer's ham?"))
 
-(defun string-test (string dictionary)
+(defun string-test (string dictionary print)
   (org #x600)
 
   (assert string nil "String was empty")
@@ -338,6 +345,11 @@
   (label :start)
 
   (zp-w :ptr)
+
+  ;;If this gets any more complex, hide this behind
+  ;;a closure so we can do
+  ;;JSR :decode-init
+  ;;JSR :decode-next
   
   (sta16.zp string :huffman-ptr)
   (LDX 1)
@@ -348,8 +360,8 @@
   (CPX (nil->0 (eos-index)))
   (BEQ :done)
   (LDA.ABX :hi-char-offsets)
-  (CMP (1+ (hi :dictionary-end)))
-  (BLT :is-word)
+  (CMP 
+  (BGE :is-word)
   (TXA)
   (LDY.ZP :output-string-index)
   (STA.ABY :str-buffer)
@@ -386,16 +398,16 @@
        
   (huffman-decoder)
   
-  (string-table dictionary t)
+  (string-table dictionary t print)
   
   (label :end))
 
-(defun compile-string-test (string dictionary)
+(defun compile-string-test (string dictionary print)
   (reset-compiler)
   (reset-strings)
   
   (flet ((pass ()
-	   (string-test string dictionary)))
+	   (string-test string dictionary print)))
     
     ;; pass 1, get strings
     
@@ -411,12 +423,12 @@
     
     (pass)))
 
-(defun test-decoder (&optional (dictionary #()))
+(defun test-decoder (&optional (dictionary #()) (print nil))
   ;;6502 string decode
-  (compile-string-test "the mat" dictionary)
+  (compile-string-test "the mat" dictionary print)
   (let ((huffvec (coerce *huffman-table* 'vector)))
     (do-hash-keys (str *string-table*)
-      (compile-string-test str dictionary)
+      (compile-string-test str dictionary print)
       (monitor-reset :start)
       (monitor-run :print nil)
       (let* ((*compiler-buffer* (monitor-buffer))

@@ -295,7 +295,7 @@
 			  (progn
 			    ;;dummy test character address
 			    (push 0 lo)
-			    (push #xD0 hi))
+			    (push #x02 hi))
 			  (progn
 			    ;;check that we actually have the typeface data
 			    ;;for this character
@@ -360,7 +360,7 @@
   (CPX (nil->0 (eos-index)))
   (BEQ :done)
   (LDA.ABX :hi-char-offsets)
-  (CMP 
+  (CMP (hi :dictionary))
   (BGE :is-word)
   (TXA)
   (LDY.ZP :output-string-index)

@@ -74,7 +74,9 @@
 	      (first p)
 	      (second p)
 	      (third p)
-	      (ash (third p) (- (second p) 16))))))
+	      (aif (third p)
+		   (ash it (- (second p) 16))
+		   nil)))))
 
 ;;note the commented out entry is the high offset; for less than 256 symbols we don't care
 ;;what that value is

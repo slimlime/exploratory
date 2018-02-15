@@ -73,7 +73,7 @@
 	   (measure-size "Dispatcher"
 	     (dispatcher))
 	   (measure-size "String Table"
-	     (string-table))
+	     (string-table #() nil t))
 	   (huffman-decoder)
 	   (image-decompressor)
 	   (label :end)

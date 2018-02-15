@@ -75,13 +75,13 @@
   (label :navigate)
   
   (with-namespace :navigate
-    (alias :loc :A4)
+    (alias :loc :A5)
     ;;We could use the 'call' graph to figure out which things
     ;;to check to ensure the variable we use here do clash
 
-    (ensure-aliases-different '(:A4) (get-aliased-labels :typeset-cs))
-    (ensure-aliases-different '(:A4) (get-aliased-labels :typeset))
-    (ensure-aliases-different '(:A4) (get-aliased-labels :decompress))
+    (ensure-aliases-different '(:A5) (get-aliased-labels :typeset-cs))
+    (ensure-aliases-different '(:A5) (get-aliased-labels :typeset))
+    (ensure-aliases-different '(:A5) (get-aliased-labels :decompress))
    
     (alias :str '(:typeset-cs . :str))
     (alias :dest '(:decompress . :dest))

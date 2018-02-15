@@ -389,7 +389,7 @@ standard object display name e.g. 'A golden apple.'"
 
 	   (object-table)
 
-	   (string-table)
+	   (string-table #() t)
 	   (huffman-decoder)
 	   
 	   (label :end)

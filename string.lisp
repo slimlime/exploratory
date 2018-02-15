@@ -12,6 +12,11 @@
 ;;this string table is basically a hash look-up of strings
 ;;to addresses, which should be valid on the final pass
 
+;;TODO The unused letters do not need a huffman code, but they
+;;do need to be in the table, so they can be given an index which
+;;is after all the others. It only needs to be there so there is
+;;a place for the word dictionary to find the character data address
+
 (defun append-eos (str)
   (format nil "~a~a" str #\nul))
 
@@ -63,6 +68,8 @@
       (assert (<= (second e) 16)
 	      nil
 	      "~a has a ~a bit pattern." (first e) (fourth e))
+      ;;Might be caused by the factor 0.1 further down which ensures
+      ;;that the 'unused' letters get very long codes.
       (setf (gethash (first e) lookup) e))
     lookup))
 
@@ -247,7 +254,7 @@
     ;;the table.
     (loop for c across *charset* do
 	 (unless (gethash c freqs)
-	   (setf (gethash c freqs) 0.00001)))
+	   (setf (gethash c freqs) 0.1)))
     (let* ((table (build-huffman-string-table freqs))
 	   (lookup (build-huffman-bit-pattern-lookup table)))
       (setf *huffman-lookup* lookup)
@@ -265,6 +272,8 @@
       ;;let's hope we don't get this
       (assert (/= 0 (eos-index)) nil "EOS index cannot be 0 as it conflicts with the end of dictionary word terminator")
       (label :dictionary)
+      (when *compiler-final-pass*
+	(assert (> (hi :dictionary) 2) nil "Dictionary must not be on page 0,1 or 2 as there is a comparison which relies on this when decoding"))
       ;;TODO assert not on page 3 or lower
       (loop for word across dictionary do
 	   (label word :word)

@@ -20,6 +20,7 @@
   (zp-w :A2)
   (zp-w :A3)
   (zp-w :A4)
+  (zp-w :A5)
   
   (zp-b :D0)
   (zp-b :D1)

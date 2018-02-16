@@ -360,9 +360,7 @@ is replaced with replacement."
   (assert string nil "String was empty")
   
   (label :start)
-
-  (zp-w :ptr)
-
+  
   ;;If this gets any more complex, hide this behind
   ;;a closure so we can do
   ;;JSR :decode-init
@@ -385,23 +383,31 @@ is replaced with replacement."
   (INC.ZP :output-string-index)
   (BNE :another)
   (label :is-word)
-  (STA.ZP (hi-add :ptr))
+  (AND.IMM #x7)
+  (CLC)
+  (ADC #x2)
+  (TAY "length")
+  (LDA.ABX :hi-char-offsets)
+  (LSR)
+  (LSR)
+  (LSR)
+  (CLC)
+  (ADC (1- (hi :dictionary))) 
+  (STA.AB (1+ (hi-add :ptr)))
   (LDA.ABX :lo-char-offsets)
-  (STA.ZP (lo-add :ptr))
-  (LDY 0)
+  (STA.AB (1+ (lo-add :ptr)))
   (label :next-char)
+  (CPY 0)
+  (BEQ :another)
   (LDX.ZP :output-string-index)
-  (LDA.IZY :ptr)
-  (CMP *end-of-word*)
-  (BEQ :another) ;;need assertion that eos is NOT 0, the word terminator
-  ;;can omit the null terminator if the last char is eos.
+  (label :ptr)
+  (LDA.ABY :ptr)
+  (DEY)
   (CMP (nil->0 (eos-index)))
   (BEQ :done)
   (STA.ABX :str-buffer)
-  (INY)
   (INC.ZP :output-string-index)
   (BNE :next-char)
-
   (label :done)
   (BRK)
   

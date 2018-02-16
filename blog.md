@@ -1,3 +1,144 @@
+## 16/2/2018 Final Destination: String Terminator
+
+After a lot of experimentation the a scheme has been chosen. It is now time to focus on something else as data-compression seems to be very expensive time-wise.
+
+Here's how it stands now.
+
+~~~~
+CL-USER> (run-simple-game)
+Dungeon Cell size 3041
+Corridor size 1768
+Frazbolg's Closet size 1269
+Object Table size 154
+Dispatcher size 337
+Strings 5095 -> 2616 (51%)
+String Table size 1093
+Fonts size 2321
+Build size 13526
+Cycles:535397
+~~~~
+
+And before,
+
+~~~~
+CL-USER> (run-simple-game)
+Dungeon Cell size 2951
+Corridor size 1881
+Frazbolg's Closet size 1322
+Build size 13681
+Cycles:548029
+~~~~
+
+So we have improved both size wise and cycle wise. Not only that, although it seems like the size of the text has increased, we are taking into account total-cost; that includes the cost of each entry into the word dictionary. If we disregard the dictionary cost another 300 bytes can be squeezed out of the string data. This will certainly save memory when the size of the string table increases. The code to build the word dictionary looks at every substring of between 2 and 8 characters, and sees what the total size (including dictionary cost) would be. It then chooses the best substring and adds it to the list. We keep going like this until we can no longer add any words that are a net benefit.
+
+Here's the dictionary for the simple game, with the huffman codes. We can clearly see that the Huffman encoder now prefers a full stop followed by an end of string marker than just the end of string marker alone.
+
+The context dependent first-letter Huffman code has been removed, possibly I will revisit that later to compress the all-caps titles better.
+
+~~~~
+  0 _        len:3   bits:0000000000000000 0
+  1 e        len:3   bits:0010000000000000 1
+  2 o        len:4   bits:0100000000000000 4
+  3 a        len:4   bits:0101000000000000 5
+  4 r        len:4   bits:0110000000000000 6
+  5 s        len:4   bits:0111000000000000 7
+  6 t        len:5   bits:1000000000000000 16
+  7 n        len:5   bits:1000100000000000 17
+  8 l        len:5   bits:1001000000000000 18
+  9 i        len:5   bits:1001100000000000 19
+ 10 d        len:6   bits:1010000000000000 40
+ 11 ↵        len:6   bits:1010010000000000 41
+ 12 .¶       len:6   bits:1010100000000000 42
+ 13 m        len:6   bits:1010110000000000 43
+ 14 c        len:6   bits:1011000000000000 44
+ 15 u        len:6   bits:1011010000000000 45
+ 16 p        len:6   bits:1011100000000000 46
+ 17 h        len:6   bits:1011110000000000 47
+ 18 in       len:6   bits:1100000000000000 48
+ 19 th       len:6   bits:1100010000000000 49
+ 20 y        len:6   bits:1100100000000000 50
+ 21 g        len:6   bits:1100110000000000 51
+ 22 .        len:6   bits:1101000000000000 52
+ 23 w        len:6   bits:1101010000000000 53
+ 24 f        len:7   bits:1101100000000000 108
+ 25 b        len:7   bits:1101101000000000 109
+ 26 ing      len:7   bits:1101110000000000 110
+ 27 Ā        len:7   bits:1101111000000000 111
+ 28 k        len:7   bits:1110000000000000 112
+ 29 _you     len:7   bits:1110001000000000 113
+ 30 ,_       len:7   bits:1110010000000000 114
+ 31 ck       len:7   bits:1110011000000000 115
+ 32 You_     len:7   bits:1110100000000000 116
+ 33 _of      len:7   bits:1110101000000000 117
+ 34 The_     len:8   bits:1110110000000000 236
+ 35 A        len:8   bits:1110110100000000 237
+ 36 v        len:8   bits:1110111000000000 238
+ 37 -        len:8   bits:1110111100000000 239
+ 38 I        len:8   bits:1111000000000000 240
+ 39 all      len:8   bits:1111000100000000 241
+ 40 O        len:9   bits:1111001000000000 484
+ 41 and_     len:9   bits:1111001010000000 485
+ 42 door     len:9   bits:1111001100000000 486
+ 43 '        len:9   bits:1111001110000000 487
+ 44 z        len:9   bits:1111010000000000 488
+ 45 M        len:9   bits:1111010010000000 489
+ 46 !¶       len:9   bits:1111010100000000 490
+ 47 ?¶       len:9   bits:1111010110000000 491
+ 48 !        len:9   bits:1111011000000000 492
+ 49 hav      len:9   bits:1111011010000000 493
+ 50 R        len:9   bits:1111011100000000 494
+ 51 N        len:9   bits:1111011110000000 495
+ 52 door_is  len:9   bits:1111100000000000 496
+ 53 P        len:9   bits:1111100010000000 497
+ 54 _key     len:9   bits:1111100100000000 498
+ 55 W        len:9   bits:1111100110000000 499
+ 56 H        len:9   bits:1111101000000000 500
+ 57 slime    len:9   bits:1111101010000000 501
+ 58 ound     len:10  bits:1111101100000000 1004
+ 59 G        len:10  bits:1111101101000000 1005
+ 60 S        len:10  bits:1111101110000000 1006
+ 61 F        len:10  bits:1111101111000000 1007
+ 62 E        len:10  bits:1111110000000000 1008
+ 63 L        len:10  bits:1111110001000000 1009
+ 64 biscuit  len:10  bits:1111110010000000 1010
+ 65 Th       len:10  bits:1111110011000000 1011
+ 66 already  len:10  bits:1111110100000000 1012
+ 67 don't    len:10  bits:1111110101000000 1013
+ 68 ?        len:10  bits:1111110110000000 1014
+ 69 You      len:10  bits:1111110111000000 1015
+ 70 C        len:10  bits:1111111000000000 1016
+ 71 ,        len:10  bits:1111111001000000 1017
+ 72 ¶        len:10  bits:1111111010000000 1018
+ 73 B        len:10  bits:1111111011000000 1019
+ 74 D        len:11  bits:1111111100000000 2040
+ 75 U        len:11  bits:1111111100100000 2041
+ 76 x        len:11  bits:1111111101000000 2042
+ 77 Y        len:11  bits:1111111101100000 2043
+ 78 j        len:11  bits:1111111110000000 2044
+ 79 K        len:11  bits:1111111110100000 2045
+ 80 Z        len:12  bits:1111111111000000 4092
+ 81 T        len:12  bits:1111111111010000 4093
+ 82 `        len:12  bits:1111111111100000 4094
+ 83 V        len:12  bits:1111111111110000 4095
+ 84 q        len:0   bits:NIL NIL
+ 85 X        len:0   bits:NIL NIL
+ 86 Q        len:0   bits:NIL NIL
+ 87 J        len:0   bits:NIL NIL
+ 88 9        len:0   bits:NIL NIL
+ 89 8        len:0   bits:NIL NIL
+ 90 7        len:0   bits:NIL NIL
+ 91 6        len:0   bits:NIL NIL
+ 92 5        len:0   bits:NIL NIL
+ 93 4        len:0   bits:NIL NIL
+ 94 3        len:0   bits:NIL NIL
+ 95 2        len:0   bits:NIL NIL
+ 96 1        len:0   bits:NIL NIL
+ 97 0        len:0   bits:NIL NIL
+~~~~
+
+
+
+
 ## 12/2/2018 Brute Force
 
 So the very upsetting lesson to learn is that all the work I did on the Huffman encoder and decoder on compressing the strings has not gained me anything. After a *lot* of fiddly experimentation I have come to the following conclusion.

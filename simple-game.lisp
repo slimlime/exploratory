@@ -331,6 +331,9 @@ preventing closed-minded mortals from seeing what is really there.")
 		(measure-size "Frazbolg's Closet"
 		  (frazbolgs-closet))
 		(generic-handlers))
+	    #(" the " ". " " you" "You " "The " "ing" "door is" "biscuit" "in" " of" "th"
+  "ck" ", " "slime" "already" "! " "hav" "and " "door" "? " "You" "Th" "don't"
+  "all" " key" "ound")
 	    :full-reset full-reset :break-on break-on))
 
 ;;You see a spanner

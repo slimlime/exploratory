@@ -73,27 +73,26 @@
       (setf (gethash (first e) lookup) e))
     lookup))
 
-(defun greedy-replace1 (str table emit)
-  (let ((strend (1- (length str))))
-    (loop for i from 0 to strend do
-	 (tagbody
-	    (loop for j from 0 to (1- (length table)) do
-		 (let ((word (aref table j)))
-		   (when (and (<= (+ i -1 (length word)) strend)
-			      (equal word (subseq str i (+ i (length word)))))
-		     (funcall emit j word)
-		     (incf i (1- (length word)))
-		     (go :next))))
-	    (funcall emit nil (char str i))
-	    :next))))
+(defun replace-all (string part replacement &key (test #'char=))
+  "Returns a new string in which all the occurences of the part 
+is replaced with replacement."
+  (with-output-to-string (out)
+    (loop with part-length = (length part)
+          for old-pos = 0 then (+ pos part-length)
+          for pos = (search part string
+                            :start2 old-pos
+                            :test test)
+          do (write-string string out
+                           :start old-pos
+                           :end (or pos (length string)))
+          when pos do (write-string replacement out)
+          while pos)))
 
 (defun pre-encode (dictionary str)
   (setf str (append-eos str))
-  (let ((s (make-array 0 :fill-pointer 0 :element-type 'extended-char :adjustable t)))
-    (greedy-replace1 str dictionary
-		     #'(lambda (i c)
-			 (vector-push-extend (if i (code-char (+ i 256)) c) s)))
-    s))
+  (loop for i from 0 to (1- (length dictionary)) do
+       (setf str (replace-all str (aref dictionary i) (string (code-char (+ i 256))))))
+  str)
 
 (defun encode (lookup dictionary str)
   (setf str (pre-encode dictionary str))
@@ -179,101 +178,60 @@
 	   (incf (gethash c freqs))
 	   (setf (gethash c freqs) 1))))
 
-(defun find-best-word-pre-huffman (dictionary strings)
+(defun find-best-word (dictionary strings min max)
   (let ((matches (make-hash-table :test 'equal))
-	(best-size 100000)
+	(best-total 1000000)
+	(best-compressed 0)
 	(best-word nil)
 	(freqs nil)
 	(table nil)
 	(lookup nil))
-    (do-hash-keys (str strings)
-      (do-subsequences (sub (append-eos str) 4 8)
+    (do-hash-keys (str strings) ;;this could be popped out
+      (do-subsequences (sub (append-eos str) min max)
 	(if (gethash sub matches)
 	    (incf (gethash sub matches))
 	    (setf (gethash sub matches) 1))))
-    (setf *matches* matches)
     (let ((dict (make-array (1+ (length dictionary)))))
       (loop for word across dictionary
 	 for i from 0 do
 	   (setf (aref dict i) word))
       (do-hashtable (sub f matches)
-	(when (> f 3)
+	(when (> f 2)
 	  (setf (aref dict (1- (length dict))) sub)
-	  (let ((size 0))
+	  (setf freqs (make-hash-table :test #'equal))
+	  (do-hash-keys (str strings)
+	    (count-frequencies (pre-encode dict str) freqs))
+	  (setf table (build-huffman-string-table freqs))
+	  (setf lookup (build-huffman-bit-pattern-lookup table))
+	  (let ((compressed-size 0)
+		(total-size 0))
 	    (do-hash-keys (str strings)
-	      (incf size
-		    (length (pre-encode dict str))))
-	    (when (< size best-size)
-	      (setf best-size size)
+	      (incf compressed-size
+		    (length (encode lookup dict str))))
+	    ;;now add the dictionary cost
+	    (setf total-size compressed-size)
+	    (loop for word across dict do
+		 (incf total-size 2) ;;2 bytes symbol entry
+		 (incf total-size (length word)))
+	    (when (< total-size best-total)
+	      (setf best-compressed compressed-size)
+	      (setf best-total total-size)
 	      (setf best-word sub)))))
       (setf (aref dict (1- (length dict))) best-word)
-      (setf freqs (make-hash-table :test #'equal))
-      (do-hash-keys (str strings)
-	(count-frequencies (pre-encode dict str) freqs))
-      (setf table (build-huffman-string-table freqs))
-      (setf lookup (build-huffman-bit-pattern-lookup table))
-      (let ((compressed-size 0))
-	(do-hash-keys (str strings)
-	  (incf compressed-size
-		(length (encode lookup dict str))))
-	(print best-size)
-	(print compressed-size)
-	(prin1 dict)
-	dict))))
+      (values best-total best-compressed dict))))
 
-(defun find-best-word-post-huffman (dictionary strings)
-  (let ((matches (make-hash-table :test 'equal))
-	(best-size 100000)
-	(best-word nil)
-	(freqs nil)
-	(table nil)
-	(lookup nil))
-    (do-hash-keys (str strings)
-      (do-subsequences (sub (append-eos str) 2 16)
-	(if (gethash sub matches)
-	    (incf (gethash sub matches))
-	    (setf (gethash sub matches) 1))))
-    (setf *matches* matches)
-    (let ((dict (make-array (1+ (length dictionary)))))
-      (loop for word across dictionary
-	 for i from 0 do
-	   (setf (aref dict i) word))
-      (do-hashtable (sub f matches)
-	  (when (> f 3)
-	    (setf (aref dict (1- (length dict))) sub)
-	    (setf freqs (make-hash-table :test #'equal))
-	    (do-hash-keys (str strings)
-	      (count-frequencies (pre-encode dict str) freqs))
-	    (setf table (build-huffman-string-table freqs))
-	    (setf lookup (build-huffman-bit-pattern-lookup table))
-	    (let ((compressed-size 0))
-	      (do-hash-keys (str strings)
-		(incf compressed-size
-		      (length (encode lookup dict str))))
-	      (when (< compressed-size best-size)
-		(setf best-size compressed-size)
-		(setf best-word sub)))))
-      (setf (aref dict (1- (length dict))) best-word)
-      (print best-size)
-      (prin1 dict)
-      dict)))
-
-;;TODO2 ensure that when we do create dictionary it takes
-;;into account word cost (i.e. 3 + len bytes)
-;;which is terminator byte and word address in index
-
-;;TODO1, try doing word substitution BEFORE compression.
-;;never know if that is a better idea.
-
-(defun create-dictionary (max-entries strings &optional (dictionary #()) (fn #'find-best-word-post-huffman))
-    (dotimes (_ max-entries)
-      (let ((new-dictionary (funcall fn dictionary strings)))
-	(if (and (> (length dictionary) 1)
-		 (equal (aref new-dictionary (1- (length new-dictionary)))
-			(aref dictionary (1- (length dictionary)))))
-	    (return-from create-dictionary dictionary)
-	    (setf dictionary new-dictionary)))))
-
+(defun create-dictionary (max-entries strings min max dictionary)
+  (let ((last-size 1000000))
+    (dotimes (_ 10000000)
+      (multiple-value-bind (total size dict)
+	  (find-best-word dictionary strings min max)
+	(when (or (= (length dict) max-entries)
+		  (<= last-size total))
+	  (return-from create-dictionary dictionary))
+	(format t "~5d ~5d ~s~%" total size dict)
+	(setf last-size total)
+	(setf dictionary dict)))))
+    
 (defparameter *end-of-word* #xff)
 
 ;;;this must be called last, after the last use of dcs/dstr

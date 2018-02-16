@@ -8,17 +8,7 @@
 (defparameter *huffman-lookup* nil)
 (defparameter *huffman-table* nil)
 
-(defparameter *word-lo-page* 3) ;;words must be on this page or higher
-;;as lower is reserved for font data offset
-
-;;TODO warning if goes over 16 bit code
-;;this string table is basically a hash look-up of strings
-;;to addresses, which should be valid on the final pass
-
-;;TODO The unused letters do not need a huffman code, but they
-;;do need to be in the table, so they can be given an index which
-;;is after all the others. It only needs to be there so there is
-;;a place for the word dictionary to find the character data address
+(defparameter *word-lo-page* 3)
 
 (defun append-eos (str)
   (format nil "~a~a" str #\nul))

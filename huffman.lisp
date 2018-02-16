@@ -66,12 +66,14 @@
 	  (incf index))))
     pop))
 
-(defun dump-huffman (pattern)
+(defun dump-huffman (pattern &optional (dictionary *word-dictionary*))
   (let ((i -1))
     (dolist (p pattern)
-      (format t "~3d ~a len:~3a bits:~16,'0b ~a~%"
+      (format t "~3d ~8a len:~3a bits:~16,'0b ~a~%"
 	      (incf i)
-	      (first p)
+	      (if (>= (char-code (first p)) 256)
+		  (fmt-str (aref dictionary (- (char-code (first p)) 256)))
+		  (fmt-str (string (first p))))
 	      (second p)
 	      (third p)
 	      (aif (third p)

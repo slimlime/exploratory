@@ -1,6 +1,6 @@
 (defparameter origin #x600)
       
-(defun build-game (initial-location game-fn &key (full-reset nil))
+(defun build-game (initial-location game-fn dictionary &key (full-reset nil))
 
   (when full-reset
     (reset-image-cache))
@@ -73,7 +73,7 @@
 	   (measure-size "Dispatcher"
 	     (dispatcher))
 	   (measure-size "String Table"
-	     (string-table #() nil t))
+	     (string-table dictionary nil t))
 	   (huffman-decoder)
 	   (image-decompressor)
 	   (label :end)
@@ -100,8 +100,8 @@
 
       (format t "Build size ~a~%" (- *compiler-ptr* origin))))
 
-(defun run-game (initial-location game-fn &key (full-reset nil) (break-on 'BRK))
-  (build-game initial-location game-fn :full-reset full-reset)
+(defun run-game (initial-location game-fn dictionary &key (full-reset nil) (break-on 'BRK))
+  (build-game initial-location game-fn dictionary :full-reset full-reset)
   (monitor-reset #x600)
   (monitor-run :break-on break-on)
   (setmem-copy (monitor-buffer)))

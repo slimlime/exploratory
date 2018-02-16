@@ -264,7 +264,7 @@
 	     ;;TODO, This has to go after the strings, otherwise it makes the build
 	     ;;unstable. Presumably another pass would fix it, but it should be
 	     ;;stable by this point shouldn't it?
-	     (string-table)
+	     (string-table #())
 	     
 	     (label :end)
 	     (font-data)

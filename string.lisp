@@ -8,6 +8,9 @@
 (defparameter *huffman-lookup* nil)
 (defparameter *huffman-table* nil)
 
+(defparameter *word-lo-page* 3) ;;words must be on this page or higher
+;;as lower is reserved for font data offset
+
 ;;TODO warning if goes over 16 bit code
 ;;this string table is basically a hash look-up of strings
 ;;to addresses, which should be valid on the final pass
@@ -231,8 +234,6 @@ is replaced with replacement."
 	(format t "~5d ~5d ~s~%" total size dict)
 	(setf last-size total)
 	(setf dictionary dict)))))
-    
-(defparameter *end-of-word* #xff)
 
 ;;;this must be called last, after the last use of dcs/dstr
 ;;;this hack means we don't have to reinitialise a hash set
@@ -270,22 +271,20 @@ is replaced with replacement."
       ;;let's hope we don't get this
       (assert (/= 0 (eos-index)) nil "EOS index cannot be 0 as it conflicts with the end of dictionary word terminator")
       (label :dictionary)
-      (when *compiler-final-pass*
-	(assert (> (hi :dictionary) 2) nil "Dictionary must not be on page 0,1 or 2 as there is a comparison which relies on this when decoding"))
       (let ((missing-chars nil))
 	(loop for c across *charset* do
 	     (unless (find c *huffman-table* :key #'first)
 	       (push (list c 0 nil) missing-chars)))
 	(setf *huffman-table* (append *huffman-table* missing-chars)))
       (loop for word across dictionary do
-	   (label word :word)
+	   (label (fmt-str word) :word)
 	   (let ((word-data nil))
 	     (loop for c across word do
 		  (let ((index (position c *huffman-table* :key #'first)))
 		    (assert index nil "'~a' was not found in the huffman table" c)
+		    ;;words go in backwards to use decrementing counter
 		    (push index word-data)))
-	     (push *end-of-word* word-data)
-	     (apply #'db nil (nreverse word-data))))
+	     (apply #'db nil word-data)))
       (let ((lo (list :lo-char-offsets))
 	    (hi (list :hi-char-offsets)))
 	(dolist (e *huffman-table*)
@@ -299,14 +298,21 @@ is replaced with replacement."
 		  (push 0 hi))
 		(let ((code (char-code c)))
 		  (if (> code 255) ;this is a word not a letter
-		      (let ((w (resolve (cons :word (aref dictionary (- code 256))))))
+		      ;;we push 1- the word address as we use a decrementing Y index
+		      
+		      (let* ((word (aref dictionary (- code 256)))
+			     (w (1- (resolve (cons :word (fmt-str word))))))
 			(push (lo w) lo)
-			(push (hi w) hi))
+			(assert (>= (length word) 2))
+			;;hi address is a 1 based offset << 3 | (length - 2)
+			(push (logior (ash (1+ (- (hi w) (hi :dictionary))) 3)
+				      (- (length word) 2)) 
+				      hi))
 		      (if omit-font-data
 			  (progn
 			    ;;dummy test character address
 			    (push 0 lo)
-			    (push #x02 hi))
+			    (push #x01 hi))
 			  (progn
 			    ;;check that we actually have the typeface data
 			    ;;for this character
@@ -371,7 +377,7 @@ is replaced with replacement."
   (CPX (nil->0 (eos-index)))
   (BEQ :done)
   (LDA.ABX :hi-char-offsets)
-  (CMP (hi :dictionary))
+  (CMP *word-lo-page* "'Page' 0,1 is character data offset")
   (BGE :is-word)
   (TXA)
   (LDY.ZP :output-string-index)

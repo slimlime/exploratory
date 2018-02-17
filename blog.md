@@ -68,7 +68,7 @@ So here are the numbers, which include 'popcount' reduction as an additional str
 ~~~~~
            Original   Simple   Best   Attributes Simple  Total   %
 sad-dog        1352      601*                169    169**  770  51
-porsche        1352      621                 169    169    683  52
+porsche        1352      621                 169    169    790  52
 ~~~~~
 
 ## Popcount Reduction

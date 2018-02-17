@@ -388,13 +388,14 @@
 	     (push (list i b) list)))
       (sort list #'> :key #'second))))
 
-(defun pre-encode-image (img sx)
+(defun pre-encode-image (img)
   (let ((out (make-array (length img) :element-type 'integer)))
     (loop for i from 0 to (1- (length img)) do
 	 (let ((index nil))
 	   (setf index (position (aref img i) *even-bytes*))
 	   (unless index
 	     (setf index (position (aref img i) *odd-bytes*)))
+	   (assert index nil "Byte ~a was not in the image byte list" (aref img i))
 	   (setf (aref out i) index)))
     out))
 
@@ -403,7 +404,7 @@
     (when (null img)
       (setf img (posterize-image sx sy (load-image file sx sy)))
       (setf (gethash file *image-cache*) img))
-    (setf img (pre-encode-image (first img) sx))
+    (setf img (pre-encode-image (first img)))
     (let* ((freq (image-byte-frequency img))
 	   (tbl (huffman freq))
 	   (lookup (build-huffman-bit-pattern-lookup tbl)))

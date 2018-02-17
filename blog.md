@@ -1,3 +1,89 @@
+## 17/2/2018 Final Destination 2: Sad Dogs
+
+If you are reading this, good news! I am going to talk about compression, a subject which I am entirely sick to death of. This dog is a reader of the blog, and it is obvious how he feels.
+
+![Sad 8bit Dog](/blog/8bit-dog.png)
+
+Early on in the blog we had some numbers for the compression and the final standings for the pattern-match scheme were (including the sad dog above).
+
+~~~~
+           Original   Simple   Best   Attributes Simple Total   %
+
+cellardoor     1352     1073    995          169    131  1204  79
+porsche        1352     1182   1042          169    154  1336  87
+maxine         1352     1054    762          169    154  1213  80
+sad-dog        1352     1103                 169    148  1251  82
+~~~~
+
+I'm glad I pressed on with the Huffman encoder, so even though it just about breaks even on compression with about 5K worth of strings, we can now do some experiments on the statistics of the images.
+
+Since the images are mostly empty space, it means the Huffman algorithm can aggressively encode for 0. 
+
+~~~~
+#b00000000    518
+#b11111111    177
+#b11111100     75
+...
+~~~~
+
+Zero is vastly more, common, followed by full-on, and from there the frequency rapidly drops off.
+
+Leading to a Huffman code table,
+
+~~~~
+  0 0        len:1   bits:0000000000000000 0
+  1 40       len:3   bits:1000000000000000 4
+  2 39       len:5   bits:1010000000000000 20
+  3 36       len:5   bits:1010100000000000 21
+  4 1        len:5   bits:1011000000000000 22
+~~~~
+
+So a zero-byte is encoded by a single bit. All other Johnny-come-lately bytes have the indignity of starting with a 1, followed by whatever else.
+
+## Halftone
+
+I had the idea that I would rather like to reduce the image sizes even more, so rather than allowing any old bytes to be used I decided on the following scheme. Each byte would be split into 4 pairs of bits,
+
+~~~~
+| 7  6 | 5  4 | 3  2 | 1  0 |
+  0  0  Off
+  0  1  Half Off
+  1  0  Half On
+  1  1  On
+~~~~~
+
+Each pair of bits can have four possible states, `00`, `11`, `10` and `01`. Or put another way, `OFF`, `ON`, `HALF-ON`, `HALF-OFF`. On the basis that `HALF-ON` is indistinguishable from `HALF-OFF`, it is a damn liberty that we expend all this entropy making a distinction. We can simply alternate between `HALF-ON` and `HALF-OFF` each scanline, producing an attractive inadvertant halftone pattern while we are at it.
+
+~~~~
+| 7  6 | 5  4 | 3  2 | 1  0 |
+     0  Off
+     1  On
+     2  Half
+~~~~~
+
+This leads to 81 symbols (3^4). The image converter now just looks for the best match from the 81 possible bytes. Extensive visual testing at YAGNILABS using anaesthetized volunteers has shown there is no difference in the images encoded with the 81 bytes (alternating each scanline) allowed in our scheme and the full evil spectrum of 256 bytes in the previous scheme. Not a difference they were willing to admit to anyway.
+
+So here are the numbers, which include 'popcount' reduction as an additional strategy.
+
+~~~~~
+           Original   Simple   Best   Attributes Simple  Total   %
+sad-dog        1352      601*                169    169**  770  51
+porsche        1352      621                 169    169    683  52
+~~~~~
+
+## Popcount Reduction
+
+When I convert the images I count the number of set bits in each 8x8 square. If the number if more than half set, I switch the foreground and background, and flip all the bits. This results in an identical square, but the statistics of the image are improved, biasing even more to 0. This was worth an astonishing 10% or so- the sad dog went from 659 to 601 bytes.
+
+Here is an interesting observation. If I hadn't doggedly pursued the unpromising approach on the string data, I would not have had a working Huffman decoder and would never have imagined it might work for images so well. I really should have focussed my attention where the gains were highest, the images took up by far the most space. Seems it is worth focussing on something, anything even and really seeing it through, because who knows where it will lead.
+
+All I need to do now is actually implement the 6502 code necessary. Perhaps there is light at the end of the tunnel after all?
+
+*not included the cost of the Huffman tables, which will be approximately 200 bytes amortized across however many images we do.
+
+**colour info didn't really compress very well. I may try again at the end when we can get better overally statistics.
+
+
 ## 16/2/2018 Final Destination: String Terminator
 
 After a lot of experimentation the a scheme has been chosen. It is now time to focus on something else as data-compression seems to be very expensive time-wise.

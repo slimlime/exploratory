@@ -399,28 +399,26 @@
 	   (setf (aref out i) index)))
     out))
 
-(defun huffman-encode-image (file &key (sx 104) (sy 104))
-  (let ((img (gethash file *image-cache*)))
-    (when (null img)
-      (setf img (posterize-image sx sy (load-image file sx sy)))
-      (setf (gethash file *image-cache*) img))
-    (setf img (pre-encode-image (first img)))
-    (let* ((freq (image-byte-frequency img))
-	   (tbl (huffman freq))
-	   (lookup (build-huffman-bit-pattern-lookup tbl)))
-      (print freq)
-      (dump-huffman tbl nil)
-      (let ((vec (make-array (length img)
+(defun pre-encode-colors (colors)
+  (let ((out (make-array (* 2 (length colors)) :element-type 'integer)))
+    (loop for i from 0 to (1- (length colors))
+       for j from 0 by 2 do
+	 (setf (aref out j) (ash (aref colors i) -4))
+	 (setf (aref out (1+ j)) (logand #xf (aref colors i))))
+    out))
+
+(defun huffman-encode-vector (vec lookup)
+  (let ((out (make-array (length vec)
 			     :fill-pointer 0
 			     :adjustable t
 			     :element-type '(unsigned-byte 8))))
 	(let ((word 0) ;;24 bits
 	      (bits 0))
 	  (flet ((emit ()
-		   (vector-push-extend (ash word -16) vec)
+		   (vector-push-extend (ash word -16) out)
 		   (setf word (logand #xffff00 (ash word 8)))
 		   (decf bits 8)))
-	    (loop for b across img
+	    (loop for b across vec
 	       for j from 0 do
 		 (let ((e (gethash b lookup)))
 		   (assert e nil "byte ~a not in lookup" b)
@@ -436,9 +434,24 @@
 	      (emit))
 	    (when (> bits 0)
 	      (emit)))
-	  (values vec (/ (+ (* 8 (length vec)) bits) 8.0)))))))
-      
-      
-      
-  
-	     
+	  out)))
+
+(defun huffman-encode-image (file &key (sx 104) (sy 104))
+  (let ((img (gethash file *image-cache*)))
+    (when (null img)
+      (setf img (posterize-image sx sy (load-image file sx sy)))
+      (setf (gethash file *image-cache*) img))
+    (let* ((data (pre-encode-image (first img)))
+	   (freq (image-byte-frequency data))
+	   (tbl (huffman freq))
+	   (lookup (build-huffman-bit-pattern-lookup tbl)))
+      ;;(dump-huffman tbl nil)
+      (let ((encoded-data (huffman-encode-vector data lookup)))
+	(format t "Size ~a~%" (length encoded-data))))
+    (let* ((colors (pre-encode-colors (second img)))
+	   (freq (image-byte-frequency colors))
+	   (tbl (huffman freq))
+	   (lookup (build-huffman-bit-pattern-lookup tbl)))
+      (dump-huffman tbl nil)
+      (let ((encoded-colors (huffman-encode-vector colors lookup)))
+	(format t "Size ~a~%" (length encoded-colors))))))

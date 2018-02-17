@@ -135,7 +135,7 @@
 			  (when (= (incf tab) 8)
 			    (terpri)
 			    (setf tab 0)))
-		      ))))))
+		      )))))
 
 (defun posterize-block (x y sx img out reduce-popcount)
   (let ((best-diff most-positive-fixnum)

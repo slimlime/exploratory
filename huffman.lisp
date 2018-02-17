@@ -42,6 +42,9 @@
 ;;test 'edge' case
 (huffman '((#\L 1) (#\C 1) (#\B 1) (#\A 11)))
 
+(huffman '((1 1) (1 1) (2 1) (3 11)))
+
+
 ;;; Return a vector containing the populations of each
 ;;; level of a huffman table, e.g. how many symbols of
 ;;; each length.
@@ -71,9 +74,11 @@
     (dolist (p pattern)
       (format t "~3d ~8a len:~3a bits:~16,'0b ~a~%"
 	      (incf i)
-	      (if (>= (char-code (first p)) 256)
-		  (fmt-str (aref dictionary (- (char-code (first p)) 256)))
-		  (fmt-str (string (first p))))
+	      (if dictionary
+		  (if (>= (char-code (first p)) 256)
+		      (fmt-str (aref dictionary (- (char-code (first p)) 256)))
+		      (fmt-str (string (first p))))
+		  (first p))
 	      (second p)
 	      (third p)
 	      (aif (third p)

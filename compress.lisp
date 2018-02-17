@@ -9,7 +9,7 @@
 	     (setf lf (aref arr i))
 	     (setf lfb i)))
       lfb)))
-
+	       
 (defparameter *max-length* 18) ; 0-15 -> 3-18
 (defparameter *max-offset* 15) ; 1-15 -> 1-15 (0 encodes the row above)
 
@@ -377,11 +377,67 @@
 
   (setmem-copy (monitor-buffer)))
 
-  
+(defun image-byte-frequency (buf)
+  (let ((arr (make-array 257 :element-type 'integer :initial-element 0)))
+    (loop for b across buf do
+	 (incf (aref arr b)))
+    (let ((list nil))
+      (loop for b across arr
+	 for i from 0 do
+	   (when (> b 0)
+	     (push (list i b) list)))
+      (sort list #'> :key #'second))))
 
+(defun pre-encode-image (img sx)
+  (let ((out (make-array (length img) :element-type 'integer)))
+    (loop for i from 0 to (1- (length img)) do
+	 (let ((index nil))
+	   (setf index (position (aref img i) *even-bytes*))
+	   (unless index
+	     (setf index (position (aref img i) *odd-bytes*)))
+	   (setf (aref out i) index)))
+    out))
 
+(defun huffman-encode-image (file &key (sx 104) (sy 104))
+  (let ((img (gethash file *image-cache*)))
+    (when (null img)
+      (setf img (posterize-image sx sy (load-image file sx sy)))
+      (setf (gethash file *image-cache*) img))
+    (setf img (pre-encode-image (first img) sx))
+    (let* ((freq (image-byte-frequency img))
+	   (tbl (huffman freq))
+	   (lookup (build-huffman-bit-pattern-lookup tbl)))
+      (print freq)
+      (dump-huffman tbl nil)
+      (let ((vec (make-array (length img)
+			     :fill-pointer 0
+			     :adjustable t
+			     :element-type '(unsigned-byte 8))))
+	(let ((word 0) ;;24 bits
+	      (bits 0))
+	  (flet ((emit ()
+		   (vector-push-extend (ash word -16) vec)
+		   (setf word (logand #xffff00 (ash word 8)))
+		   (decf bits 8)))
+	    (loop for b across img
+	       for j from 0 do
+		 (let ((e (gethash b lookup)))
+		   (assert e nil "byte ~a not in lookup" b)
+		   ;;shift the bit patter to the right so it would be at the
+		   ;;24 bit position if the word buffer were empty
+		   (setf word (logior word (ash (third e) (- 8 bits))))
+		   ;;now add on the number of bits
+		   (incf bits (second e))
+		   (do ()
+		       ((< bits 8))
+		     (emit))))
+	    (when (> bits 0)
+	      (emit))
+	    (when (> bits 0)
+	      (emit)))
+	  (values vec (/ (+ (* 8 (length vec)) bits) 8.0)))))))
       
-    
+      
       
   
 	     

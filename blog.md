@@ -1,4 +1,4 @@
-## 17/2/2018 Final Destination 2: Sad Dogs
+## 17/2/2018 Image Redux
 
 If you are reading this, good news! I am going to talk about compression, a subject which I am entirely sick to death of. This dog is a reader of the blog, and it is obvious how he feels.
 
@@ -83,6 +83,9 @@ All I need to do now is actually implement the 6502 code necessary. Perhaps ther
 
 **colour info didn't really compress very well. I may try again at the end when we can get better overally statistics.
 
+![David A. Huffman](/blog/david_a_huffman.png)
+
+David A. Huffman, 1925-1999
 
 ## 16/2/2018 Final Destination: String Terminator
 

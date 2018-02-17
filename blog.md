@@ -1,3 +1,9 @@
+## 17/2/2018 Purple Dog
+
+Better colours? This was done using Imagemagick's remap, followed by my import. Their color mapping is obviously a lot better, so maybe I should just process it through that.
+
+![Sad 8bit Dog](/blog/purple-dog.png)
+
 ## 17/2/2018 Image Redux
 
 If you are reading this, good news! I am going to talk about compression, a subject which I am entirely sick to death of. This dog is a reader of the blog, and it is obvious how he feels.

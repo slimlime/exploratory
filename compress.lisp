@@ -1,12 +1,10 @@
 (defparameter *images* nil)
-(defparameter *image-huffman-table* nil)
 (defparameter *image-huffman-lookup* nil)
 
 ;; This must be called before each build
 
 (defun reset-image-table ()
   (setf *images* (make-hash-table :test 'equal))
-  (setf *image-huffman-table* nil)
   (setf *image-huffman-lookup* nil))
 
 ;; A cache of converted images, since it takes so long to posterize them
@@ -26,14 +24,6 @@
 	     (setf index (position (aref img i) *odd-bytes*)))
 	   (assert index nil "Byte ~a was not in the image byte list" (aref img i))
 	   (setf (aref out i) index)))
-    out))
-
-(defun pre-encode-colors (colors)
-  (let ((out (make-array (* 2 (length colors)) :element-type 'integer)))
-    (loop for i from 0 to (1- (length colors))
-       for j from 0 by 2 do
-	 (setf (aref out j) (ash (aref colors i) -4))
-	 (setf (aref out (1+ j)) (logand #xf (aref colors i))))
     out))
 
 (defun huffman-encode-vector (vec lookup)
@@ -66,6 +56,7 @@
 	  out)))
 
 (defun huffman-encode-image (file &key (sx 104) (sy 104))
+  ;;test function
   (let ((img (gethash file *image-cache*)))
     (when (null img)
       (setf img (posterize-image sx sy (load-image file sx sy)))
@@ -88,21 +79,28 @@
 (defun get-posterized-image (file sx sy)
   (aif (gethash file *image-cache*)
        it
-       (posterize-image sx sy (load-image file sx sy))))
+       (setf (gethash file *image-cache*)
+	     (posterize-image sx sy (load-image file sx sy)))))
 
-;; On the first pass, lets just
 (defun dimg (name file sx sy)
   (assert (= 0 (mod sx 8)))
   (assert (= 0 (mod sy 8)))
-  (if *image-huffman-table*
-      (progn
+  (if *image-huffman-lookup*
+      ;;stick the image data here
+      (destructuring-bind (pixels colours) (get-posterized-image file sx sy)
 	(dc (format nil "Image ~a ~ax~a (~a)" name sx sy file))
-	(destructuring-bind (pixels colors) (get-posterized-image file sx sy)
-	  (huffman-encode
+	(let ((data (huffman-encode-vector (pre-encode-image pixels)
+					   *image-huffman-lookup*)))
+	  (label :pixels name)
+	  (add-hint (length data) (format nil "~a pixels (~a)" name (length data)))
+	  (loop for c across data do (push-byte c)))
+	(label :colours name)
+	(add-hint (length colours) (format nil "~a colours (~a)" file (length colours)))
+	(loop for c across colours do (push-byte c)))
       ;;otherwise just add it to the list to be processed
-      (setf (gethash name *images*) (list file sx sy)))))
+      (setf (gethash name *images*) (list file sx sy))))
 
-(defun image-huffman-table ()
+(defun image-table ()
   (let ((freq (make-array 256 :element-type 'integer :initial-element 0)))
     (do-hashtable (name image *images*)
       (declare (ignore name))
@@ -110,40 +108,25 @@
 	(destructuring-bind (pixels colors) (get-posterized-image file sx sy)
 	  (declare (ignore colors))
 	  ;;get byte frequencies across all images
-	  (loop for byte across pixels do (incf (aref freq byte))))))
+	  (loop for byte across (pre-encode-image pixels) do
+	       (incf (aref freq byte))))))
     ;;filter out the 0 occurances and sort
     (let ((tbl nil))
       (loop for f across freq
 	 for i from 0 do
 	   (when (> f 0)
 	     (push (list i f) tbl)))
-      (setf *image-huffman-table* (huffman (sort tbl #'> :key #'second)))
+      (setf tbl (huffman (sort tbl #'> :key #'second)))
       (setf *image-huffman-lookup*
-	    (build-huffman-bit-pattern-lookup *image-huffman-table*)))))
+	    (build-huffman-bit-pattern-lookup tbl))
+      (huffman-pop-table :pixel-population tbl "Image Pixel Huffman Table")
+      ;;now we have to be able to translate from indices to bytes
+      ;;using the amazing tables, which we interleave so we can
+      (apply #'db :even-bytes (mapcar #'(lambda (e) (aref *even-bytes* (second e))) tbl))
+      (apply #'db :odd-bytes (mapcar #'(lambda (e) (aref *odd-bytes* (second e))) tbl)))))
 
 (defun set-attributes (colour)
   (call-memset colour *char-memory-address* +char-memory-length+))
-
-(defun draw-image (image w h &optional (img-align :right))
-  ;;TEST FUNCTION ONLY.
-  (assert (= 0 (mod w 8)))
-  (assert (= 0 (mod h 8)))
-  (with-namespace :decompress
-    ;;we don't really need to emit this much assembly for the call
-    (let ((offset (if (eq img-align :right)
-		      (+ (/ +screen-width+ 8) (- (/ w 8)))
-		      0)))
-
-      (LDA (/ w 8))
-      (STA.ZP :imgw)
-      (sta16.zp (cons image :pixels) :data)
-      (sta16.zp (+ offset *screen-memory-address*) :dest)
-      (LDA h)
-      (JSR :decompress)
-      (sta16.zp (cons image :colours) :data)
-      (sta16.zp (+ offset *char-memory-address*) :dest)
-      (LDA (/ h 8))
-      (JSR :decompress))))
 
 ;; Render an image to the screen
 (defun image-decompressor ()
@@ -155,40 +138,53 @@
     (alias :dst :A1)
     (alias :w :D1)
     (alias :h :D2)
-
-    
-    (label :emit)
-    (dc "Emit a byte to the screen")
-    (LDY.ZP :dest-y)
-    (STA.IZY :dest)
-    (INY)
-    (TYA)
-    (CMP.ZP :w)
-    (BNE :emit-end)
-    (dc "Scanline wrap")
-    (add16.zp (/ +screen-width+ 8) :dest)
+    (alias :y :D3)
+    (dc "Initialize huffman decoder")
+    (LDA 1)
+    (STA.ZP :huffman-bits)
+    (sta16.zp :pixel-population :huffman-pop-table)
     (LDY 0)
+    (label :next)
+    (STY.ZP :y)
+    (JSR :huffman-next)
+    (LDA.ZP :h)
+    (AND.IMM 1 "Odd or even scanline?")
+    (BEQ :odd)
+    (LDA.ABX :even-bytes)
+    (BPL :emit "Assume positive, since only 81 indices are possible")
+    (label :odd)
+    (LDA.ABX :odd-bytes)
+    (label :emit)
+    (LDY.ZP :y)
+    (STA.IZY :dst)
+    (INY)
+    (BNE :next)
     (DEC.ZP :h)
-    (BNE :emit-end)
-    (dc "We are done, pop the stack return directly to caller")
-    (PLA)
-    (PLA)
-    (RTS)
-    (label :emit-end)
-    (STY.ZP :dest-y)
-    (RTS)))
+    (BEQ :done)
+    (add16.zp (/ +screen-width+ 8) :dst)
+    (LDY 0)
+    (BEQ :next)
+    (label :done)
+    (RTS)))    
     
 (defun draw-test ()
   (reset-compiler)
-  (reset-strings)
+  (reset-image-table)
   (flet ((pass ()
 	   (zeropage)	     
 	   (org #x600)
 	   (CLD)
-	   (draw-image :odd 104 104)
+	   (LDA 13)
+	   (STA.ZP '(:decompress-image . :w))
+	   (STA.ZP '(:decompress-image . :h))
+	   (sta16.zp (cons :img :pixels) '(:decompress-image . :src))
+	   (sta16.zp *screen-memory-address* '(:decompress-image . :dst))
+	   (JSR :decompress-image)
 	   (BRK)
+	   (huffman-decoder)
 	   (image-decompressor)
-	   (dimg :odd "/home/dan/Downloads/odd.bmp" 104 104)
+	   (dimg :img "~/exploratory/images/porsche.bmp" 104 104)
+	   (image-table)
 	   (label :end)))
     (build #'pass))
   (monitor-reset #x600)

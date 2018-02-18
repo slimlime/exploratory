@@ -26,7 +26,7 @@
 	   (org origin)
 	   (CLD)
 	   (label :start)
-	   (cls #x10)
+	   (set-colours #x10)
 	   (sta16.zp (cons :font :present) :font)
 
 	   (JSR :vm-enter)

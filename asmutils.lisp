@@ -1,4 +1,20 @@
 ;;TODO rationalise the tests and make an automated build which calls them
+;;TODO In memcpy and memset, why use just two pointers? For copying a page
+;;     at least we can do
+
+;;     a0 = 0
+;;     a1 = 64
+;;     a2 = 128
+;;     a3 = 192
+;;     then do four
+;;     LDA.IZY :a0
+;;     LDA.IZY :a1
+;;     LDA.IZY :a2
+;;     LDA.IZY :a3
+;;     LDA.IZY :a4
+;;     INY
+;;     Using 1/4 of the INY instructions. Got to be worth 3*256 microseconds!
+;;     Could add up, at least when clearing the screen.
 
 (defun zeropage ()
 
@@ -66,6 +82,15 @@
   (ADC (hi value))
   (STA.ZP (hi-add zp)))
 
+(defun add16.ab (value loc)
+  (CLC)
+  (LDA.AB (lo-add loc))
+  (ADC (lo value))
+  (STA.AB (lo-add loc))
+  (LDA.AB (hi-add loc))
+  (ADC (hi value))
+  (STA.AB (hi-add loc)))
+
 (defun adc16a.zp (zp)
   "16 bit add accumulator to zero page"
   (with-local-namespace
@@ -104,11 +129,18 @@
   (STA.ZP (hi-add to)))
 
 (defun sta16.zp (addr zpg)
-  "Load an address into a zero page word"
+  "Store an address into a zero page location"
   (LDA (lo addr))
   (STA.ZP (lo-add zpg))
   (LDA (hi addr))
   (STA.ZP (hi-add zpg)))
+
+(defun sta16.ab (addr loc)
+  "Store an address into a location"
+  (LDA (lo addr))
+  (STA.AB (lo-add loc))
+  (LDA (hi addr))
+  (STA.AB (hi-add loc)))
 
 (defun call-memcpy (src dst len)
   (assert (> len 0))

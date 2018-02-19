@@ -44,5 +44,6 @@
 
 (defun load-vicky ()
   (ql:quickload 'lispbuilder-sdl)
+  (bload "sharedmem.lisp")
   (bload "vicky-shared.lisp")
   (bload "vicky.lisp"))

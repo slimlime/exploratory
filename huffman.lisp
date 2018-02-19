@@ -1,3 +1,18 @@
+;;Example of the information required to store the indices of a Huffman table
+;;TODO, the lead in byte to indicate a populated row could be squashed into
+;;      the high byte of the Max Code value, by offsetting by 1.
+;;
+;;PIXEL-POPULATION 0A27 FF000000 DB $FF, $00, $00, $00 ;f( 1)= 1 Max:0000 Del:0000
+;;                     0A2B 00       DB $00    ;f( 2)= 0 Max:NIL Del:NIL
+;;                     0A2C 00       DB $00    ;f( 3)= 0 Max:NIL Del:NIL
+;;                     0A2D FF000907 DB $FF, $00, $09, $07 ;f( 4)= 2 Max:0009 Del:0007
+;;                     0A31 FF001711 DB $FF, $00, $17, $11 ;f( 5)= 4 Max:0017 Del:0011
+;;                     0A35 FF003629 DB $FF, $00, $36, $29 ;f( 6)= 7 Max:0036 Del:0029
+;;                     0A39 FF007460 DB $FF, $00, $74, $60 ;f( 7)= 7 Max:0074 Del:0060
+;;                     0A3D FF00F3D5 DB $FF, $00, $F3, $D5 ;f( 8)=10 Max:00F3 Del:00D5
+;;                     0A41 FF01F8C9 DB $FF, $01, $F8, $C9 ;f( 9)=17 Max:01F8 Del:01C9
+;;                     0A45 FF03FFC2 DB $FF, $03, $FF, $C2 ;f(10)=14 Max:03FF Del:03C2
+
 (defun huffman1 (symbols)
   (let ((q (sort (copy-list symbols) #'< :key #'second))
 	(node nil))
@@ -93,7 +108,7 @@
   (dc description)
   (let ((len 0))
     (loop for p across (huffman-population huffman-table) do
-	 (dc (format nil "f(~d)=~2d Max:~4,'0X Del:~4,'0X"
+	 (dc (format nil "f(~2d)=~2d Max:~4,'0X Del:~4,'0X"
 		     (incf len) (first p) (second p) (third p))
 	     t)
 	 (if (> (first p) 0)

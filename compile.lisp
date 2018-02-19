@@ -38,6 +38,10 @@
 ;;      For now I am using org as the thing to reset between
 ;;      passes, but maybe this should be split into org and reset
 
+;;TODO  Make passes modular so each 'module' can hook into it independently
+;;      without the client build having to do things like put the string
+;;      table at the end or reset various flags.
+
 (defun reset-compiler (&optional (buffer-size 65536))
   (setf *compiler-ptr* 0)
   (setf *compiler-disassembler-hints* (make-hash-table))
@@ -273,6 +277,12 @@
   (push label (gethash *compiler-ptr* *compiler-address-labels*))
   (setf (gethash label *compiler-labels*) *compiler-ptr*))
 
+(defun label+1 (label &optional (namespace nil namespace-p))
+  (let ((*compiler-ptr* (1+ *compiler-ptr*)))
+    (if namespace-p
+	(label label namespace)
+	(label label))))
+    
 (defun alias (alias label)
   (assert (not (numberp alias)))
   (unless (consp alias)

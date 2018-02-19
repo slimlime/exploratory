@@ -1,7 +1,19 @@
+;; TODO popcount reduction is broken as it looks rubbish if we
+;; just swap the bytes round. Break the posterization into 2- if we want popcount
+;; reduction we have to go round choosing the bytes again, but with a fixed colour
+;; Secondly, we need to measure how badly the images are affected by sharing the
+;; huffman table
+;; Third, how many empty squares are there? Do they have FG=BG in addition to popcount 0
+;; might improve the statistics
+;; Fourth, If we share one Huffman table over the whole attributes, does it improve at all?
+
 (defparameter *images* nil)
 (defparameter *image-huffman-lookup* nil)
 
-(defparameter *image-cache* (make-hash-table :test 'equal))
+;; A cache of converted images, since it takes so long to posterize them
+;; Unless the posterization changes, we can save this between builds
+
+(defparameter *posterized-image-cache* (make-hash-table :test 'equal))
 
 ;; This must be called before each build
 
@@ -9,20 +21,19 @@
   (setf *images* (make-hash-table :test 'equal))
   (setf *image-huffman-lookup* nil))
 
-;; A cache of converted images, since it takes so long to posterize them
-;; Unless the posterization changes, we can save this between builds
-
-(defparameter *posterized-image-cache* nil)
-
-(defun pre-encode-image (img)
-  (let ((out (make-array (length img) :element-type 'integer)))
-    (loop for i from 0 to (1- (length img)) do
-	 (let ((index nil))
-	   (setf index (position (aref img i) *even-bytes*))
-	   (unless index
-	     (setf index (position (aref img i) *odd-bytes*)))
-	   (assert index nil "Byte ~a was not in the image byte list" (aref img i))
-	   (setf (aref out i) index)))
+(defun pre-encode-image (img sx sy)
+  (let ((out (make-array (length img) :element-type 'integer))
+	(k 0))
+    (loop for i from 0 to (1- sy) do
+	 (loop for j from 0 to (1- (/ sx 8)) do
+	      (let ((index (position (aref img k)
+				     (if (= (mod i 2) 0)
+					 *even-bytes*
+					 *odd-bytes*))))
+		
+		(assert index nil "Byte ~a was not in the image byte list" (aref img k))
+		(setf (aref out k) index))
+	      (incf k)))
     out))
 
 (defun huffman-encode-vector (vec lookup)
@@ -55,10 +66,10 @@
 	  out)))
 
 (defun get-posterized-image (file sx sy)
-  (aif (gethash file *image-cache*)
+  (aif (gethash file *posterized-image-cache*)
        it
-       (setf (gethash file *image-cache*)
-	     (posterize-image sx sy (load-image file sx sy)))))
+       (setf (gethash file *posterized-image-cache*)
+	     (posterize-image sx sy (load-image file sx sy) :reduce-popcount nil))))
 
 (defun dimg (name file sx sy)
   (assert (= 0 (mod sx 8)))
@@ -67,7 +78,7 @@
       ;;stick the image data here
       (destructuring-bind (pixels colours) (get-posterized-image file sx sy)
 	(dc (format nil "Image ~a ~ax~a (~a)" name sx sy file))
-	(let ((data (huffman-encode-vector (pre-encode-image pixels)
+	(let ((data (huffman-encode-vector (pre-encode-image pixels sx sy)
 					   *image-huffman-lookup*)))
 	  (label :pixels name)
 	  (add-hint (length data) (format nil "~a pixel data ~a bytes" name (length data)))
@@ -86,7 +97,7 @@
 	(destructuring-bind (pixels colors) (get-posterized-image file sx sy)
 	  (declare (ignore colors))
 	  ;;get byte frequencies across all images
-	  (loop for byte across (pre-encode-image pixels) do
+	  (loop for byte across (pre-encode-image pixels sx sy) do
 	       (incf (aref freq byte))))))
     ;;filter out the 0 occurances and sort
     (let ((tbl nil))
@@ -122,18 +133,14 @@
     (LDA 1)
     (STA.ZP :huffman-bits)
     (sta16.zp :pixel-population :huffman-pop-table)
+    (dc "Start with the even lookup table")
+    (sta16.ab :even-bytes :bytes)
     (LDY 0)
     (label :next)
     (STY.ZP :column)
     (JSR :huffman-next)
-    (LDA.ZP :height-pixels)
-    (AND.IMM 1 "Odd or even scanline?")
-    (BEQ :odd)
-    (LDA.ABX :even-bytes)
-    (BPL :emit "Assume positive, since only 81 indices are possible")
-    (label :odd)
-    (LDA.ABX :odd-bytes)
-    (label :emit)
+    (label+1 :bytes)
+    (LDA.ABX 0)
     (LDY.ZP :column)
     (STA.IZY :dst)
     (INY)
@@ -141,6 +148,15 @@
     (BNE :next)
     (DEC.ZP :height-pixels)
     (BEQ :done)
+    (dc "Swap the lookup table from even to odd")
+    (dc "and vice-versa, using the XOR trick.")
+    ;;cost, 20 cycles per line, 2ms per 104 pixel
+    (LDA.AB  (hi-add :bytes))
+    (EOR (logxor (hi :even-bytes) (hi :odd-bytes)))
+    (STA.AB (hi-add :bytes))
+    (LDA.AB (lo-add :bytes))
+    (EOR (logxor (lo :even-bytes) (lo :odd-bytes)))
+    (STA.AB (lo-add :bytes))
     (add16.zp (/ +screen-width+ 8) :dst)
     (LDY 0)
     (BEQ :next)
@@ -231,15 +247,13 @@
 	   (LDY 12)
 	   (LDX 12)
 	   (JSR :decompress-colours)
-	   
-	   
 	   (BRK)
 	   (memset)
 	   (huffman-decoder)
 	   (image-decompressor)
 	   (dimg :img1 "~/exploratory/images/porsche.bmp" 104 104)
 	   (dimg :img2 "~/exploratory/images/cell.bmp" 104 104)
-	   (dimg :img3 "~/exploratory/images/face.bmp" 104 104)
+	   (dimg :img3 "~/exploratory/images/dog2.bmp" 104 104)
 	   (image-table)
 	   (label :end)))
     (build #'pass))

@@ -27,7 +27,6 @@
   (bload "justify.lisp")
   (bload "image.lisp")
   (bload "graphics.lisp")
-  (bload "compress.lisp")
   (bload "parse.lisp")
   (bload "objects.lisp")
   (bload "dispatcher.lisp")

@@ -7,6 +7,9 @@
 ;; might improve the statistics
 ;; Fourth, If we share one Huffman table over the whole attributes, does it improve at all?
 
+;; Note popcount reversal saved about 200 bytes over three images
+;; 590 542 645
+
 (defparameter *images* nil)
 (defparameter *image-huffman-lookup* nil)
 
@@ -176,46 +179,46 @@
 	   (when (< diff best-diff)
 	     (setf best-diff diff)
 	     (setf best-c c))))
-    (loop for j from y to (+ 7 y) do
-	 (let ((fg (aref *c64-colours* (ash best-c -4)))
-	       (bg (aref *c64-colours* (logand best-c #xf))))
-	   (let ((best-byte 0))
-	     (unless (= fg bg)
-	       (let ((best-diff most-positive-fixnum))
-		 (loop for byte across (if (= (mod j 2) 0)
-					      *even-bytes*
-					      *odd-bytes*)
-		    do (let ((diff 0)
-			     (bit #x80))
-			 (loop for i from x to (+ 7 x) do
-			      (let ((img-col (aref img (+ i (* sx j))))
-				    (is-bg (= 0 (logand bit byte))))
-				(incf diff (colour-diff (if is-bg bg fg) img-col)))
-			      (setf bit (ash bit -1)))
-			 (when (< diff best-diff)
-			   (setf best-diff diff)
-			   (setf best-byte byte))))))
-	     (setf (aref out (+ (* j (floor sx 8)) (floor x 8))) best-byte)
-	     (let ((bit #x80))
-	       (loop for i from 0 to 7 do
-		    (let ((is-bg (= 0 (logand bit best-byte))))
-		      (unless is-bg (incf popcount)))
-		    (setf bit (ash bit -1)))))))
-    (when (and reduce-popcount
-	       (> popcount 32))
-      ;;invert to reduce number of set bits. Saved a whol 50 bytes for the maxine image
-      (setf best-c (logior (logand #xf0 (ash best-c 4))
-			   (ash best-c -4)))
-      (loop for j from y to (+ 7 y) do
-	   (let ((byte (aref out (+ (* j (floor sx 8)) (floor x 8)))))
-	     (setf (aref out (+ (* j (floor sx 8)) (floor x 8)))
-		   (logxor #xff byte)))))
-    (when (= 0 popcount)
-      ;; all the bits are zero so let us set the foreground colour to
-      ;; be the same as the background colour
-      (setf best-c (logior (logand #xf0 (ash best-c 4))
-			   (logand #x0f best-c))))    
-    best-c))
+    (flet ((apply-best-match (fg bg)
+	     (loop for j from y to (+ 7 y) do
+		  (let ((best-byte 0))
+		    (unless (= fg bg)
+		      (let ((best-diff most-positive-fixnum))
+			(loop for byte across (if (= (mod j 2) 0)
+						  *even-bytes*
+						  *odd-bytes*)
+			   do (let ((diff 0)
+				    (bit #x80))
+				(loop for i from x to (+ 7 x) do
+				     (let ((img-col (aref img (+ i (* sx j))))
+					   (is-bg (= 0 (logand bit byte))))
+				       (incf diff (colour-diff (if is-bg bg fg) img-col)))
+				     (setf bit (ash bit -1)))
+				(when (< diff best-diff)
+				  (setf best-diff diff)
+				  (setf best-byte byte))))))
+		    (setf (aref out (+ (* j (floor sx 8)) (floor x 8))) best-byte)
+		    (let ((bit #x80))
+		      (loop for i from 0 to 7 do
+			   (let ((is-bg (= 0 (logand bit best-byte))))
+			     (unless is-bg (incf popcount)))
+			   (setf bit (ash bit -1))))))))
+      (let ((fg (aref *c64-colours* (ash best-c -4)))
+	    (bg (aref *c64-colours* (logand best-c #xf))))
+	(apply-best-match fg bg)
+	(when (and reduce-popcount
+		   (> popcount 32))
+	  (setf popcount 0)
+	  (apply-best-match bg fg)
+	  ;;experiments show doesn't really make much difference
+	  ;;if we swap back when popcount > 32 here
+	  (setf best-c (logior (ash (logand best-c #xf) 4)
+			       (ash best-c -4)))))
+      (when (= 0 popcount)
+	;; all the bits are zero so let us set the foreground colour to
+	;; be 0
+	(setf best-c (logand #x0f best-c)))
+      best-c)))
 
 (defun posterize-image (sx sy img &key (reduce-popcount t))
   (let ((attributes nil)
@@ -232,7 +235,6 @@
        (setmem (+ i #x8000) 0))
   (loop for i from 0 to 1000 do
        (setmem (+ i #x7000) 0))
-
   (let ((ptr #x7000)
 	(x 0))
     (loop for att across (second result) do
@@ -242,17 +244,13 @@
 	 (when (= x (floor sx 8))
 	   (incf ptr (- 40 x))
 	   (setf x 0))))
-
-
   (let ((ptr #x8000)
 	(x 0))
     (loop for b across (first result) do
-	 
 	 (setmem ptr b)
 	 (incf ptr)
 	 (incf x)
-	 (when (= x (floor sx 8))
-	   
+	 (when (= x (floor sx 8))	   
 	   (incf ptr (- 40 x))
 	   (setf x 0)))))
 
@@ -265,7 +263,6 @@
 				     (if (= (mod i 2) 0)
 					 *even-bytes*
 					 *odd-bytes*))))
-		
 		(assert index nil "Byte ~a was not in the image byte list" (aref img k))
 		(setf (aref out k) index))
 	      (incf k)))
@@ -286,7 +283,7 @@
 	       for j from 0 do
 		 (let ((e (gethash b lookup)))
 		   (assert e nil "byte ~a not in lookup" b)
-		   ;;shift the bit patter to the right so it would be at the
+		   ;;shift the bit pattern to the right so it would be at the
 		   ;;24 bit position if the word buffer were empty
 		   (setf word (logior word (ash (third e) (- 8 bits))))
 		   ;;now add on the number of bits
@@ -304,7 +301,7 @@
   (aif (gethash file *posterized-image-cache*)
        it
        (setf (gethash file *posterized-image-cache*)
-	     (posterize-image sx sy (load-image file sx sy) :reduce-popcount nil))))
+	     (posterize-image sx sy (load-image file sx sy) :reduce-popcount t))))
 
 (defun dimg (name file sx sy)
   (assert (= 0 (mod sx 8)))
@@ -386,9 +383,12 @@
     (dc "Swap the lookup table from even to odd")
     (dc "and vice-versa, using the XOR trick.")
     ;;cost, 20 cycles per line, 2ms per 104 pixel
-    (LDA.AB  (hi-add :bytes))
-    (EOR (logxor (hi :even-bytes) (hi :odd-bytes)))
-    (STA.AB (hi-add :bytes))
+    (let ((hi-xor (logxor (hi :even-bytes) (hi :odd-bytes))))
+      (unless (= hi-xor 0)
+	(print "Warning: Byte table not on page 1ms penalty!")
+	(LDA.AB  (hi-add :bytes))
+	(EOR (logxor (hi :even-bytes) (hi :odd-bytes)))
+	(STA.AB (hi-add :bytes))))
     (LDA.AB (lo-add :bytes))
     (EOR (logxor (lo :even-bytes) (lo :odd-bytes)))
     (STA.AB (lo-add :bytes))
@@ -487,8 +487,8 @@
 	   (huffman-decoder)
 	   (image-decompressor)
 	   (dimg :img1 "~/exploratory/images/porsche.bmp" 104 104)
-	   (dimg :img2 "~/exploratory/images/cell.bmp" 104 104)
-	   (dimg :img3 "~/exploratory/images/face.bmp" 104 104)
+	   (dimg :img2 "~/exploratory/images/cheetos.bmp" 104 104)
+	   (dimg :img3 "~/exploratory/images/garage.bmp" 104 104)
 	   (image-table)
 	   (label :end)))
     (build #'pass))

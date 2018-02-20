@@ -61,7 +61,6 @@
 	       -3))))
 
 (defun navigator ()
-  
   (label :restore-game)
   (dc "Navigate to the restored location")
   (JSR :navigate)
@@ -71,21 +70,17 @@
     ;;saved.
     (dw :current-location 0))
   (BRK)
-
   (label :navigate)
-  
   (with-namespace :navigate
     (alias :loc :A5)
     ;;We could use the 'call' graph to figure out which things
     ;;to check to ensure the variable we use here do clash
-
     (ensure-aliases-different '(:A5) (get-aliased-labels :typeset-cs))
     (ensure-aliases-different '(:A5) (get-aliased-labels :typeset))
-    (ensure-aliases-different '(:A5) (get-aliased-labels :decompress))
-   
+    (ensure-aliases-different '(:A5) (get-aliased-labels :decompress-image))
     (alias :str '(:typeset-cs . :str))
-    (alias :dest '(:decompress . :dst))
-    (alias :data '(:decompress . :src))
+    (alias :dest '(:decompress-image . :dst))
+    (alias :data '(:decompress-image . :src))
     (JSR :deref-w)
     (dc "Store the address of the current location")
     (dc "In the zeropage so we can use it")
@@ -98,7 +93,6 @@
     (dc "Clear the top half of the screen")
     (call-memset 0 *screen-memory-address*
 		 (* (live-row 0) +screen-width-bytes+))
-
     (dc "Set the current place")
     (LDY 14)
     (LDA.IZY :loc)
@@ -122,7 +116,7 @@
     (STA.ZP (lo-add :str))
     (INY)
     (LDA.IZY :loc)
-    (STA.ZP (hi-add :s
+    (STA.ZP (hi-add :str))
     (sta16.zp (scradd (+ *text-line-offset* *line-height*) 0)
 	      '(:typeset . :raster))
     (JSR :typeset-cs)
@@ -133,12 +127,12 @@
     (dc "Get the image width in bytes")
     (LDY 6)
     (LDA.IZY :loc)
-    (STA.ZP '(:decompress-pixels . :imgw))
+    (STA.ZP '(:decompress-image . :width/8))
     (let ((dst (+ +screen-width-bytes+ *screen-memory-address*)))
       (dc "Work out where to put the image")
       (LDA (lo dst))
       (SEC)
-      (SBC.ZP '(:decompress-pixels . :imgw))
+      (SBC.ZP '(:decompress-image . :width/8))
       (STA.ZP (lo-add :dest))
       (LDA (hi dst))
       (SBC 0)
@@ -153,13 +147,13 @@
       (dc "Now the height of the image")
       (INY)
       (LDA.IZY :loc)
-      (STA.ZP '(:decompress-pixels . :imgh))
-      (JSR :decompress-pixels)
+      (STA.ZP '(:decompress-image . :height))
+      (JSR :decompress-image)
       (dc "Work out where to put the colour data image")
       (setf dst (+ +screen-width-bytes+ *char-memory-address*))
       (LDA (lo dst))
       (SEC)
-      (SBC.ZP '(:decompress-pixels . :imgw))
+      (SBC.ZP '(:decompress-image . :width/8))
       (STA.ZP (lo-add :dest))
       (LDA (hi dst))
       (SBC 0)
@@ -167,10 +161,10 @@
       (dc "Get the colour data for the image")
       (LDY 10)
       (LDA.IZY :loc)
-      (STA.ZP (lo-add '(:decompress-pixels . :data)))
+      (STA.ZP (lo-add '(:decompress-image . :src)))
       (INY)
       (LDA.IZY :loc)
-      (STA.ZP (hi-add '(:decompress-pixels . :data)))
+      (STA.ZP (hi-add '(:decompress-image . :src)))
       (dc "Set the location dispatch table while we are here")
       (INY)
       (LDA.IZY :loc)
@@ -185,7 +179,7 @@
       (LSR)
       (LSR)
       (LSR)
-      (STA.ZP '(:decompress-pixels . :imgh))
+      (STA.ZP '(:decompress-image . :height))
       (dc "Tail jump to decompress the colours and return")
       (JMP :decompress-colours))))
   

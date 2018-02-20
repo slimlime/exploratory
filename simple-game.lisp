@@ -320,7 +320,7 @@ preventing closed-minded mortals from seeing what is really there.")
     (action '(? ? ?)
       (respond "I don't know what that means."))))
 
-(defun run-simple-game (&key (full-reset nil) (break-on 'BRK))
+(defun run-simple-game (&key (break-on 'BRK))
   (run-game :dungeon-cell
 	    #'(lambda ()
 		(synonyms)
@@ -333,8 +333,8 @@ preventing closed-minded mortals from seeing what is really there.")
 		(generic-handlers))
 	    #(" the " ". " " you" "You " "The " "ing" "door is" "biscuit" "in" " of" "th"
   "ck" ", " "slime" "already" "! " "hav" "and " "door" "? " "You" "Th" "don't"
-  "all" " key" "ound")
-	    :full-reset full-reset :break-on break-on))
+	      "all" " key" "ound")
+	    :break-on break-on))
 
 ;;You see a spanner
 

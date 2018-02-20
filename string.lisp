@@ -13,21 +13,6 @@
 (defun append-eos (str)
   (format nil "~a~a" str #\nul))
 
-(defun fmt-str (str &optional (spaces t))
-  (when (characterp str)
-    (setf str (format nil "~a" str)))
-  (let ((s (make-string (length str))))
-    (loop for c across str
-       for i from 0 do
-	 (if (and spaces (char= c #\  ))
-	     (setf c #\_ )
-	     (if (char= c #\Newline)
-		 (setf c #\↵)
-		 (when (char= c #\Nul)
-		   (setf c #\¶))))
-	 (setf (char s i) c))
-       s))
-
 (defun dump-frequency-table (freqs)
   (let ((col 0)
 	(items nil))
@@ -225,6 +210,9 @@ is replaced with replacement."
 	(setf last-size total)
 	(setf dictionary dict)))))
 
+(defun eos-index () (position #\Nul *huffman-table* :key #'car))
+(defun eol-index () (position #\Newline *huffman-table* :key #'car))
+
 ;;;this must be called last, after the last use of dcs/dstr
 ;;;this hack means we don't have to reinitialise a hash set
 ;;;on each pass.
@@ -333,9 +321,6 @@ is replaced with replacement."
     ;;		     *first-letter-huffman-table*)
     ;;	     (list 0))))
     
-(defun eos-index () (position #\Nul *huffman-table* :key #'car))
-(defun eol-index () (position #\Newline *huffman-table* :key #'car))
-
 (defparameter *test-strings*
   '("The quick brown fox killed the lazy dog and ate his innards"
     "The cat sat on"

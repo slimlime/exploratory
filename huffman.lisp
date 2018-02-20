@@ -13,6 +13,21 @@
 ;;                     0A41 FF01F8C9 DB $FF, $01, $F8, $C9 ;f( 9)=17 Max:01F8 Del:01C9
 ;;                     0A45 FF03FFC2 DB $FF, $03, $FF, $C2 ;f(10)=14 Max:03FF Del:03C2
 
+(defun fmt-str (str &optional (spaces t))
+  (when (characterp str)
+    (setf str (format nil "~a" str)))
+  (let ((s (make-string (length str))))
+    (loop for c across str
+       for i from 0 do
+	 (if (and spaces (char= c #\  ))
+	     (setf c #\_ )
+	     (if (char= c #\Newline)
+		 (setf c #\↵)
+		 (when (char= c #\Nul)
+		   (setf c #\¶))))
+	 (setf (char s i) c))
+       s))
+
 (defun huffman1 (symbols)
   (let ((q (sort (copy-list symbols) #'< :key #'second))
 	(node nil))
@@ -84,7 +99,7 @@
 	  (incf index))))
     pop))
 
-(defun dump-huffman (pattern &optional (dictionary *word-dictionary*))
+(defun dump-huffman (pattern &optional (dictionary nil))
   (let ((i -1))
     (dolist (p pattern)
       (format t "~3d ~8a len:~3a bits:~16,'0b ~a~%"

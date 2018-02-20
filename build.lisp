@@ -1,23 +1,18 @@
 (defparameter origin #x600)
       
-(defun build-game (initial-location game-fn dictionary &key (full-reset nil))
-
-  (when full-reset
-    (reset-image-cache))
-  
+(defun build-game (initial-location game-fn dictionary)  
   (reset-compiler)
   (reset-strings)
   (reset-bits)
   (reset-parser)
   (reset-object-model)
   (reset-game-state-ranges)
-
+  (reset-images)
   ;;this (atm) must be called so the widths are initialised
   ;;todo, make a font-init function which just does the widths.
   (font-data)
   (reset-compiler)
   (reset-vm)
-  
   (flet ((pass ()
 
 	   (reset-dispatcher)
@@ -74,6 +69,8 @@
 	     (dispatcher))
 	   (measure-size "String Table"
 	     (string-table dictionary nil t))
+	   (measure-size "Images"
+	     (image-table))
 	   (huffman-decoder)
 	   (image-decompressor)
 	   (label :end)
@@ -100,8 +97,8 @@
 
       (format t "Build size ~a~%" (- *compiler-ptr* origin))))
 
-(defun run-game (initial-location game-fn dictionary &key (full-reset nil) (break-on 'BRK))
-  (build-game initial-location game-fn dictionary :full-reset full-reset)
+(defun run-game (initial-location game-fn dictionary &key (break-on 'BRK))
+  (build-game initial-location game-fn dictionary)
   (monitor-reset #x600)
   (monitor-run :break-on break-on)
   (setmem-copy (monitor-buffer)))

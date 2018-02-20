@@ -1,3 +1,49 @@
+## 20/2/2018 Finished with compression
+
+Hopefully forever. One final tweak that went in was compressing the colour data. To exploit correlations between adjacent bytes, the colour data was XOR encoded, that is each byte has to be XOR'd with the previous one to get the value. That way, colour runs are encoded as zeroes which entropy encoding can squash down for us. Now the Huffman decoder is doing triple duty for strings, pixel data and colour data. I wonder.. can virtual machine instructions be Huffman coded?
+
+Anyway here are the measurements.
+
+Before, 
+
+~~~~
+CL-USER> (run-simple-game)
+Dungeon Cell size 2951
+Corridor size 1881
+Frazbolg's Closet size 1322
+Build size 13681
+Cycles:548029
+~~~~
+
+After,
+
+~~~~
+CL-USER> (run-simple-game)
+Dungeon Cell size 2463
+Corridor size 1241
+Frazbolg's Closet size 721
+Build size 12148
+Cycles:874654
+~~~~
+
+Total saving of 1.5K, which when multiplied up to 24 rooms is about 10K I would say. It has gotten about 300ms slower to render the location on account of all the Huffman decoding, but there will be some rounds of optimization. Now I have to get back to the game logic...
+
+### Xor Magic
+
+Let us say you want to swap between two numbers, 5 and 23. First you take 5 XOR 23, which is 18.
+Then, to toggle between 5 and 23 it is merely a case of applying an XOR of 18.
+
+The decompressor uses this trick to switch between decoding tables on each scanline. I haven't tried to optimize it, but it seemed better than doing a test and branch.
+
+~~~~
+    (LDA.AB  (hi-add :bytes))
+    (EOR (logxor (hi :even-bytes) (hi :odd-bytes)))
+    (STA.AB (hi-add :bytes))
+    (LDA.AB (lo-add :bytes))
+    (EOR (logxor (lo :even-bytes) (lo :odd-bytes)))
+    (STA.AB (lo-add :bytes))
+~~~~
+
 ## 17/2/2018 Purple Dog
 
 Better colours? This was done using Imagemagick's remap, followed by my import. Their color mapping is obviously a lot better, so maybe I should just process it through that.

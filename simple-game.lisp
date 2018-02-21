@@ -3,14 +3,23 @@
 ;; No assembly in here...
 ;; ..(label has leaked through...)
 
-;; ...TODO separate out the build process
 ;; ...EXAMINE FINGER doesn't work COULD MAKE IT FINGER-BONE AND SYNONYMISE WITH BONE
 ;; ...but EXAMINE BONE does
-;; TODO EAT DOOR -> I don't see that.
+;; TODO EAT DOOR -> I don't see that- objectize everything
 ;; TODO IT IT IT and Also, With What? etc
 ;; SMILE AT SLIME
 ;;TODO EXAMINE FLOOR FAILS TO SET THE BIT (OR THE CHECK FAILS)
 ;; catchphrases
+;;TODO test framework
+;;should be able to do
+
+;;(test '("" "" "") :location blah :set '() :unset '() :objects '(:slime :inventory))
+;;which we may want to extend to have a starting point. Need a save/restore
+;;game state which is human readable, contains anything which deviates from
+;;its default state.
+;;Additionally, we need ot be able to reset the game state to the beginning
+;;'(:door-locked t :lock-jammed f) etc
+;;todo, sign state so that it only works with compatible version
 
 (defparameter *snickering* "You hear the faint sound of snickering...")
 (defparameter *thegodslookaway* "The gods look away in shame.")

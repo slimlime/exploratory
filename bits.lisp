@@ -27,6 +27,31 @@
 		   (format t "~a ~a~%" v k)))
 	   *bit->index*))
 
+(defun unique-bit-index (bit)
+  "Find a bit, without having to specify the location. Asserts if
+there is not matching bit, or if there are duplicates. Fully specified
+bits will only match at the location they are defined."
+  (aif (gethash bit *bit->index*)
+       it
+       (let ((indexes nil))
+	 (do-hashtable (bit-key index *bit->index*)
+	   (print (cdr bit-key))
+	   (when (equal (cdr bit-key) bit)
+	     (push index indexes)))
+	 (assert (= (length indexes) 1) nil "Could not resolve bit '~a', matches ~a"
+		 bit
+		 indexes)
+	 (car indexes))))
+
+(defun bit-value (bit)
+  "Get the current value of a bit. Does what VM routine VM-SET etc do
+   to find the bit index"
+  (let* ((index (unique-bit-index bit))
+	 (bit-mask (ash 1 (logand index #x7)))
+	 (bit-offset (ash index -3)))
+    (not (zerop (logand (monitor-peek (+ (resolve :bit-table) bit-offset))
+			bit-mask)))))
+				      
 (defun bit-index (bit)
   (unless (consp bit)
     (setf bit (cons *current-location* bit)))

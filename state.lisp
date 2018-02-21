@@ -75,9 +75,6 @@
 	      (if (third (car range)) "As bits" "As bytes")))
     *game-state-addresses*))
 
-(defun state->hashtable ()
-  (maphash 
-
 (defun dump-state-base64 (&key (pack-bits t) (peek-fn #'monitor-peek))
   (let ((data (make-array 0
 			  :adjustable t

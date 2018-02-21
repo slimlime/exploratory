@@ -184,6 +184,10 @@
 (defun monitor-peek (address)
   (funcall *monitor-peek-fn* address))
 
+(defun monitor-peek-addr (addr)
+  (logior (monitor-peek addr)
+	  (ash (monitor-peek (1+ addr)) 8)))
+
 (defun monitor-poke (address byte)
   (funcall *monitor-poke-fn* address byte))
 

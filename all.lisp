@@ -36,10 +36,12 @@
   (bload "location.lisp")
   (bload "handlers.lisp")
   (bload "build.lisp")
+  (bload "testing.lisp")
 
   ;; the games...
   
-  (bload "simple-game.lisp"))
+  (bload "simple-game.lisp")
+  (bload "simple-game-tests.lisp"))
 
 (defun load-vicky ()
   (ql:quickload 'lispbuilder-sdl)

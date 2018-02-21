@@ -241,8 +241,10 @@
 	     (push (hi offset) hi)))
       (apply #'db (nreverse lo))
       (apply #'db (nreverse hi)))))
-  
-(defun enter-input (str &key (break-on 'brk))
+
+;;TODO Move this into slime-interface.lisp
+
+(defun enter-input (str &key (break-on 'brk) (print t))
   ;;really need to make better 6502 emulator to avoid need
   ;;for copying the buffer
   (let ((buffer (cl-6502:get-range 0)))
@@ -256,11 +258,15 @@
 	       (to-alphabet-pos c)))
     (setf (cl-6502:get-range 0) buffer))
   (monitor-setpc :test-input)
-  (monitor-run :break-on break-on :print (eq break-on 'brk))
-  (unless (eq break-on 'brk)
-    (monitor-go))
+  (monitor-run :break-on break-on :print (and print
+					      (eq break-on 'brk)))
+
+  (when print
+    (unless (eq break-on 'brk)
+      (monitor-go)))
   (setmem-copy (monitor-buffer))
-  (dump-state-base64))
+  (when print
+    (dump-state-base64)))
 
 (defun gogogo ()
   (tagbody
@@ -275,3 +281,4 @@
   (setmem-copy (monitor-buffer))
   (enter-input "LOOK")
   (values))
+  

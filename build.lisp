@@ -97,8 +97,8 @@
 
       (format t "Build size ~a~%" (- *compiler-ptr* origin))))
 
-(defun run-game (initial-location game-fn dictionary &key (break-on 'BRK))
+(defun run-game (initial-location game-fn dictionary &key (break-on 'BRK) (print t))
   (build-game initial-location game-fn dictionary)
   (monitor-reset #x600)
-  (monitor-run :break-on break-on)
+  (monitor-run :break-on break-on :print print)
   (setmem-copy (monitor-buffer)))

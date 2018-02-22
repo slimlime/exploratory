@@ -89,3 +89,4 @@
 	      "KNOCK DOOR" "UNLOCK DOOR" "OPEN DOOR" "USE DOOR")
   (assert-location :corridor))
 
+(princ "Tests finished")

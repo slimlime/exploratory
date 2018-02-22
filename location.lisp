@@ -46,7 +46,7 @@
      (STA.IZY :raster)
      (DEY)
      (CPY.ZP :D0)
-     (BPL :next-column)
+     (BPL :next-column) ;;suspicious bpl
      (DEX)
      (BPL :next-row)
      (RTS)

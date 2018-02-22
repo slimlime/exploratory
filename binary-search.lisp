@@ -41,7 +41,7 @@
     (BEQ :return)
     
     (label :not-match)
-    (BPL :gt)
+    (BGE :gt)
     (dc "Less than...")
     (LSR.ZP :delta)
     (BEQ :not-found)

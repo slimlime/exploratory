@@ -162,7 +162,7 @@
     (BEQ :trim)
     (label :next-word)
     (CPY *max-input-length*)
-    (BPL :done)
+    (BGE :done)
     (dc "Now start a binary search")
     (dc "but first save word index in case")
     (dc "we need to resolve a collision")
@@ -200,7 +200,7 @@
     (BEQ :found)
     
     (label :not-match)
-    (BPL :gt)
+    (BGE :gt)
     (dc "Less than...")
     (LSR.ZP :delta)
     (BEQ :not-found)

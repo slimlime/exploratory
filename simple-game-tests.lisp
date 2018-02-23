@@ -54,6 +54,13 @@
   (assert-object-in "FINGER BONE" :nowhere))
 
 (test
+  "Not poking out the blockage and not losing the bone"
+  (assert-set :lock-jammed)
+  (test-input "POKE BONE IN LOCK")
+  (assert-set :lock-jammed)
+  (assert-object-in "FINGER BONE" :dungeon-cell))
+
+(test
   "Examining the floor"
   (assert-object-in "SHINY KEY" :nowhere)
   (assert-clr :floor-examined)

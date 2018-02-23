@@ -223,7 +223,6 @@ all of which will refer to the same object."
 		  (split name)
 		;;put in global lookup so we can find it later
 		(setf (gethash name *object-name->index*) index)
-			
 		;;also push into a list so we can make a lookup table in code
 		(push (list (gethash noun *word->meaning*)
 			    (if adjective

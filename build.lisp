@@ -17,8 +17,8 @@
 
 	   (reset-dispatcher)
 	   	   
-	   (zeropage)
 	   (org origin)
+	   (zeropage)
 	   (CLD)
 	   (label :start)
 	   (set-colours #x10)

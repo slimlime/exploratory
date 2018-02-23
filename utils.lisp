@@ -16,5 +16,10 @@
   (let ((k (gensym)))
     `(maphash #'(lambda (,k ,v) (declare (ignore ,k)) ,@body) ,table)))
 
+(defmacro not-nil (value)
+  `(aif ,value
+	it
+	(assert nil nil ,(format nil "~s was nil" value))))
+
 
 	       

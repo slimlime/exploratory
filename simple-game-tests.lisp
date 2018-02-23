@@ -39,12 +39,12 @@
   (test-input "DROP BONE")
   (assert-object-in "FINGER BONE" :dungeon-cell))
 
-#|(test "Taking and dropping the bone, as adjunct noun"
+(test "Taking and dropping the bone, as adjunct noun"
   (assert-object-in "FINGER BONE" :dungeon-cell)
   (test-input "TAKE FINGER")
   (assert-object-in "FINGER BONE" :inventory)
   (test-input "DROP FINGER")
-  (assert-object-in "FINGER BONE" :dungeon-cell))|#
+  (assert-object-in "FINGER BONE" :dungeon-cell))
 
 (test
   "Poking out the blockage and losing the bone"

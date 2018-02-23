@@ -11,8 +11,7 @@
 ;; ELSEWHERE and INVENTORY are PLACES
 
 (defparameter *current-location* nil)
-(defparameter *object-name->id* nil)
-(defparameter *object-id->data* nil)
+(defparameter *object-name->data* nil)
 (defparameter *object-name->index* nil)
 (defparameter *place->id* nil)
 (defparameter *next-place-id* nil)
@@ -32,25 +31,23 @@
 ;;ELSEWHERE = 0
 ;;INVENTORY = 1
 (defun reset-object-model ()
-  (setf *object-name->id* (make-hash-table :test 'equal))
-  (setf *object-id->data* (make-hash-table :test 'equal))
+  (setf *object-name->data* (make-hash-table :test 'equal))
+  (setf *object-name->index* (make-hash-table :test 'equal))
   (setf *place->id* (make-hash-table :test 'equal))
   (setf *object->vtable* (make-hash-table :test 'equal))
-  (setf *object-name->index* (make-hash-table :test 'equal))
   (setf *next-place-id* 0)
-  
   (defplace :nowhere)
   (defplace :inventory))
 
 ;;TODO justify-with-prompt, here and in (respond)
 
-;;split an object name into a noun and adjective
+;;split an object name into noun, adjective
 (defun split (name) 
   (let ((pos (position #\  name)))
     (if pos
-	(cons (subseq name 0 pos)
-	      (subseq name (1+ pos)))
-	(cons name nil))))
+	(values (subseq name (1+ pos))
+		(subseq name 0 pos))
+	(values name nil))))
 
 (defun ends-with-punctuation (string)
   (let ((char (char string (1- (length string)))))
@@ -75,61 +72,49 @@
 (assert (string= "An apple." (name-with-indefinite-article "APPLE")))
 (assert (string= "A telephone." (name-with-indefinite-article "TELEPHONE")))
 
-(defun decompose-name (name)
-  "Decompose a name into noun adjective"
-  (let ((pair (split name)))
-    (values (if (cdr pair) (cdr pair) (car pair))
-	    (if (cdr pair) (car pair) nil))))
-
-(defun make-object-id (noun adj)
-  "Turn an object name into a cons pair of word ids"
-  (unless (gethash noun *word->meaning*)
-    (defword noun))
-  (when adj
-    (unless (gethash adj *word->meaning*)
-      (defword adj)))
-  (cons (gethash noun *word->meaning*)
-	(gethash adj *word->meaning*)))
-
-(defun make-object-data (name name-override noun initial-place description)
+(defun make-object-data (name names description initial-place name-override)
   "Return a list of data associated with an object"
   (let* ((text (justify-with-image description
 				   5 4 *act-font*))
 	 (lines (1+ (count #\Newline text))))
     (assert (< lines 4) nil (format nil "Object description must be 1-3 lines, was ~a ~a" lines text))
-    (list noun
-	  initial-place
-	  (dstr text)
-	  (dstr (if name-override
-		    (progn
-		      (warn-if-not-punctuated name-override)
-		      name-override)
-		    (name-with-indefinite-article name)))
-	  lines
-	  name)))
+    (list
+     names
+     (dstr (if name-override
+	       (progn
+		 (warn-if-not-punctuated name-override)
+		 name-override)
+	       (name-with-indefinite-article name)))
+     (dstr text)
+     initial-place
+     lines)))
 
 (defun defobject-fn (names description initial-place name-override)
   (when (stringp names)
     (setf names (list names)))
-  (let ((name (if (listp names) (first names) names)))
+  (let ((name (first names)))
     (when (null initial-place)
       (setf initial-place *current-location*))
     ;;firstly ensure the place exists
     (defplace initial-place)
-    ;;Ok, so we're going to take the name and split it
-    ;;if there are two words then the first word is the
-    ;;adjective, which is not normally required unless
-    ;;there are multiple objects of the same name.
-    (multiple-value-bind (noun adj)
-	(decompose-name name)
-      (let ((id (make-object-id noun adj)))
-	(setf (gethash id *object-id->data*)
-	      (make-object-data name name-override noun initial-place description))
-	(dolist (alias names)
-	  (setf (gethash alias *object-name->id*) id))))))
-	
+    ;;define the object
+    (setf (gethash name *object-name->data*)
+	  (make-object-data name names description initial-place name-override))
+    ;;ensure all object names and adjectives have words defined for them
+    (dolist (name names)
+      (multiple-value-bind (noun adj)
+	  (split name)
+	(unless (gethash noun *word->meaning*)
+	  (defword noun))
+	(when adj
+	  (unless (gethash adj *word->meaning*)
+	    (defword adj)))))))
+ 
+(defun first-or-it (s)
+  (if (listp s) (first s) s))
+
 (defmacro with-object (object &body body)
-  `(let ((*current-object* ,object))
+  `(let ((*current-object* (first-or-it ,object)))
      ,@body))
 
 (defmacro defobject (names description initial-place display-name-override &body body)
@@ -141,7 +126,7 @@ all of which will refer to the same object."
        (with-object ,names-sym
 	 (defobject-fn ,names-sym ,description ,initial-place ,display-name-override)
 	 ,@body))))
-     
+
 (defun object-table ()
   ;;return values - Y = index of matching item
   ;;                C = Set if not unique
@@ -203,8 +188,10 @@ all of which will refer to the same object."
       (CMP.ABY (1- (resolve :adjectives)))
       (BNE :next-noun)
       (label :adjective-matches)
+      (dc "Dereference into the object index table")
+      (LDX.ABY (1- (resolve :object-index)))
       (dc "Now check it is in our place")
-      (LDA.ABY (1- (resolve :places)))
+      (LDA.ABX (1- (resolve :places)))
       (BEQ :next-noun "Object is elsewhere")
       (CMP 1)
       (BEQ :found "Object is in our inventory")
@@ -217,43 +204,47 @@ all of which will refer to the same object."
       (dc "If we already have found one then return")
       (LDA.ZP :found-index)
       (BNE :already-found)
-      (STY.ZP :found-index)
+      (STX.ZP :found-index)
       (BEQ :next-noun)
       (label :already-found)
       (dc "Carry AND not-zero, i.e. duplicate AND found")
       (SEC)
       (RTS)
-      ;;Objects and their aliases are in noun-id adjective-id order in
-      ;;these tables for searching.
-      (let ((name-word-ids nil)
-	    (next-index 1)
-	    (id->index (make-hash-table :test 'equal))
-	    (objects nil))
+
+      (let ((objects nil)
+	    (names nil))
 	(clrhash *object-name->index*)
-	(do-hash-values (id *object-name->id*)
-	  (push id name-word-ids)
-	  (let ((index (gethash id id->index)))
-	    (unless index
-	      (setf index next-index)
-	      ;;but each object only has one entry in the object table
-	      (setf (gethash id id->index) index)
-	      (incf next-index)
-	      (push (gethash id *object-id->data*) objects))
-	    ;;all object names and alternate names map to the same index
-	    (setf (gethash (sixth (gethash id *object-id->data*))
-			   *object-name->index*)
-		  index)))
+	(let ((index 1))
+	  (do-hash-values (data *object-name->data*)
+	    (push data objects)
+	    (dolist (name (first data))
+	      ;;add all names for objects to a list
+	      (multiple-value-bind (noun adjective)
+		  (split name)
+		;;put in global lookup so we can find it later
+		(setf (gethash name *object-name->index*) index)
+			
+		;;also push into a list so we can make a lookup table in code
+		(push (list (gethash noun *word->meaning*)
+			    (if adjective
+				(gethash adjective *word->meaning*)
+				0)
+			    index)
+		      names)))
+	  (incf index)))
+	;;reverse the objects as they were pushed in
 	(setf objects (nreverse objects))
-	;;sort order, by name then adjective id
-	(setf name-word-ids (sort name-word-ids #'< :key #'cdr))
-	(setf name-word-ids (stable-sort name-word-ids #'< :key #'car))
-	(apply #'db :names (mapcar #'car name-word-ids))
-	(apply #'db :adjectives (mapcar #'cdr name-word-ids))
-	(apply #'db :object-index (mapcar #'(lambda (id) (gethash id id->index)) name-word-ids))
-	(when *compiler-final-pass*
-	  (print name-word-ids)
-	  (print objects)
-	  (do-hashtable (k v *object-name->index*) (format t "~a->~a~%" k v)))
+	;;(when *compiler-final-pass*
+	;;  (print names)
+	;;  (print objects)
+	;;  (do-hashtable (k v *object-name->index*) (format t "~a->~a~%" k v)))
+	;;now sort as the searching algorithm expects them to be in
+	;;noun-id order
+	(setf names (stable-sort (sort names #'< :key #'second)
+					 #'< :key #'first))
+	(apply #'db :names (mapcar #'first names))
+	(apply #'db :adjectives (mapcar #'second names))
+	(apply #'db :object-index (mapcar #'third names))
 	;; function to initialise the objects
 	(label :init-objects nil)
 	(LDY (length objects))
@@ -264,20 +255,24 @@ all of which will refer to the same object."
 	(BNE :copy-place)
 	(RTS)
 	;; now we can generate the object data tables
-	(let ((places (mapcar #'(lambda (o)
-				  (nil->0 (gethash (second o) *place->id*)))
-			      objects)))
+	(let ((places (mapcar
+		       #'(lambda (o)
+			   (aif (gethash (fourth o) *place->id*)
+				it
+				(assert nil nil "Place ~a was not defined" (fourth o))))
+		       objects)))
 	  (game-state-bytes "Object Places"
 	    (apply #'db :places places))
 	  (apply #'db :initial-places places))
 	;; object name strings
-	(apply #'db :name-hi (mapcar #'(lambda (o) (hi (fourth o))) objects))
-	(apply #'db :name-lo (mapcar #'(lambda (o) (lo (fourth o))) objects))
+	(apply #'db :name-hi (mapcar #'(lambda (o) (hi (second o))) objects))
+	(apply #'db :name-lo (mapcar #'(lambda (o) (lo (second o))) objects))
 	;; object verb handlers
 	(labels ((verb-addr (o)
-		   (if (gethash (sixth o) *object->vtable*) 
-		       (cons :vtable (sixth o))
-		       0)))
+		   (let ((name (caar o)))
+		     (if (gethash name *object->vtable*) 
+			 (cons :vtable name)
+			 0))))
 	  (apply #'db :verb-hi (mapcar #'(lambda (o) (hi (verb-addr o))) objects))
 	  (apply #'db :verb-lo (mapcar #'(lambda (o) (lo (verb-addr o))) objects)))
 	;; object descriptions
@@ -294,9 +289,11 @@ all of which will refer to the same object."
 		 *object->vtable*)))))
 
 (defun dump-objects ()
-  (dolist (object (build-object-table))
-    (print object)))
-
+  (do-hashtable (name data *object-name->data*)
+    (format t "~3d ~20a $~4,'0x (~d) $~4,'0x ~20a ~s~%"
+	    (object-id name) name (second data) (fifth data) (third data)
+		  (fourth data) (cdar data))))
+      
 (defun objects-count ()
   (hash-table-count *object-id->data*))
 
@@ -332,7 +329,8 @@ all of which will refer to the same object."
   (defobject "ENTRAILS" "Animal guts" :nippur nil)
   (defobject "POCKET FLUFF" "Lovely pocket fluff" :inventory nil)
   (defobject "OBSIDIAN CUBE" "Black cube" :nowhere nil)
-  (defobject "CAT FLUFF" "Cat fluff" :babylon nil))	   
+  (defobject "CAT FLUFF" "Cat fluff" :babylon nil)
+  (defobject '("FINGER BONE" "BONE FINGER") "A bony finger" :inventory nil))	   
 
 (defun object-tester (name-id adj-id current-place)
   (reset-compiler)
@@ -400,7 +398,7 @@ all of which will refer to the same object."
 		     (gethash place *place->id*))
     (assert (eq found expected-found))
     (assert (eq duplicate expected-duplicate))))
-#|
+
 (font-data)
 (reset-object-model)
 (reset-parser)
@@ -428,19 +426,12 @@ all of which will refer to the same object."
 (test-object-find "STONE" "BISCUIT" :ur :not-found :unique)
 (test-object-find "ENTRAILS" "FLUFF" :ur :not-found :unique)
 (test-object-find nil "GINGER" :ur :not-found :unique)
+(test-object-find nil "BONE" :inventory :found :unique)
+(test-object-find nil "FINGER" :inventory :found :unique)
+(test-object-find "FINGER" "BONE" :inventory :found :unique)
+(test-object-find "BONE" "FINGER" :inventory :found :unique)
 
-;; Add parse input tests
-;; So this test case comes from POKE BONE DOOR which didn't work
-;; because the finder is looking for a Bone Door rather than
-;; Bone and ignoring the door.
-;; (test-object-find "BISCUIT" "DOG" :ur :found :unique)
-      
-(assert (= 1 (object-id "MARDUK STATUE")))
-(assert (= 2 (object-id "STONE STATUE")))
-(assert (= 3 (object-id "GINGER BISCUIT")))
-(assert (= 4 (object-id "ENTRAILS")))
-(assert (= 5 (object-id "POCKET FLUFF")))
-(assert (= 6 (object-id "CAT FLUFF")))
-(assert (= 7 (object-id "OBSIDIAN CUBE")))
+(assert (= (object-id "FINGER BONE")
+	   (object-id "BONE FINGER")))
 
-|#
+

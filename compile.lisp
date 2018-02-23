@@ -38,6 +38,10 @@
 ;;      For now I am using org as the thing to reset between
 ;;      passes, but maybe this should be split into org and reset
 
+;;TODO  zero page labels resolve, but do not appear in the disassembly
+;;      this is related to the above, when org is called, it removes
+;;      them from the compiler-address-labels reverse lookup
+
 ;;TODO  Make passes modular so each 'module' can hook into it independently
 ;;      without the client build having to do things like put the string
 ;;      table at the end or reset various flags.
@@ -407,22 +411,24 @@
   (logior (peek-byte (lo-add add))
           (ash (peek-byte (hi-add add)) 8)))
 
-;todo remove byte/word as not really setting it and also clashes
-;if it appears once in the program, could assemble a zero page
-;set up routine if needed.
+;;todo remove byte/word as not really setting it and also clashes
+;;if it appears once in the program, could assemble a zero page
+;;set up routine if needed.
 
 (defun zp-b (label &optional (byte 0))
   (assert (> #xFF *compiler-zp-free-slot*))
   (unless (gethash label *compiler-labels*)
     (let ((*compiler-ptr* *compiler-zp-free-slot*))
-      (db label byte))
+      (label label nil)
+      (db nil byte))
     (incf *compiler-zp-free-slot*)))
 
 (defun zp-w (label &optional (word 0))
   (assert (> #xFE *compiler-zp-free-slot*))
   (unless (gethash label *compiler-labels*)
     (let ((*compiler-ptr* *compiler-zp-free-slot*))
-      (dw label word))
+      (label label nil)
+      (dw nil word))
     (incf *compiler-zp-free-slot* 2)))
 
 (defun inc-namespace-bytes (namespace bytes)

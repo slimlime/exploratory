@@ -23,7 +23,7 @@
 	(dc "Reset matching object count to 0")
 	(LDX 0)
 	(STX.AB :object-count)
-	(LDY (objects-count))
+	(LDY (hash-table-count *object-name->index*))
 	(label :next-object)
 	(dc "List the object in the place in A")
 	(dc "Look in one-based object places table")
@@ -270,9 +270,12 @@
 
 (defun gogogo ()
   (tagbody
-     :top
-     (enter-input (read-line))
-     (go :top)))
+   :top
+     (let ((line (read-line)))
+       (if (equalp line "q")
+	   (return-from gogogo))
+       (enter-input line :print nil)
+       (go :top))))
 
 (defun restore-game (str &key (break-on 'brk))
   (restore-state-base64 str)

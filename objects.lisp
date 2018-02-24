@@ -292,9 +292,6 @@ all of which will refer to the same object."
     (format t "~3d ~20a $~4,'0x (~d) $~4,'0x ~20a ~s~%"
 	    (object-id name) name (second data) (fifth data) (third data)
 		  (fourth data) (cdar data))))
-      
-(defun objects-count ()
-  (hash-table-count *object-id->data*))
 
 (defun dump-places ()
   (maphash #'(lambda (k v) (format t "~a -> ~a~%" k v)) *place->id*))

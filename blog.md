@@ -91,6 +91,27 @@ UNLOCK DOOR WITH BONE
 
 Currently this has to be simulated in a very unsatisfactory way, with verb handlers on both the door and the bone when it would be nice if we could simply define handlers in a more natural way. This is one of the issues with OO, where to put things that belong to more than one object.
 
+## 25/2/2018 Object Aliases
+
+To solve the `FINGER BONE` problem, we can now specify object aliases. There is now a level of indirection between the words and the object. I think all problems in computer science can be solved this way.
+
+
+
+~~~~
+(object '("FINGER BONE" "BONE FINGER")
+	(:description "A finger bone.")
+      (verb 'EAT
+	(respond *thegodslookaway*))
+      (verb 'POKE...
+
+TAKE BONE
+TAKE FINGER
+TAKE FINGER BONE
+TAKE BONE FINGER
+~~~~
+
+All these now mean the same thing. Should another finger or bone be present, the normal rules of object resoltion would follow.
+
 ## 25/2/2018 It lives
 
 It is nice in adventure games for the parser to be a bit forgiving. A nicety is to be able to type `IT` and have the computer vaguely understand what you mean.

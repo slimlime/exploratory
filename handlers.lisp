@@ -16,6 +16,21 @@
   (with-location :generic
     (defword :INVENTORY :I)
 
+    (custom-action '(WHAT)
+      (with-namespace :what
+	(LDY.AB '(:object-table . :it))
+	(BNE :something)
+	(respond-raw "Nothing.")
+	(RTS)
+	(label :something)
+	(dc "Now print the object name")
+	(LDA.ABY (1- (resolve '(:object-table . :name-hi))))
+	(STA.AB (hi-add '(:typeset-cs . :str)))
+	(LDA.ABY (1- (resolve '(:object-table . :name-lo))))
+	(STA.AB (lo-add '(:typeset-cs . :str)))
+	(LDA 1 "Object names are one line")
+	(JMP :print-message)))
+    
     (custom-action '(LOOK)
       (with-namespace :look
 	(respond-raw "You take a look around and see...")
@@ -134,7 +149,6 @@
 	(entry 'DROP :drop)))
     
     (custom-action '(? ? ? ?)
-
       (with-namespace :verb-handler
 	(alias :vtable :A0)
 	(alias :object-id :D0)

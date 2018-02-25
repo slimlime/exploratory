@@ -1,3 +1,84 @@
+## 25/2/2018 Object orientation
+
+Everything's an object, or so they say. Since OO is something of a dirty word around these parts, it was with some dismay that I have had to accept that when it comes to modeling *objects* then object-oriented design is not a bad idea at all. So those guys were only exaggerating a little when they said everything is an object when what they really meant was that every object is an object, which isn't really saying anything at all. Tautological philosophy aside, we can go from disembodied actions and bits of state like this,
+
+~~~~
+   (action '((EXAMINE TORCHES) (EXAMINE TORCH))
+      (progn
+	(setbit :torches-examined)
+	(respond "The flickering shadows make you think of something profound, like a packet of Cheezows caught in the wind.")))
+    
+    (action '(TAKE TORCH)
+      (progn
+	(setbit :torch-carried)
+	(respond "You take one of the torches.")))
+~~~~
+
+This approach was fine until the complexity started to multiply. Once you have an adjective in there, or objects with the same name, or objects that are carried around it becomes very difficult to make it work. It is worth then to more tightly couple state and behaviour against an instance.
+
+Here the verbs 
+
+~~~~
+(object "SHINY KEY" (:description "It's a key, man."
+				      :place :nowhere)
+      (action '(TAKE KEY)
+	(if-in-place "SHINY KEY" :nowhere
+	  (respond *whatyoutalkingabout*)
+	  (delegate-action)))
+      (verb 'EAT (respond "You eat the key. Much, much later, it re-emerges."))
+      (verb 'TURN (respond "You turn the key. Nothing happens.")))
+~~~~
+
+## 25/2/2018 It lives
+
+It is nice in adventure games for the parser to be a bit forgiving. A nicety is to be able to type `IT` and have the computer vaguely understand what you mean.
+
+To this end, I have added a memory location for this purpose which simply records the last object which the parser found, in various cirumstances, including, 
+
+- When there is a single unambiguous item from `LOOK`, `INVENTORY`
+- When the player directly addresses an object e.g. `EXAMINE DOOR`
+- Explicitly, in code with the new opcode `VM-IT`. Useful where the game outputs something which clearly references an object
+
+So now we can do
+
+~~~~
+EXAMINE DOOR
+OPEN IT
+~~~~~
+
+and
+
+~~~~
+LOOK
+You have...
+A shiny key.
+DROP IT
+You dropped it.
+~~~~
+
+The memory location is wrapped in the `game-state` macro, so it will be remembered across save/restore. This may or may not be a good idea.
+
+## 25/2/2018 Testing
+
+Since we can peek the memory locations however we want, and we know where to find the interesting bits, it was straightforward to test the side-effects of a user's actions, e.g.
+
+~~~~
+    (test "Examining slime"
+      (assert-clr :slime-examined)
+      (test-input "EXAMINE SLIME")
+      (assert-set :slime-examined))
+~~~~
+
+So we can test that objects are in the right place and bits are set and unset as required. All this has been added in preparation to move action based code to object based code. We can even test longer paths,
+
+~~~~
+    (test "Can escape"
+      (test-input "LICK SLIME" "EXAMINE FLOOR" "EXAMINE CRACK"
+		  "TAKE KEY" "TAKE FINGER BONE" "POKE BONE IN LOCK"
+		  "KNOCK DOOR" "UNLOCK DOOR" "OPEN DOOR" "USE DOOR")
+      (assert-location :corridor)))
+~~~~
+
 ## 20/2/2018 Finished with compression
 
 Hopefully forever. One final tweak that went in was compressing the colour data. To exploit correlations between adjacent bytes, the colour data was XOR encoded, that is each byte has to be XOR'd with the previous one to get the value. That way, colour runs are encoded as zeroes which entropy encoding can squash down for us. Now the Huffman decoder is doing triple duty for strings, pixel data and colour data. I wonder.. can virtual machine instructions be Huffman coded?

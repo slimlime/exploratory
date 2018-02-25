@@ -41,6 +41,37 @@
       (test-input "EXAMINE BONE" "TAKE IT")
       (assert-object-in "FINGER BONE" :inventory))
 
+    (test "Looking when unique object sets 'it'"
+      (assert-object-in "FINGER BONE" :dungeon-cell)
+      (test-input "LOOK" "TAKE IT")
+      (assert-object-in "FINGER BONE" :inventory))
+
+    (test "Looking when not unique object clears 'it'"
+      (test-input "LICK SLIME" "EXAMINE FLOOR" "EXAMINE CRACK")
+      (assert-object-in "FINGER BONE" :dungeon-cell)
+      (assert-object-in "SHINY KEY" :dungeon-cell)
+      (test-input "LOOK")
+      (assert-object-in "FINGER BONE" :dungeon-cell)
+      (assert-object-in "SHINY KEY" :dungeon-cell))
+
+    (test "Examining something sets it"
+      (assert-object-in "FINGER BONE" :dungeon-cell)
+      (test-input "LOOK" "EXAMINE SLIME" "TAKE IT")
+      (assert-object-in "FINGER BONE" :dungeon-cell))
+    
+    (test "Unique inventory item sets it"
+      (assert-object-in "FINGER BONE" :dungeon-cell)
+      (test-input "TAKE FINGER BONE" "EXAMINE SLIME" "I" "DROP IT")
+      (assert-object-in "FINGER BONE" :dungeon-cell))
+
+    (test "Non-unique inventory item clears it"
+      (assert-object-in "FINGER BONE" :dungeon-cell)
+      (test-input "TAKE FINGER BONE"
+		  "LICK SLIME" "EXAMINE FLOOR" "EXAMINE CRACK"
+		  "TAKE KEY" "I" "DROP IT")
+      (assert-object-in "SHINY KEY" :inventory)
+      (assert-object-in "FINGER BONE" :inventory))
+    
     (test "Taking and dropping the bone, qualified with adjective"
       (assert-object-in "FINGER BONE" :dungeon-cell)
       (test-input "TAKE FINGER BONE")
@@ -150,18 +181,7 @@
       (test-input "LICK SLIME" "EXAMINE FLOOR" "EXAMINE CRACK"
 		  "TAKE KEY" "TAKE FINGER BONE" "POKE BONE IN LOCK"
 		  "KNOCK DOOR" "UNLOCK DOOR" "OPEN DOOR" "USE DOOR")
-      (assert-location :corridor))
-    
-    ;;Two problems
-
-    ;;A "EXAMINE BALL" does not find the correct object- finds the door
-    ;;in the previous room!
-    ;;Doing "TAKE GREEN BALL" works, but then when we do EXAMINE BALL
-    ;;rather than saying, "Which one?" it decides that you meant the
-    ;;green one.
-    
-
-    )
+      (assert-location :corridor)))
 
 (let ((*warn-only* nil))
   (time

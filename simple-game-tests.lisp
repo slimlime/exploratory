@@ -22,19 +22,24 @@
   (terpri)
   
     (test "Examining slime"
-	  (assert-clr :slime-examined)
-	  (test-input "EXAMINE SLIME")
-	  (assert-set :slime-examined))
-
+      (assert-clr :slime-examined)
+      (test-input "EXAMINE SLIME")
+      (assert-set :slime-examined))
+    
     (test "Can't take the slime"
-	  (assert-object-in "REPELLENT SLIME" :dungeon-cell)
-	  (test-input "TAKE SLIME")
-	  (assert-object-in "REPELLENT SLIME" :dungeon-cell))
-
+      (assert-object-in "REPELLENT SLIME" :dungeon-cell)
+      (test-input "TAKE SLIME")
+      (assert-object-in "REPELLENT SLIME" :dungeon-cell))
+    
     (test "Poking out the blockage requires bone"
-	  (assert-set :lock-jammed)
-	  (test-input "POKE BONE IN LOCK")
-	  (assert-set :lock-jammed))
+      (assert-set :lock-jammed)
+      (test-input "POKE BONE IN LOCK")
+      (assert-set :lock-jammed))
+
+    (test "Examining bone sets 'it'"
+      (assert-object-in "FINGER BONE" :dungeon-cell)
+      (test-input "EXAMINE BONE" "TAKE IT")
+      (assert-object-in "FINGER BONE" :inventory))
 
     (test "Taking and dropping the bone, qualified with adjective"
 	  (assert-object-in "FINGER BONE" :dungeon-cell)
@@ -145,7 +150,18 @@
 	  (test-input "LICK SLIME" "EXAMINE FLOOR" "EXAMINE CRACK"
 		      "TAKE KEY" "TAKE FINGER BONE" "POKE BONE IN LOCK"
 		      "KNOCK DOOR" "UNLOCK DOOR" "OPEN DOOR" "USE DOOR")
-	  (assert-location :corridor)))
+	  (assert-location :corridor))
+
+    ;;Two problems
+
+    ;;A "EXAMINE BALL" does not find the correct object- finds the door
+    ;;in the previous room!
+    ;;Doing "TAKE GREEN BALL" works, but then when we do EXAMINE BALL
+    ;;rather than saying, "Which one?" it decides that you meant the
+    ;;green one.
+    
+
+    )
 
 (let ((*warn-only* nil))
   (time

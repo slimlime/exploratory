@@ -10,6 +10,9 @@
 ;; LOCATION has a PLACE ID
 ;; ELSEWHERE and INVENTORY are PLACES
 
+;; TODO The lower level parser should probably not return any index
+;; if the there is a duplicate
+
 (defparameter *current-location* nil)
 (defparameter *object-name->data* nil)
 (defparameter *object-name->index* nil)
@@ -162,6 +165,8 @@ all of which will refer to the same object."
       (alias :adjective :D1)
       (alias :pos :A0)
       (alias :found-index :D2)
+      (game-state-bytes "It"
+	  (db :it 0))
       (when (resolves '(:parser . :words))
 	;;some of the test functions don't use the parser
 	;;so this entry point won't compile- exclude it if
@@ -175,7 +180,15 @@ all of which will refer to the same object."
 	(STA.ZP :adjective)
 	(JSR :find-object-index)
 	(BEQ :ignore-word-three)
+	(label :translate-it)
+	(BCS :duplicate)
+	(CPY (object-id "IT"))
+	(BNE :return)
+	(LDY.AB :it)
 	(RTS)
+	(label :duplicate)
+	(LDY 0)
+	(BEQ :return)
 	(dc "We didn't find it, but what if the third word")
 	(dc "isn't part of the first object? Could be TAKE NOUN1 NOUN2")
 	(label :ignore-word-three)
@@ -183,7 +196,13 @@ all of which will refer to the same object."
 	(label :no-adjective)
 	(STA.ZP :adjective)
 	(LDA.AB (+ 1 (resolve '(:parser . :words))))
-	(STA.ZP :noun))
+	(STA.ZP :noun)
+	(JSR :find-object-index)
+	(BNE :translate-it)
+	(label :return)
+	(STY.AB :it)
+	(RTS))
+      
       (label :find-object-index nil)
       (dc "Linear search for the noun")
       (LDY 0)
@@ -355,6 +374,8 @@ all of which will refer to the same object."
   (object "POCKET FLUFF" (:description "Lovely pocket fluff" :place :inventory))
   (object "OBSIDIAN CUBE" (:description "Black cube" :place :nowhere))
   (object "CAT FLUFF" (:description "Cat fluff" :place :babylon))
+  (object "GREEN BALL" (:description "Green ball" :place :ur))
+  (object "RED BALL" (:description "Red ball" :place :ur))
   (object '("FINGER BONE" "BONE FINGER") (:description "A bony finger" :place :inventory)))
 
 (defun object-tester (name-id adj-id current-place)
@@ -455,6 +476,8 @@ all of which will refer to the same object."
 (test-object-find nil "FINGER" :inventory :found :unique)
 (test-object-find "FINGER" "BONE" :inventory :found :unique)
 (test-object-find "BONE" "FINGER" :inventory :found :unique)
+
+(test-object-find nil "BALL" :ur :found :duplicate)
 
 (assert (= (object-id "FINGER BONE")
 	   (object-id "BONE FINGER")))

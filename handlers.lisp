@@ -6,6 +6,9 @@
 (defparameter *be-more-specific* "You'll have to be more specific...")
   
 (defun generic-generic-handlers ()
+
+  (fixture "IT" (:place :inventory :name-override "It."))
+  
   (with-location :generic
     (defword :INVENTORY :I)
 
@@ -27,6 +30,14 @@
 	(label :next-object)
 	(dc "List the object in the place in A")
 	(dc "Look in one-based object places table")
+	;;todo this explicit check for IT should be removed if
+	;;there are more 'invisible' objects. Could also make
+	;;IT have a specific id so that the cound could skip it
+	;;without the check. Another way to do it would be if there
+	;;are any omnipresent objects- a special place called
+	;;everywhere (for example the imaginary biscuit)
+	(CPY (object-id "IT"))
+	(BEQ :object-not-here)
 	(CMP.ABY (1- (resolve '(:object-table . :places))))
 	(BNE :object-not-here)
 	(dc "Save A and Y")

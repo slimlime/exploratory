@@ -6,7 +6,7 @@ Everything's an object, or so they say. Since OO is something of a dirty word ar
    (action '((EXAMINE TORCHES) (EXAMINE TORCH))
       (progn
 	(setbit :torches-examined)
-	(respond "The flickering shadows make you think of something profound, like a packet of Cheezows caught in the wind.")))
+	(respond "The flickering shadows...")))
     
     (action '(TAKE TORCH)
       (progn
@@ -16,8 +16,11 @@ Everything's an object, or so they say. Since OO is something of a dirty word ar
 
 This approach was fine until the complexity started to multiply. Once you have an adjective in there, or objects with the same name, or objects that are carried around it becomes very difficult to make it work. It is worth then to more tightly couple state and behaviour against an instance.
 
-Here the verbs 
-
+Here the verbs are tightly coupled to the object. The parser and dispatcher will only invoke the verb action when the object is found using the rules of resolution
+	- Is the object in the room?
+	- Is the object in our inventory?
+	- Has the player disambiguated the object from another object e.g. `GREEN BALL`, `RED BALL`
+	
 ~~~~
 (object "SHINY KEY" (:description "It's a key, man."
 				      :place :nowhere)
@@ -28,6 +31,65 @@ Here the verbs
       (verb 'EAT (respond "You eat the key. Much, much later, it re-emerges."))
       (verb 'TURN (respond "You turn the key. Nothing happens.")))
 ~~~~
+
+Notice that we have over-ridden the generic `TAKE` verb so that we can display a sarcastic message, before delegating the task to the code which will move the object to the inventory.
+
+### Fixed objects
+
+Since we already had the capability to have objects which could be moved to the inventory, the idea behind making everything an object was for the items in the room. Because everything had to have it's own action, even erroneous actions had to be specified. The user could get some pretty contradictory messages,
+
+~~~~
+OPEN DOOR
+The door is locked.
+EAT DOOR
+I don't know that word.
+EAT APPLE
+You eat the apple.
+~~~~~
+
+Clearly the parser does understand the word `EAT`, it just doesn't know it in relation to the door. Once everything is an object, verbs which aren't handled can be given a better handler, e.g.
+
+~~~~
+EAT DOOR
+You can't do that to it!
+~~~~
+
+In addition, it makes our lives a lot easier when there is a `GREEN DOOR` and a `RED DOOR`. All the power of the generic object resolution code comes into play, e.g.
+
+~~~~
+OPEN DOOR
+You'll have to be more specific.
+OPEN GREEN DOOR
+You open the green door.
+EXAMINE RED DOOR
+The red door is closed.
+OPEN IT
+You open the red door.
+~~~~
+
+Example of fixed object definition,
+
+~~~~
+(fixture "REPELLENT SLIME" ()
+      (verb 'EXAMINE
+	(respond "Millions of eyes peer out from the slime.")
+	(setbit :slime-examined)
+	(if-in-place "SHINY KEY" :nowhere
+	  (respond "Some of them are staring at the floor.")))
+~~~~
+
+A *fixture* is just an object with a `:take` parameter of false. The generic handler for `TAKE` checks a bit in the object table to see if an object can be taken.
+
+### Double Dispatch
+
+It is becoming increasingly clear that double object resolution is required- it is very difficult to simulate just by testing for the presence of words. One of the things in the test room is to poke a finger-bone into a key-hole. This can be accomplished by
+
+~~~~
+POKE BONE IN KEYHOLE
+UNLOCK DOOR WITH BONE
+~~~~
+
+Currently this has to be simulated in a very unsatisfactory way, with verb handlers on both the door and the bone when it would be nice if we could simply define handlers in a more natural way. This is one of the issues with OO, where to put things that belong to more than one object.
 
 ## 25/2/2018 It lives
 

@@ -63,7 +63,43 @@
 	  (assert-clr :lock-jammed)
 	  (assert-object-in "FINGER BONE" :nowhere))
 
-    (test "Not poking out the blockage and not losing the bone"
+    (test "Poke keyhole with bone, with bone"
+	  (assert-set :lock-jammed)
+	  (test-input "TAKE BONE" "POKE KEYHOLE WITH BONE")
+	  (assert-clr :lock-jammed)
+	  (assert-object-in "FINGER BONE" :nowhere))
+
+    (test "Poke keyhole with bone, without bone"
+	  (assert-set :lock-jammed)
+	  (test-input "POKE KEYHOLE WITH BONE")
+	  (assert-set :lock-jammed)
+	  (assert-object-in "FINGER BONE" :dungeon-cell))
+
+    (test "Unlock door with finger, with finger"
+	  (assert-set :lock-jammed)
+	  (test-input "TAKE BONE" "UNLOCK DOOR WITH FINGER")
+	  (assert-clr :lock-jammed)
+	  (assert-object-in "FINGER BONE" :nowhere))
+
+    (test "Unlock door with finger, withut finger"
+	  (assert-set :lock-jammed)
+	  (test-input "UNLOCK DOOR WITH FINGER")
+	  (assert-set :lock-jammed)
+	  (assert-object-in "FINGER BONE" :dungeon-cell))
+    
+    (test "Unlock door with bone, with bone"
+	  (assert-set :lock-jammed)
+	  (test-input "TAKE BONE" "UNLOCK DOOR WITH BONE")
+	  (assert-clr :lock-jammed)
+	  (assert-object-in "FINGER BONE" :nowhere))
+
+    (test "Unlock door with bone, without bone"
+	  (assert-set :lock-jammed)
+	  (test-input "UNLOCK DOOR WITH BONE")
+	  (assert-set :lock-jammed)
+	  (assert-object-in "FINGER BONE" :dungeon-cell))
+    
+    (test "POKE BONE IN LOCK, without bone"
 	  (assert-set :lock-jammed)
 	  (test-input "POKE BONE IN LOCK")
 	  (assert-set :lock-jammed)
@@ -78,11 +114,9 @@
 	  (assert-clr :sought-gorilla))
 
     (test "Examining the crack"
-	  (assert-clr :maya)
 	  (test-input "EXAMINE CRACK")
-	  (assert-clr :maya)
+	  (assert-object-in "SHINY KEY" :nowhere)
 	  (test-input "EXAMINE FLOOR" "EXAMINE CRACK")
-	  (assert-set :maya)
 	  (test-input "LICK SLIME")
 	  (assert-object-in "SHINY KEY" :nowhere)
 	  (test-input "EXAMINE CRACK")

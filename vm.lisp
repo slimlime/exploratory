@@ -222,7 +222,8 @@
 			 (string-downcase bit)
 			 (fmt-addr addr))
   (bit addr)
-  ((push-byte (bit-index bit))
+  ((bit-read bit)
+   (push-byte (bit-index bit))
    (push-byte (forward-branch-offset addr)))
   ((JSR :get-bit-mask)
    (AND.ABY :bit-table)
@@ -236,7 +237,8 @@
 			 (string-downcase bit)
 			 (fmt-addr addr))
   (bit addr)
-  ((push-byte (bit-index bit))
+  ((bit-read bit)
+   (push-byte (bit-index bit))
    (push-byte (forward-branch-offset addr)))
   ((JSR :get-bit-mask)
    (AND.ABY :bit-table)
@@ -399,7 +401,8 @@ incorrect branch offsets elsewhere
 ;;VM-CLR - Clear bit
 ;;
 (defvmop vm-clr (format nil "VM-CLR ~a" (string-downcase bit)) (bit)
-	 ((push-byte (bit-index bit)))
+	 ((bit-modified bit)
+	  (push-byte (bit-index bit)))
 	 ((JSR :get-bit-mask)
 	  (EOR #xff)
 	  (AND.ABY :bit-table)
@@ -410,7 +413,8 @@ incorrect branch offsets elsewhere
 ;;VM-SET - Set bit
 ;;
 (defvmop vm-set (format nil "VM-SET ~a" (string-downcase bit)) (bit)
-	 ((push-byte (bit-index bit)))
+	 ((bit-modified bit)
+	  (push-byte (bit-index bit)))
 	 ((JSR :get-bit-mask)
 	  (ORA.ABY :bit-table)
 	  (STA.ABY :bit-table)

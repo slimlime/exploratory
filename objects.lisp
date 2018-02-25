@@ -287,6 +287,11 @@ all of which will refer to the same object."
 		     (db nil 0))
 		 *object->vtable*)))))
 
+(defun object-id (name)
+  (if *compiler-final-pass*
+      (gethash name *object-name->index*)
+      0))
+
 (defun dump-objects ()
   (do-hashtable (name data *object-name->data*)
     (format t "~3d ~20a $~4,'0x (~d) $~4,'0x ~20a ~s~%"
@@ -302,11 +307,6 @@ all of which will refer to the same object."
     (when *compiler-final-pass*
       (assert id (place) "~a is not a valid place" place))
     (if id id 0)))
-
-(defun object-id (name)
-  (if *compiler-final-pass*
-      (gethash name *object-name->index*)
-      0))
 
 (defun object-place-address (name)
   "Get the object place address"

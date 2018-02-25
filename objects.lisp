@@ -18,6 +18,10 @@
 (defparameter *current-object* nil)
 (defparameter *object->vtable* nil)
 
+;;object property bitmasks
+
+(defparameter *object-take* 1)
+
 ;; Define a new place, probably not necessary to call from game
 ;; code as the call which actually use the place will call this
 ;; indirectly.
@@ -72,7 +76,7 @@
 (assert (string= "An apple." (name-with-indefinite-article "APPLE")))
 (assert (string= "A telephone." (name-with-indefinite-article "TELEPHONE")))
 
-(defun make-object-data (name names description initial-place name-override)
+(defun make-object-data (name names description initial-place name-override take)
   "Return a list of data associated with an object"
   (let* ((text (justify-with-image description
 				   5 4 *act-font*))
@@ -87,9 +91,10 @@
 	       (name-with-indefinite-article name)))
      (dstr text)
      initial-place
-     lines)))
+     lines
+     take)))
 
-(defun defobject-fn (names description initial-place name-override)
+(defun defobject-fn (names &key description initial-place name-override take)
   (when (stringp names)
     (setf names (list names)))
   (let ((name (first names)))
@@ -99,7 +104,7 @@
     (defplace initial-place)
     ;;define the object
     (setf (gethash name *object-name->data*)
-	  (make-object-data name names description initial-place name-override))
+	  (make-object-data name names description initial-place name-override take))
     ;;ensure all object names and adjectives have words defined for them
     (dolist (name names)
       (multiple-value-bind (noun adj)
@@ -117,14 +122,30 @@
   `(let ((*current-object* (first-or-it ,object)))
      ,@body))
 
-(defmacro defobject (names description initial-place display-name-override &body body)
+(defmacro object (names (&key description place name-override) &body body)
   "Define an object. Initial place may be nil for 'here'. Name-override may be nil for
 standard object display name e.g. 'A golden apple.' Names can be a list of names,
 all of which will refer to the same object."
   (let ((names-sym (gensym)))
     `(let ((,names-sym ,names))
        (with-object ,names-sym
-	 (defobject-fn ,names-sym ,description ,initial-place ,display-name-override)
+	 (defobject-fn ,names-sym
+	     :description ,description
+	     :initial-place ,place
+	     :name-override ,name-override
+	     :take t)
+	 ,@body))))
+
+(defmacro fixture (names (&key description place name-override) &body body)
+  "Define an object than cannot be taken."
+  (let ((names-sym (gensym)))
+    `(let ((,names-sym ,names))
+       (with-object ,names-sym
+	 (defobject-fn ,names-sym
+	     :description ,description
+	     :initial-place ,place
+	     :name-override ,name-override
+	     :take nil)
 	 ,@body))))
 
 (defun object-table ()
@@ -210,7 +231,6 @@ all of which will refer to the same object."
       (dc "Carry AND not-zero, i.e. duplicate AND found")
       (SEC)
       (RTS)
-
       (let ((objects nil)
 	    (names nil))
 	(clrhash *object-name->index*)
@@ -278,6 +298,9 @@ all of which will refer to the same object."
 	(apply #'db :description-hi (mapcar #'(lambda (o) (hi (third o))) objects))
 	(apply #'db :description-lo (mapcar #'(lambda (o) (lo (third o))) objects))
 	(apply #'db :description-lines (mapcar #'(lambda (o) (lo (fifth o))) objects))
+	;; object properties
+	(apply #'db :properties
+	       (mapcar #'(lambda (o) (if (sixth o) *object-take* 0)) objects))
 	(maphash #'(lambda (object verb-handlers)
 		     (label object :vtable)
 		     (dolist (verb-handler verb-handlers)
@@ -294,9 +317,15 @@ all of which will refer to the same object."
 
 (defun dump-objects ()
   (do-hashtable (name data *object-name->data*)
-    (format t "~3d ~20a $~4,'0x (~d) $~4,'0x ~20a ~s~%"
-	    (object-id name) name (second data) (fifth data) (third data)
-		  (fourth data) (cdar data))))
+    (format t "~3d ~20a $~4,'0x (~d) $~4,'0x ~20a TAKE:~a ~s~%"
+	    (object-id name)
+	    name
+	    (second data)
+	    (fifth data)
+	    (third data)
+	    (fourth data)
+	    (if (sixth data) "Y" "N")
+	    (cdar data))))
 
 (defun dump-places ()
   (maphash #'(lambda (k v) (format t "~a -> ~a~%" k v)) *place->id*))
@@ -319,14 +348,14 @@ all of which will refer to the same object."
   (defplace :nippur)
   (defplace :babylon)
   
-  (defobject "MARDUK STATUE" "A bronze statue" :ur nil)
-  (defobject "STONE STATUE" "A stone statue" :ur nil)
-  (defobject "GINGER BISCUIT" "A tasty snack" :ur nil)
-  (defobject "ENTRAILS" "Animal guts" :nippur nil)
-  (defobject "POCKET FLUFF" "Lovely pocket fluff" :inventory nil)
-  (defobject "OBSIDIAN CUBE" "Black cube" :nowhere nil)
-  (defobject "CAT FLUFF" "Cat fluff" :babylon nil)
-  (defobject '("FINGER BONE" "BONE FINGER") "A bony finger" :inventory nil))	   
+  (object "MARDUK STATUE" (:description "A bronze statue" :place :ur))
+  (object "STONE STATUE" (:description "A stone statue" :place :ur))
+  (object "GINGER BISCUIT" (:description "A tasty snack" :place :ur))
+  (object "ENTRAILS" (:description "Animal guts" :place :nippur))
+  (object "POCKET FLUFF" (:description "Lovely pocket fluff" :place :inventory))
+  (object "OBSIDIAN CUBE" (:description "Black cube" :place :nowhere))
+  (object "CAT FLUFF" (:description "Cat fluff" :place :babylon))
+  (object '("FINGER BONE" "BONE FINGER") (:description "A bony finger" :place :inventory)))
 
 (defun object-tester (name-id adj-id current-place)
   (reset-compiler)
@@ -335,7 +364,7 @@ all of which will refer to the same object."
   (reset-compiler)
   (reset-object-model)
   (reset-parser)
-	   
+  
   (flet ((pass ()
 	   (zeropage)	     
 	   (org #x600)

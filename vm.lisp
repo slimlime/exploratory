@@ -457,6 +457,16 @@ incorrect branch offsets elsewhere
    (STA.ZP :vm-t)
    (RTS)))
 
+;;;
+;;;VM-IT - Set 'it' object
+;;;
+(defvmop vm-it (format nil "VM-IT ~a" (string-downcase object))
+  (object)
+  ((push-byte (object-id object)))
+  ((vm-fetch)
+   (STA.AB '(:object-table . :it))
+   (RTS)))
+
 ;; reverse the order of the ops since they were pushed in
 
 (setf *vmops* (nreverse *vmops*))

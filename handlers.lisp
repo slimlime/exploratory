@@ -1,6 +1,10 @@
 ;; Actions and handler that should be common across
 ;; games, e.g. INVENTORY, EXAMINE etc
 
+;; TODO When there is a duplicate object, one of which is in the
+;; inventory, there is no point in saying "Be more specific"
+;; we should only find the objects which are in the inventory
+
 ;; Test-game stuff also in here
 
 (defparameter *be-more-specific* "You'll have to be more specific...")

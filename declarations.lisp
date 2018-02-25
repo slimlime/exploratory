@@ -263,5 +263,8 @@
   "An action for a verb associated with this object"
   `(verb-fn t *current-object* ,verb-or-verbs #'(lambda () ,@body)))
 
+(defun it (object)
+  (vm-it object))
+
 (defun goto (label)
   (vm-jmp label))

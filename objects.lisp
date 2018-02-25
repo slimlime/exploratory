@@ -185,6 +185,7 @@ all of which will refer to the same object."
 	(CPY (object-id "IT"))
 	(BNE :return)
 	(LDY.AB :it)
+	(CLC "Clear the carry to indicate not a duplicate")
 	(RTS)
 	(label :duplicate)
 	(LDY 0)

@@ -151,6 +151,12 @@ all of which will refer to the same object."
 	     :take nil)
 	 ,@body))))
 
+(defun object-id (name)
+  (let ((id (gethash name *object-name->index*)))
+  (when *compiler-final-pass*
+    (assert id nil "Object ~a was not defined" name))
+  (nil->0 id)))
+
 (defun object-table ()
   ;;return values - Y = index of matching item
   ;;                C = Set if not unique
@@ -370,12 +376,6 @@ all of which will refer to the same object."
 		       (dw nil (cdr verb-handler)))
 		     (db nil 0))
 		 *object->vtable*)))))
-
-(defun object-id (name)
-  (let ((id (gethash name *object-name->index*)))
-  (when *compiler-final-pass*
-    (assert id nil "Object ~a was not defined" name))
-  (nil->0 id)))
 
 (defun dump-objects ()
   (do-hashtable (name data *object-name->data*)

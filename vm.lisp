@@ -436,24 +436,20 @@ incorrect branch offsets elsewhere
    (RTS)))
 
 ;;;
-;;;VM-TWORD - Test for a word
+;;;VM-OBJ - Test for an object, i.e. the second object in a sentence
 ;;;
-(defvmop vm-tword (format nil "VM-TWORD ~a"
-			  (string-downcase word))
-  (word)
-  ((push-byte (word-id word)))
+(defvmop vm-obj (format nil "VM-OBJ ~a"
+			(string-downcase object))
+  (object)
+  ((push-byte (object-id object)))
   ((vm-fetch)
-   (LDY (1- *max-input-words*))
-   (label :next)
-   (CMP.ABY '(:parser . :words))
-   (BEQ :found)
-   (DEY)
-   (BPL :next)
-   (INY "Set Y to 0")
-   (STY.ZP :vm-t)
+   (CMP.AB :object2)
+   (BNE :not-found)
+   (LDA #xFF)
+   (STA.ZP :vm-t)
    (RTS)
-   (label :found)
-   (LDA #xff)
+   (label :not-found)
+   (LDA 0)
    (STA.ZP :vm-t)
    (RTS)))
 

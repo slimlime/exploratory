@@ -5,7 +5,7 @@
 (defparameter *word->meaning* nil)
 (defparameter *meaning->word* nil)
 (defparameter *word-collisions* nil)
-(defparameter *max-input-length* 64)
+(defparameter *max-input-length* 35)
 ;;this following parameter is boring because it just suppresses the
 ;;defword assertion that a word not already be in the table.
 ;;and so needs to be set at the end of the build pass.
@@ -68,6 +68,9 @@
   (label :binary-parser)
   (with-namespace :binary-parser
     (alias :word :A0)
+    (unless wordlist
+      (RTS)
+      (return-from binary-parser))
     (let ((words (coerce wordlist 'vector))
 	  (label-number 1))
       (setf words (sort words #'string<))
@@ -503,6 +506,6 @@
 (test-parse-input "    OPEN  FRABJOUS  DOOR  " '(OPEN ? DOOR))
 (test-parse-input "OPEN     DOOR      CLOSE    " '(OPEN DOOR CLOSE))
 (test-parse-input "OPEN DOOR WITH CYLINDER" '(OPEN DOOR WITH CYLINDER))
-(test-parse-input "OPEN DOOR WITH CYLINDER IN HORSE TABLE COLA"
-		  '(OPEN DOOR WITH CYLINDER IN HORSE TABLE COLA))
+(test-parse-input "OPEN DOOR WITH CYLINDER IN HORSE"
+		  '(OPEN DOOR WITH CYLINDER IN HORSE))
 

@@ -116,8 +116,14 @@
       (test-input "TAKE BONE" "UNLOCK DOOR WITH FINGER")
       (assert-clr :lock-jammed)
       (assert-object-in "FINGER BONE" :nowhere))
+
+    (test "Unlock door with finger bone, with finger bone"
+      (assert-set :lock-jammed)
+      (test-input "TAKE BONE" "UNLOCK DOOR WITH FINGER BONE")
+      (assert-clr :lock-jammed)
+      (assert-object-in "FINGER BONE" :nowhere))
     
-    (test "Unlock door with finger, withut finger"
+    (test "Unlock door with finger, without finger"
       (assert-set :lock-jammed)
       (test-input "UNLOCK DOOR WITH FINGER")
       (assert-set :lock-jammed)

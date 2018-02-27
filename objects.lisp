@@ -156,52 +156,94 @@ all of which will refer to the same object."
   ;;                C = Set if not unique
   ;;                Z = Set if not found
   (when *word-table-built*
-    ;;Current-place does not need to be saved as it will
+    ;;Current-place does not need to be marked as game state as it will
     ;;be set implicitly by a call to restore the game state
     ;;when there is a call to navigate made.
     (zp-b :current-place)
+    
+    (db :object1 0)
+    (db :object2 0)
+    
     (with-namespace :object-table
       (alias :noun :D0)
       (alias :adjective :D1)
       (alias :pos :A0)
       (alias :found-index :D2)
+      (alias :word-index :D3)
+      
       (game-state-bytes "It"
-	  (db :it 0))
+	(db :it 0))
+
       (when (resolves '(:parser . :words))
-	;;some of the test functions don't use the parser
-	;;so this entry point won't compile- exclude it if
-	;;that is the case
-	(label :find-object-index-from-input nil)
-	(dc "Get the third word, e.g. TAKE ADJ NOUN")
-	(LDA.AB (+ 2 (resolve '(:parser . :words))))
-	(BEQ :no-adjective "Could be of form TAKE NOUN")
+	(alias :words :A1)
+	(label :parse-objects nil)
+	(sta16.zp (resolve '(:parser . :words)) :words)
+     	(LDY 0)
+	(STY.AB :object1)
+	(STY.AB :object2)
+	(LDA 1)
+	(STA.ZP :word-index)
+	(label :next)
+	(LDY.ZP :word-index)
+	(CPY 6)
+	(BGE :done)
+	(JSR :find-object)
+	(CPY (object-id "IT"))
+	(BNE :not-it)
+	(LDY.AB :it)
+	(label :not-it)
+	(LDA.AB :object1)
+	(BNE :set-object2)
+	(STY.AB :object1)
+	(BEQ :next)
+	(label :set-object2)
+	(STY.AB :object2)
+	(CPY 0 "Keep searching for object 2")
+	(BEQ :next)
+	(label :done)
+	(dc "Unless there were two words")
+	(dc "Set 'it' to be object one")
+	(CLC "Clear carry to indicate not a duplicate")
+	(LDA.AB :object2)
+	(BNE :clear-it)
+	(LDA.AB :object1)
+	(STA.AB :it)
+	(RTS)
+	(label :clear-it)
+	(LDA 0)
+	(STA.AB :it)
+	(RTS)
+	(label :find-object)
+	(INY)
+	(LDA.IZY :words)
+	(BEQ :try-without-adjective)
 	(STA.ZP :noun)
-	(LDA.AB (+ 1 (resolve '(:parser . :words))))
+	(DEY)
+	(LDA.IZY :words)
 	(STA.ZP :adjective)
 	(JSR :find-object-index)
-	(BEQ :ignore-word-three)
-	(label :translate-it)
 	(BCS :duplicate)
-	(CPY (object-id "IT"))
-	(BNE :return)
-	(LDY.AB :it)
-	(CLC "Clear the carry to indicate not a duplicate")
+	(BEQ :try-without-adjective)
+	(INC.ZP :word-index)
+	(INC.ZP :word-index)
+	(RTS)
+	(label :try-without-adjective)
+	(LDY.ZP :word-index)
+	(LDA.IZY :words)
+	(STA.ZP :noun)
+	(LDA 0)
+	(STA.ZP :adjective)
+	(JSR :find-object-index)
+	(BCS :duplicate)
+	(INC.ZP :word-index)
 	(RTS)
 	(label :duplicate)
 	(LDY 0)
-	(BEQ :return)
-	(dc "We didn't find it, but what if the third word")
-	(dc "isn't part of the first object? Could be TAKE NOUN1 NOUN2")
-	(label :ignore-word-three)
-	(LDA 0)
-	(label :no-adjective)
-	(STA.ZP :adjective)
-	(LDA.AB (+ 1 (resolve '(:parser . :words))))
-	(STA.ZP :noun)
-	(JSR :find-object-index)
-	(BNE :translate-it)
-	(label :return)
 	(STY.AB :it)
+	(STY.AB :object1)
+	(STY.AB :object2)
+	(PLA)
+	(PLA)
 	(RTS))
       
       (label :find-object-index nil)
@@ -273,14 +315,10 @@ all of which will refer to the same object."
 	  (incf index)))
 	;;reverse the objects as they were pushed in
 	(setf objects (nreverse objects))
-	;;(when *compiler-final-pass*
-	;;  (print names)
-	;;  (print objects)
-	;;  (do-hashtable (k v *object-name->index*) (format t "~a->~a~%" k v)))
 	;;now sort as the searching algorithm expects them to be in
 	;;noun-id order
 	(setf names (stable-sort (sort names #'< :key #'second)
-					 #'< :key #'first))
+				 #'< :key #'first))
 	(apply #'db :names (mapcar #'first names))
 	(apply #'db :adjectives (mapcar #'second names))
 	(apply #'db :object-index (mapcar #'third names))
@@ -293,6 +331,7 @@ all of which will refer to the same object."
 	(DEY)
 	(BNE :copy-place)
 	(RTS)
+
 	;; now we can generate the object data tables
 	(let ((places (mapcar
 		       #'(lambda (o)
@@ -315,12 +354,14 @@ all of which will refer to the same object."
 	  (apply #'db :verb-hi (mapcar #'(lambda (o) (hi (verb-addr o))) objects))
 	  (apply #'db :verb-lo (mapcar #'(lambda (o) (lo (verb-addr o))) objects)))
 	;; object descriptions
+	
 	(apply #'db :description-hi (mapcar #'(lambda (o) (hi (third o))) objects))
 	(apply #'db :description-lo (mapcar #'(lambda (o) (lo (third o))) objects))
 	(apply #'db :description-lines (mapcar #'(lambda (o) (lo (fifth o))) objects))
 	;; object properties
 	(apply #'db :properties
 	       (mapcar #'(lambda (o) (if (sixth o) *object-take* 0)) objects))
+
 	(maphash #'(lambda (object verb-handlers)
 		     (label object :vtable)
 		     (dolist (verb-handler verb-handlers)
@@ -331,9 +372,10 @@ all of which will refer to the same object."
 		 *object->vtable*)))))
 
 (defun object-id (name)
-  (if *compiler-final-pass*
-      (gethash name *object-name->index*)
-      0))
+  (let ((id (gethash name *object-name->index*)))
+  (when *compiler-final-pass*
+    (assert id nil "Object ~a was not defined" name))
+  (nil->0 id)))
 
 (defun dump-objects ()
   (do-hashtable (name data *object-name->data*)
@@ -367,7 +409,8 @@ all of which will refer to the same object."
   (defplace :ur)
   (defplace :nippur)
   (defplace :babylon)
-  
+
+  (fixture "IT" (:place :inventory :name-override "It."))
   (object "MARDUK STATUE" (:description "A bronze statue" :place :ur))
   (object "STONE STATUE" (:description "A stone statue" :place :ur))
   (object "GINGER BISCUIT" (:description "A tasty snack" :place :ur))
@@ -483,4 +526,68 @@ all of which will refer to the same object."
 (assert (= (object-id "FINGER BONE")
 	   (object-id "BONE FINGER")))
 
+(defun parse-objects-tester (input &key (break-on 'brk))
+  (reset-compiler)
+  (reset-strings)
+  (font-data)
+  (reset-compiler)
+  (reset-object-model)
+  (reset-parser)
+  (flet ((pass ()
+	   (zeropage)	     
+	   (org #x600)
+	   (CLD)
+	   (label :start)
+	   (LDA (nil->0 (gethash :ur *place->id*)))
+	   (STA.ZP :current-place)
+	   (JSR :parse)
+	   (JSR :parse-objects)
+	   (BRK)
+	   (test-object-definitions)
+	   (object-table)
+	   (parser)
+	   (string-table #() t)
+	   (huffman-decoder)
+	   (label :end)
+	   (font-data)))
+    (pass)
+    (setf *word-table-built* t)
+    (pass)
+    (let ((end *compiler-ptr*))
+      (pass)
+      (assert (= end *compiler-ptr*) nil "Build was not stable"))
+    (setf *compiler-final-pass* t)
+    (pass))
+  
+  ;; install the string into the input buffer
+  
+  (loop for c across input
+        for i from 0 to *max-input-length* do       
+       (setf (aref *compiler-buffer* (+ i (resolve '(:parser . :input))))
+	     (to-alphabet-pos c)))
+  
+  (monitor-reset #x600)
+  (monitor-run :print nil :break-on break-on)
+  
+  (coerce (subseq (monitor-buffer)
+		  (resolve :object1)
+		  (1+ (resolve :object2)))
+	  'list))
 
+(defun test-parse-objects (input object1 object2)
+  ;;(format t "Testing ~a~%" input)
+  (let ((objects (parse-objects-tester input)))
+    (when object1 (assert (equal (object-id object1) (first objects))))
+    (when object2 (assert (equal (object-id object2) (second objects))))))
+
+(test-parse-objects "TAKE MARDUK STATUE" "MARDUK STATUE" nil)
+(test-parse-objects "TAKE BISCUIT" "GINGER BISCUIT" nil)
+(test-parse-objects "HIT MARDUK STATUE STONE STATUE" "MARDUK STATUE" "STONE STATUE")
+(test-parse-objects "HIT MARDUK STATUE GINGER BISCUIT" "MARDUK STATUE" "GINGER BISCUIT")
+(test-parse-objects "HIT MARDUK STATUE BISCUIT" "MARDUK STATUE" "GINGER BISCUIT")
+(test-parse-objects "HIT BISCUIT MARDUK STATUE" "GINGER BISCUIT" "MARDUK STATUE")
+(test-parse-objects "HIT FLUFF BISCUIT" "POCKET FLUFF" "GINGER BISCUIT")
+(test-parse-objects "HIT MARDUK STATUE WITH GINGER BISCUIT" "MARDUK STATUE" "GINGER BISCUIT")
+(test-parse-objects "HIT MARDUK STATUE WITH BISCUIT" "MARDUK STATUE" "GINGER BISCUIT")
+(test-parse-objects "HIT BISCUIT WITH MARDUK STATUE" "GINGER BISCUIT" "MARDUK STATUE")
+(test-parse-objects "HIT FLUFF WITH BISCUIT" "POCKET FLUFF" "GINGER BISCUIT")

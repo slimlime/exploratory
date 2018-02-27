@@ -89,10 +89,10 @@
 	  (funcall else)))
       (label :end-if))))
 
-(defun if-word-fn (word then else)
+(defun if-object-fn (object then else)
   (let ((namespace *compiler-label-namespace*))
     (with-local-namespace
-      (vm-tword word)
+      (vm-obj object)
       (if then
 	  (progn
 	    (vm-brf (if else :else :end-if))
@@ -109,13 +109,13 @@
 	  (funcall else)))
       (label :end-if))))
 
-(defmacro if-word (word then &optional (else nil else-supplied-p))
-  `(if-word-fn ,word
+(defmacro if-object (object then &optional (else nil else-supplied-p))
+  `(if-object-fn ,object
 	       #'(lambda () ,then)
 	       (if ,else-supplied-p #'(lambda () ,else) nil)))
 
-(defmacro when-word (word &body then)
-  `(if-word-fn ,word
+(defmacro when-object (object &body then)
+  `(if-object-fn ,object
 	       #'(lambda () ,then)
 	       nil))
 

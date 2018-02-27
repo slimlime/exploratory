@@ -1,9 +1,24 @@
 (defparameter *bits* nil)
 (defparameter *bit->index* nil)
 
+(defparameter *bits-read* nil)
+(defparameter *bits-modified* nil)
+
 (defun reset-bits ()
   (setf *bit->index* (make-hash-table :test 'equal))
-  (setf *bits* (make-hash-table :test 'equal)))
+  (setf *bits* (make-hash-table :test 'equal))
+  (setf *bits-read* (make-hash-table :test 'equal))
+  (setf *bits-modified* (make-hash-table :test 'equal)))
+
+(defun bit-modified (bit)
+  (unless (consp bit)
+    (setf bit (cons *current-location* bit)))
+  (setf (gethash bit *bits-modified*) t))
+
+(defun bit-read (bit)
+  (unless (consp bit)
+    (setf bit (cons *current-location* bit)))
+  (setf (gethash bit *bits-read*) t))
 
 (defun defbit (bit &key (initially-set :not-specified initially-set-supplied-p)
 		     (namespace *current-location*))
@@ -69,6 +84,13 @@ bits will only match at the location they are defined."
 
 ;;Bit packed table
 (defun bit-table ()
+  (when *compiler-final-pass*
+    (do-hash-keys (bit *bits-read*)
+      (unless (gethash bit *bits-modified*)
+	(format t "WARNING Bit ~a is read, but never modified.~%" bit)))
+    (do-hash-keys (bit *bits-modified*)
+      (unless (gethash bit *bits-read*)
+	(format t "WARNING Bit ~a is modified, but never read.~%" bit))))
   (let ((bits nil))
     (maphash #'(lambda (bit initially-set)
 		 (push (list

@@ -162,20 +162,22 @@
   (monitor-print)
   (tagbody
    :prompt
-     (format t "Ret=Step q=Quit label/address=Run o=Skip 3~%")
+     (format t "Ret=Step q=Quit label/address=Run 3=Skip 3 5=Skip 5~%")
      (let ((line (read-line)))
-       (if (equal "o" line)
+       (if (equalp "3" line)
 	   ;;TODO, can we detect dereferencing functions?
 	   ;;TODO use case
 	   (monitor-run :break-on (+ 3 (monitor-pc)))
-	   (if (equal "q" line)
-	       (return-from monitor-go (values))
-	       (if (equal "" line)
-		   (monitor-step)
-		   (let ((exp (with-input-from-string (s line) (read s))))
-		     (if (resolves exp)
-			 (monitor-run :break-on exp)
-			 (format t "~a is not a valid address.~%" exp)))))))
+	   (if (equalp "5" line)
+	       (monitor-run :break-on (+ 5 (monitor-pc)))
+	       (if (equalp "q" line)
+		   (return-from monitor-go (values))
+		   (if (equal "" line)
+		       (monitor-step)
+		       (let ((exp (with-input-from-string (s line) (read s))))
+			 (if (resolves exp)
+			     (monitor-run :break-on exp)
+			     (format t "~a is not a valid address.~%" exp))))))))
        (go :prompt)))
 
 (defun monitor-buffer ()

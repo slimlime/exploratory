@@ -5,6 +5,8 @@
 ;; TODO (goto label) is fine, but the label it jumps to is somewhat leaky as it is a
 ;; genuine assembler label. Probably fine.
 
+(defparameter *donothave* "You don't have that.")
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun translate-this (object-name)
     (if (eq 'this object-name)
@@ -89,10 +91,10 @@
 	  (funcall else)))
       (label :end-if))))
 
-(defun if-word-fn (word then else)
+(defun if-object-fn (object then else)
   (let ((namespace *compiler-label-namespace*))
     (with-local-namespace
-      (vm-tword word)
+      (vm-obj object)
       (if then
 	  (progn
 	    (vm-brf (if else :else :end-if))
@@ -109,13 +111,13 @@
 	  (funcall else)))
       (label :end-if))))
 
-(defmacro if-word (word then &optional (else nil else-supplied-p))
-  `(if-word-fn ,word
+(defmacro if-object (object then &optional (else nil else-supplied-p))
+  `(if-object-fn ,(translate-this object)
 	       #'(lambda () ,then)
 	       (if ,else-supplied-p #'(lambda () ,else) nil)))
 
-(defmacro when-word (word &body then)
-  `(if-word-fn ,word
+(defmacro when-object (object &body then)
+  `(if-object-fn ,object
 	       #'(lambda () ,then)
 	       nil))
 
@@ -263,5 +265,15 @@
   "An action for a verb associated with this object"
   `(verb-fn t *current-object* ,verb-or-verbs #'(lambda () ,@body)))
 
+(defun it (object)
+  (vm-it object))
+
 (defun goto (label)
   (vm-jmp label))
+
+(defmacro ensure-has (object)
+  `(if-has ,object
+	   nil
+	   (progn
+	     (respond *donothave*)
+	     (vm-done))))

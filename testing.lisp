@@ -16,8 +16,8 @@
 (defun assert-object-in (object location)
   (let ((expected-place (place-id location))
 	(actual-place (monitor-peek (object-place-address object))))
-    (assert expected-place)
-    (assert (= expected-place actual-place)
+    (assert expected-place nil "Expected place ~a was not defined" location)
+    (assert (eq expected-place actual-place)
 	    nil
 	    "Expected the ~a in ~a (~a) was in place ~a"
 	    object location expected-place actual-place)))

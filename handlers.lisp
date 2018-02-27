@@ -1,14 +1,36 @@
 ;; Actions and handler that should be common across
 ;; games, e.g. INVENTORY, EXAMINE etc
 
+;; TODO When there is a duplicate object, one of which is in the
+;; inventory, there is no point in saying "Be more specific"
+;; we should only find the objects which are in the inventory
+
 ;; Test-game stuff also in here
 
 (defparameter *be-more-specific* "You'll have to be more specific...")
   
 (defun generic-generic-handlers ()
+
+  (fixture "IT" (:place :inventory :name-override "It."))
+  
   (with-location :generic
     (defword :INVENTORY :I)
 
+    (custom-action '(WHAT)
+      (with-namespace :what
+	(LDY.AB '(:object-table . :it))
+	(BNE :something)
+	(respond-raw "Nothing.")
+	(RTS)
+	(label :something)
+	(dc "Now print the object name")
+	(LDA.ABY (1- (resolve '(:object-table . :name-hi))))
+	(STA.AB (hi-add '(:typeset-cs . :str)))
+	(LDA.ABY (1- (resolve '(:object-table . :name-lo))))
+	(STA.AB (lo-add '(:typeset-cs . :str)))
+	(LDA 1 "Object names are one line")
+	(JMP :print-message)))
+    
     (custom-action '(LOOK)
       (with-namespace :look
 	(respond-raw "You take a look around and see...")
@@ -23,16 +45,20 @@
 	(dc "Reset matching object count to 0")
 	(LDX 0)
 	(STX.AB :object-count)
-	(LDY (objects-count))
+	(LDY (hash-table-count *object-name->index*))
 	(label :next-object)
 	(dc "List the object in the place in A")
 	(dc "Look in one-based object places table")
+	(PHA)
 	(CMP.ABY (1- (resolve '(:object-table . :places))))
 	(BNE :object-not-here)
-	(dc "Save A and Y")
-	(PHA)
-	(TYA)
-	(PHA)
+	(dc "Get object properties")
+	(LDA.ABY (1- (resolve '(:object-table . :properties))))
+	(dc "Non-takeable objects don't appear in the output")
+	(AND.IMM *object-take*)
+	(BEQ :object-not-here)
+	(dc "Save object index")
+        (STY.AB '(:object-table . :it))
 	(dc "Now print the object name")
 	(LDA.ABY (1- (resolve '(:object-table . :name-hi))))
 	(STA.AB (hi-add '(:typeset-cs . :str)))
@@ -41,17 +67,21 @@
 	(LDA 1 "Object names are one line")
 	(JSR :print-message)
 	(dc "Restore Y and A")
-	(PLA)
-	(TAY)
-	(PLA)
+	(LDY.AB '(:object-table . :it))
 	(INC.AB :object-count)
 	(label :object-not-here)
+	(PLA)
 	(DEY)
 	(BNE :next-object)
 	(LDX.AB :object-count)
 	(BNE :not-empty)
 	(respond-raw "Nothing.")
 	(label :not-empty)
+	(CPX 1)
+	(BEQ :unique)
+	(LDA 0 "Clear It")
+	(STA.AB '(:object-table . :it))
+	(label :unique)
 	(RTS)
 	(dc "Temporary counter when scanning objects")
 	(db :object-count 0)))
@@ -63,8 +93,14 @@
       (dc "Do we already have this?")
       (LDA 1)
       (CMP.ABY (1- (resolve '(:object-table . :places))))
-      (BNE :take-it)
+      (BNE :can-take-it?)
       (respond-raw "You already have that.")
+      (RTS)
+      (label :can-take-it?)
+      (LDA *object-take*)
+      (AND.ABY (1- (resolve '(:object-table . :properties))))
+      (BNE :take-it)
+      (respond-raw "You can't take that.")
       (RTS)
       (label :take-it)
       (dc "Set the place to inventory")
@@ -113,7 +149,6 @@
 	(entry 'DROP :drop)))
     
     (custom-action '(? ? ? ?)
-
       (with-namespace :verb-handler
 	(alias :vtable :A0)
 	(alias :object-id :D0)
@@ -122,8 +157,9 @@
 	(respond-raw "I don't know that word.")
 	(RTS)
 	(label :valid-ish-verb)
-	(JSR :find-object-index-from-input)
+	(JSR :parse-objects)
 	(BCS :duplicate-found)
+	(LDY.AB :object1)
 	(BEQ :not-found)
 	(STY.ZP :object-id)
 	(dc "Look for the verb handler for an object")
@@ -270,9 +306,12 @@
 
 (defun gogogo ()
   (tagbody
-     :top
-     (enter-input (read-line))
-     (go :top)))
+   :top
+     (let ((line (read-line)))
+       (if (equalp line "q")
+	   (return-from gogogo))
+       (enter-input line :print nil)
+       (go :top))))
 
 (defun restore-game (str &key (break-on 'brk))
   (restore-state-base64 str)

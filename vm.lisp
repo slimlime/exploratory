@@ -222,7 +222,8 @@
 			 (string-downcase bit)
 			 (fmt-addr addr))
   (bit addr)
-  ((push-byte (bit-index bit))
+  ((bit-read bit)
+   (push-byte (bit-index bit))
    (push-byte (forward-branch-offset addr)))
   ((JSR :get-bit-mask)
    (AND.ABY :bit-table)
@@ -236,7 +237,8 @@
 			 (string-downcase bit)
 			 (fmt-addr addr))
   (bit addr)
-  ((push-byte (bit-index bit))
+  ((bit-read bit)
+   (push-byte (bit-index bit))
    (push-byte (forward-branch-offset addr)))
   ((JSR :get-bit-mask)
    (AND.ABY :bit-table)
@@ -399,7 +401,8 @@ incorrect branch offsets elsewhere
 ;;VM-CLR - Clear bit
 ;;
 (defvmop vm-clr (format nil "VM-CLR ~a" (string-downcase bit)) (bit)
-	 ((push-byte (bit-index bit)))
+	 ((bit-modified bit)
+	  (push-byte (bit-index bit)))
 	 ((JSR :get-bit-mask)
 	  (EOR #xff)
 	  (AND.ABY :bit-table)
@@ -410,7 +413,8 @@ incorrect branch offsets elsewhere
 ;;VM-SET - Set bit
 ;;
 (defvmop vm-set (format nil "VM-SET ~a" (string-downcase bit)) (bit)
-	 ((push-byte (bit-index bit)))
+	 ((bit-modified bit)
+	  (push-byte (bit-index bit)))
 	 ((JSR :get-bit-mask)
 	  (ORA.ABY :bit-table)
 	  (STA.ABY :bit-table)
@@ -432,25 +436,31 @@ incorrect branch offsets elsewhere
    (RTS)))
 
 ;;;
-;;;VM-TWORD - Test for a word
+;;;VM-OBJ - Test for an object, i.e. the second object in a sentence
 ;;;
-(defvmop vm-tword (format nil "VM-TWORD ~a"
-			  (string-downcase word))
-  (word)
-  ((push-byte (word-id word)))
+(defvmop vm-obj (format nil "VM-OBJ ~a"
+			(string-downcase object))
+  (object)
+  ((push-byte (object-id object)))
   ((vm-fetch)
-   (LDY (1- *max-input-words*))
-   (label :next)
-   (CMP.ABY '(:parser . :words))
-   (BEQ :found)
-   (DEY)
-   (BPL :next)
-   (INY "Set Y to 0")
-   (STY.ZP :vm-t)
-   (RTS)
-   (label :found)
-   (LDA #xff)
+   (CMP.AB :object2)
+   (BNE :not-found)
+   (LDA #xFF)
    (STA.ZP :vm-t)
+   (RTS)
+   (label :not-found)
+   (LDA 0)
+   (STA.ZP :vm-t)
+   (RTS)))
+
+;;;
+;;;VM-IT - Set 'it' object
+;;;
+(defvmop vm-it (format nil "VM-IT ~a" (string-downcase object))
+  (object)
+  ((push-byte (object-id object)))
+  ((vm-fetch)
+   (STA.AB '(:object-table . :it))
    (RTS)))
 
 ;; reverse the order of the ops since they were pushed in

@@ -10,6 +10,9 @@
 ;; LOCATION has a PLACE ID
 ;; ELSEWHERE and INVENTORY are PLACES
 
+;; TODO The lower level parser should probably not return any index
+;; if the there is a duplicate
+
 (defparameter *current-location* nil)
 (defparameter *object-name->data* nil)
 (defparameter *object-name->index* nil)
@@ -17,6 +20,10 @@
 (defparameter *next-place-id* nil)
 (defparameter *current-object* nil)
 (defparameter *object->vtable* nil)
+
+;;object property bitmasks
+
+(defparameter *object-take* 1)
 
 ;; Define a new place, probably not necessary to call from game
 ;; code as the call which actually use the place will call this
@@ -72,7 +79,7 @@
 (assert (string= "An apple." (name-with-indefinite-article "APPLE")))
 (assert (string= "A telephone." (name-with-indefinite-article "TELEPHONE")))
 
-(defun make-object-data (name names description initial-place name-override)
+(defun make-object-data (name names description initial-place name-override take)
   "Return a list of data associated with an object"
   (let* ((text (justify-with-image description
 				   5 4 *act-font*))
@@ -87,9 +94,10 @@
 	       (name-with-indefinite-article name)))
      (dstr text)
      initial-place
-     lines)))
+     lines
+     take)))
 
-(defun defobject-fn (names description initial-place name-override)
+(defun defobject-fn (names &key description initial-place name-override take)
   (when (stringp names)
     (setf names (list names)))
   (let ((name (first names)))
@@ -99,7 +107,7 @@
     (defplace initial-place)
     ;;define the object
     (setf (gethash name *object-name->data*)
-	  (make-object-data name names description initial-place name-override))
+	  (make-object-data name names description initial-place name-override take))
     ;;ensure all object names and adjectives have words defined for them
     (dolist (name names)
       (multiple-value-bind (noun adj)
@@ -117,52 +125,133 @@
   `(let ((*current-object* (first-or-it ,object)))
      ,@body))
 
-(defmacro defobject (names description initial-place display-name-override &body body)
+(defmacro object (names (&key description place name-override) &body body)
   "Define an object. Initial place may be nil for 'here'. Name-override may be nil for
 standard object display name e.g. 'A golden apple.' Names can be a list of names,
 all of which will refer to the same object."
   (let ((names-sym (gensym)))
     `(let ((,names-sym ,names))
        (with-object ,names-sym
-	 (defobject-fn ,names-sym ,description ,initial-place ,display-name-override)
+	 (defobject-fn ,names-sym
+	     :description ,description
+	     :initial-place ,place
+	     :name-override ,name-override
+	     :take t)
 	 ,@body))))
+
+(defmacro fixture (names (&key description place name-override) &body body)
+  "Define an object than cannot be taken."
+  (let ((names-sym (gensym)))
+    `(let ((,names-sym ,names))
+       (with-object ,names-sym
+	 (defobject-fn ,names-sym
+	     :description ,description
+	     :initial-place ,place
+	     :name-override ,name-override
+	     :take nil)
+	 ,@body))))
+
+(defun object-id (name)
+  (let ((id (gethash name *object-name->index*)))
+  (when *compiler-final-pass*
+    (assert id nil "Object ~a was not defined" name))
+  (nil->0 id)))
 
 (defun object-table ()
   ;;return values - Y = index of matching item
   ;;                C = Set if not unique
   ;;                Z = Set if not found
   (when *word-table-built*
-    ;;Current-place does not need to be saved as it will
+    ;;Current-place does not need to be marked as game state as it will
     ;;be set implicitly by a call to restore the game state
     ;;when there is a call to navigate made.
     (zp-b :current-place)
+    
+    (db :object1 0)
+    (db :object2 0)
+    
     (with-namespace :object-table
       (alias :noun :D0)
       (alias :adjective :D1)
       (alias :pos :A0)
       (alias :found-index :D2)
+      (alias :word-index :D3)
+      
+      (game-state-bytes "It"
+	(db :it 0))
+
       (when (resolves '(:parser . :words))
-	;;some of the test functions don't use the parser
-	;;so this entry point won't compile- exclude it if
-	;;that is the case
-	(label :find-object-index-from-input nil)
-	(dc "Get the third word, e.g. TAKE ADJ NOUN")
-	(LDA.AB (+ 2 (resolve '(:parser . :words))))
-	(BEQ :no-adjective "Could be of form TAKE NOUN")
+	(alias :words :A1)
+	(label :parse-objects nil)
+	(sta16.zp (resolve '(:parser . :words)) :words)
+     	(LDY 0)
+	(STY.AB :object1)
+	(STY.AB :object2)
+	(LDA 1)
+	(STA.ZP :word-index)
+	(label :next)
+	(LDY.ZP :word-index)
+	(CPY 6)
+	(BGE :done)
+	(JSR :find-object)
+	(CPY (object-id "IT"))
+	(BNE :not-it)
+	(LDY.AB :it)
+	(label :not-it)
+	(LDA.AB :object1)
+	(BNE :set-object2)
+	(STY.AB :object1)
+	(BEQ :next)
+	(label :set-object2)
+	(STY.AB :object2)
+	(CPY 0 "Keep searching for object 2")
+	(BEQ :next)
+	(label :done)
+	(dc "Unless there were two words")
+	(dc "Set 'it' to be object one")
+	(CLC "Clear carry to indicate not a duplicate")
+	(LDA.AB :object2)
+	(BNE :clear-it)
+	(LDA.AB :object1)
+	(STA.AB :it)
+	(RTS)
+	(label :clear-it)
+	(LDA 0)
+	(STA.AB :it)
+	(RTS)
+	(label :find-object)
+	(INY)
+	(LDA.IZY :words)
+	(BEQ :try-without-adjective)
 	(STA.ZP :noun)
-	(LDA.AB (+ 1 (resolve '(:parser . :words))))
+	(DEY)
+	(LDA.IZY :words)
 	(STA.ZP :adjective)
 	(JSR :find-object-index)
-	(BEQ :ignore-word-three)
+	(BCS :duplicate)
+	(BEQ :try-without-adjective)
+	(INC.ZP :word-index)
+	(INC.ZP :word-index)
 	(RTS)
-	(dc "We didn't find it, but what if the third word")
-	(dc "isn't part of the first object? Could be TAKE NOUN1 NOUN2")
-	(label :ignore-word-three)
+	(label :try-without-adjective)
+	(LDY.ZP :word-index)
+	(LDA.IZY :words)
+	(STA.ZP :noun)
 	(LDA 0)
-	(label :no-adjective)
 	(STA.ZP :adjective)
-	(LDA.AB (+ 1 (resolve '(:parser . :words))))
-	(STA.ZP :noun))
+	(JSR :find-object-index)
+	(BCS :duplicate)
+	(INC.ZP :word-index)
+	(RTS)
+	(label :duplicate)
+	(LDY 0)
+	(STY.AB :it)
+	(STY.AB :object1)
+	(STY.AB :object2)
+	(PLA)
+	(PLA)
+	(RTS))
+      
       (label :find-object-index nil)
       (dc "Linear search for the noun")
       (LDY 0)
@@ -210,7 +299,6 @@ all of which will refer to the same object."
       (dc "Carry AND not-zero, i.e. duplicate AND found")
       (SEC)
       (RTS)
-
       (let ((objects nil)
 	    (names nil))
 	(clrhash *object-name->index*)
@@ -233,14 +321,10 @@ all of which will refer to the same object."
 	  (incf index)))
 	;;reverse the objects as they were pushed in
 	(setf objects (nreverse objects))
-	;;(when *compiler-final-pass*
-	;;  (print names)
-	;;  (print objects)
-	;;  (do-hashtable (k v *object-name->index*) (format t "~a->~a~%" k v)))
 	;;now sort as the searching algorithm expects them to be in
 	;;noun-id order
 	(setf names (stable-sort (sort names #'< :key #'second)
-					 #'< :key #'first))
+				 #'< :key #'first))
 	(apply #'db :names (mapcar #'first names))
 	(apply #'db :adjectives (mapcar #'second names))
 	(apply #'db :object-index (mapcar #'third names))
@@ -253,6 +337,7 @@ all of which will refer to the same object."
 	(DEY)
 	(BNE :copy-place)
 	(RTS)
+
 	;; now we can generate the object data tables
 	(let ((places (mapcar
 		       #'(lambda (o)
@@ -275,9 +360,14 @@ all of which will refer to the same object."
 	  (apply #'db :verb-hi (mapcar #'(lambda (o) (hi (verb-addr o))) objects))
 	  (apply #'db :verb-lo (mapcar #'(lambda (o) (lo (verb-addr o))) objects)))
 	;; object descriptions
+	
 	(apply #'db :description-hi (mapcar #'(lambda (o) (hi (third o))) objects))
 	(apply #'db :description-lo (mapcar #'(lambda (o) (lo (third o))) objects))
 	(apply #'db :description-lines (mapcar #'(lambda (o) (lo (fifth o))) objects))
+	;; object properties
+	(apply #'db :properties
+	       (mapcar #'(lambda (o) (if (sixth o) *object-take* 0)) objects))
+
 	(maphash #'(lambda (object verb-handlers)
 		     (label object :vtable)
 		     (dolist (verb-handler verb-handlers)
@@ -289,12 +379,15 @@ all of which will refer to the same object."
 
 (defun dump-objects ()
   (do-hashtable (name data *object-name->data*)
-    (format t "~3d ~20a $~4,'0x (~d) $~4,'0x ~20a ~s~%"
-	    (object-id name) name (second data) (fifth data) (third data)
-		  (fourth data) (cdar data))))
-      
-(defun objects-count ()
-  (hash-table-count *object-id->data*))
+    (format t "~3d ~20a $~4,'0x (~d) $~4,'0x ~20a TAKE:~a ~s~%"
+	    (object-id name)
+	    name
+	    (second data)
+	    (fifth data)
+	    (third data)
+	    (fourth data)
+	    (if (sixth data) "Y" "N")
+	    (cdar data))))
 
 (defun dump-places ()
   (maphash #'(lambda (k v) (format t "~a -> ~a~%" k v)) *place->id*))
@@ -306,11 +399,6 @@ all of which will refer to the same object."
       (assert id (place) "~a is not a valid place" place))
     (if id id 0)))
 
-(defun object-id (name)
-  (if *compiler-final-pass*
-      (gethash name *object-name->index*)
-      0))
-
 (defun object-place-address (name)
   "Get the object place address"
   (+ -1 (resolve '(:object-table . :places)) (object-id name)))
@@ -321,15 +409,18 @@ all of which will refer to the same object."
   (defplace :ur)
   (defplace :nippur)
   (defplace :babylon)
-  
-  (defobject "MARDUK STATUE" "A bronze statue" :ur nil)
-  (defobject "STONE STATUE" "A stone statue" :ur nil)
-  (defobject "GINGER BISCUIT" "A tasty snack" :ur nil)
-  (defobject "ENTRAILS" "Animal guts" :nippur nil)
-  (defobject "POCKET FLUFF" "Lovely pocket fluff" :inventory nil)
-  (defobject "OBSIDIAN CUBE" "Black cube" :nowhere nil)
-  (defobject "CAT FLUFF" "Cat fluff" :babylon nil)
-  (defobject '("FINGER BONE" "BONE FINGER") "A bony finger" :inventory nil))	   
+
+  (fixture "IT" (:place :inventory :name-override "It."))
+  (object "MARDUK STATUE" (:description "A bronze statue" :place :ur))
+  (object "STONE STATUE" (:description "A stone statue" :place :ur))
+  (object "GINGER BISCUIT" (:description "A tasty snack" :place :ur))
+  (object "ENTRAILS" (:description "Animal guts" :place :nippur))
+  (object "POCKET FLUFF" (:description "Lovely pocket fluff" :place :inventory))
+  (object "OBSIDIAN CUBE" (:description "Black cube" :place :nowhere))
+  (object "CAT FLUFF" (:description "Cat fluff" :place :babylon))
+  (object "GREEN BALL" (:description "Green ball" :place :ur))
+  (object "RED BALL" (:description "Red ball" :place :ur))
+  (object '("FINGER BONE" "BONE FINGER") (:description "A bony finger" :place :inventory)))
 
 (defun object-tester (name-id adj-id current-place)
   (reset-compiler)
@@ -338,7 +429,7 @@ all of which will refer to the same object."
   (reset-compiler)
   (reset-object-model)
   (reset-parser)
-	   
+  
   (flet ((pass ()
 	   (zeropage)	     
 	   (org #x600)
@@ -430,7 +521,73 @@ all of which will refer to the same object."
 (test-object-find "FINGER" "BONE" :inventory :found :unique)
 (test-object-find "BONE" "FINGER" :inventory :found :unique)
 
+(test-object-find nil "BALL" :ur :found :duplicate)
+
 (assert (= (object-id "FINGER BONE")
 	   (object-id "BONE FINGER")))
 
+(defun parse-objects-tester (input &key (break-on 'brk))
+  (reset-compiler)
+  (reset-strings)
+  (font-data)
+  (reset-compiler)
+  (reset-object-model)
+  (reset-parser)
+  (flet ((pass ()
+	   (zeropage)	     
+	   (org #x600)
+	   (CLD)
+	   (label :start)
+	   (LDA (nil->0 (gethash :ur *place->id*)))
+	   (STA.ZP :current-place)
+	   (JSR :parse)
+	   (JSR :parse-objects)
+	   (BRK)
+	   (test-object-definitions)
+	   (object-table)
+	   (parser)
+	   (string-table #() t)
+	   (huffman-decoder)
+	   (label :end)
+	   (font-data)))
+    (pass)
+    (setf *word-table-built* t)
+    (pass)
+    (let ((end *compiler-ptr*))
+      (pass)
+      (assert (= end *compiler-ptr*) nil "Build was not stable"))
+    (setf *compiler-final-pass* t)
+    (pass))
+  
+  ;; install the string into the input buffer
+  
+  (loop for c across input
+        for i from 0 to *max-input-length* do       
+       (setf (aref *compiler-buffer* (+ i (resolve '(:parser . :input))))
+	     (to-alphabet-pos c)))
+  
+  (monitor-reset #x600)
+  (monitor-run :print nil :break-on break-on)
+  
+  (coerce (subseq (monitor-buffer)
+		  (resolve :object1)
+		  (1+ (resolve :object2)))
+	  'list))
 
+(defun test-parse-objects (input object1 object2)
+  ;;(format t "Testing ~a~%" input)
+  (let ((objects (parse-objects-tester input)))
+    (when object1 (assert (equal (object-id object1) (first objects))))
+    (when object2 (assert (equal (object-id object2) (second objects))))))
+
+(test-parse-objects "TAKE MARDUK STATUE" "MARDUK STATUE" nil)
+(test-parse-objects "TAKE BISCUIT" "GINGER BISCUIT" nil)
+(test-parse-objects "HIT MARDUK STATUE STONE STATUE" "MARDUK STATUE" "STONE STATUE")
+(test-parse-objects "HIT MARDUK STATUE GINGER BISCUIT" "MARDUK STATUE" "GINGER BISCUIT")
+(test-parse-objects "HIT MARDUK STATUE BISCUIT" "MARDUK STATUE" "GINGER BISCUIT")
+(test-parse-objects "HIT BISCUIT MARDUK STATUE" "GINGER BISCUIT" "MARDUK STATUE")
+(test-parse-objects "HIT FLUFF BISCUIT" "POCKET FLUFF" "GINGER BISCUIT")
+(test-parse-objects "HIT MARDUK STATUE WITH GINGER BISCUIT" "MARDUK STATUE" "GINGER BISCUIT")
+(test-parse-objects "HIT MARDUK STATUE WITH BISCUIT" "MARDUK STATUE" "GINGER BISCUIT")
+(test-parse-objects "HIT BISCUIT WITH MARDUK STATUE" "GINGER BISCUIT" "MARDUK STATUE")
+(test-parse-objects "HIT FLUFF WITH BISCUIT" "POCKET FLUFF" "GINGER BISCUIT")

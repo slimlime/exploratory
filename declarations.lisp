@@ -5,6 +5,8 @@
 ;; TODO (goto label) is fine, but the label it jumps to is somewhat leaky as it is a
 ;; genuine assembler label. Probably fine.
 
+(defparameter *donothave* "You don't have that.")
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun translate-this (object-name)
     (if (eq 'this object-name)
@@ -110,7 +112,7 @@
       (label :end-if))))
 
 (defmacro if-object (object then &optional (else nil else-supplied-p))
-  `(if-object-fn ,object
+  `(if-object-fn ,(translate-this object)
 	       #'(lambda () ,then)
 	       (if ,else-supplied-p #'(lambda () ,else) nil)))
 
@@ -268,3 +270,10 @@
 
 (defun goto (label)
   (vm-jmp label))
+
+(defmacro ensure-has (object)
+  `(if-has ,object
+	   nil
+	   (progn
+	     (respond *donothave*)
+	     (vm-done))))

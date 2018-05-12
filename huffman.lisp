@@ -13,6 +13,10 @@
 ;;                     0A41 FF01F8C9 DB $FF, $01, $F8, $C9 ;f( 9)=17 Max:01F8 Del:01C9
 ;;                     0A45 FF03FFC2 DB $FF, $03, $FF, $C2 ;f(10)=14 Max:03FF Del:03C2
 
+;; NOTE, I feel that the use of BMI is incorrect... so I changed to BLT which
+;; is correct. BMI probably only worked when the incoming accumulator value was
+;; less than 128 more than the value in the pop table.
+
 (defun fmt-str (str &optional (spaces t))
   (when (characterp str)
     (setf str (format nil "~a" str)))
@@ -186,11 +190,11 @@
     (dc "for codes of this length. So let's compare it.")
     (LDA.IZY :pop)
     (CMP.ZP :acc-hi)
-    (BMI :gt1 "acc-hi > max-code(len)-hi")
+    (BLT :gt1 "acc-hi > max-code(len)-hi")
     (INY)
     (LDA.IZY :pop)
     (CMP.ZP :acc-lo)
-    (BMI :gt2 "acc-lo > max-code(len)-lo")
+    (BLT :gt2 "acc-lo > max-code(len)-lo")
     (INY)
     (dc "Now acc<=max-code(len), this means we have a symbol woo!")
     (dc "To get the symbol index we subtract the offset")

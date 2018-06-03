@@ -7,7 +7,11 @@
 ;; TODO
 ;; Combine dloc with a body parameter which is wrapped in with-location
 ;; Sort out absolute paths in dloc for loading image
-;; 
+;; Esnure that correct game dictionary is used
+;; There is a bug that means that space and newline are confused if
+;; none of the strings wrap. This should not be a problem in practice
+;; BUG enter NORTH when NORTH is not a valid action gives the respons "I don't see that"
+;; There is no response to the user navigation- probably should be
 
 (defparameter *game-dictionary* #())
 
@@ -34,13 +38,19 @@
   ;;NOTE could probably add &body parameter to dloc which drops into a
   ;;with-location.
   (dloc :basement-stairs "BASEMENT STAIRS" "/home/dan/Downloads/cellardoor.bmp"
-	"Bottom of a flight of stairs.")
+	"You are at the bottom of a dank flight of stairs. A mysterious passage, which seems vaguely familiar, runs left and right. Wafting in from the right you can hear the sound of arguments, ironic chortling and the sound of fizzy pop bottles being opened.")
 
   (with-location :basement-stairs
     (action '(LEFT)
       (navigate :garage))
     (action '(RIGHT)
-      (navigate :basement)))
+      (navigate :basement))
+    (action '(UP)
+      (label :go-up)
+      (navigate :kitchen))
+    (fixture "BASEMENT STAIRS" (:description "Just ordinary stairs in an ordinary damp basement." :name-override "Some stairs.")
+      (verb 'CLIMB
+	(goto :go-up))))
 
   (dloc :garage "GARAGE" "/home/dan/Downloads/porsche.bmp"
 	"Red porsche. Paint can, etc.")

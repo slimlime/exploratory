@@ -182,7 +182,7 @@
       (STA.ZP '(:decompress-image . :height))
       (dc "Tail jump to decompress the colours and return")
       (JMP :decompress-colours))))
-  
+
 (defun dloc (name title img-file text)
   (label name)
   (let ((sx 104) (sy 104))

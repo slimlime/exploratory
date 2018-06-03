@@ -207,7 +207,17 @@
     (dc (format nil "~a" text) t)
     (dw nil (dstr text))))
 
-(defun navigate (location)
+(defun navigate (location &key (message nil))
+  "Navigate, with a default message of 'You go north.' etc"
+  (unless message
+    (setf message (concatenate 'string
+			       "You go "
+			       (string-downcase
+				(if (listp (first *enclosing-action*))
+				    (first (first *enclosing-action*))
+				    (first *enclosing-action*)))
+			       ".")))
+  (respond message)
   (vm-nav location))
 
 (defun delegate-action ()
@@ -234,9 +244,15 @@
   (funcall fn)
   (if vm (vm-done) (rts)))
 
+(defparameter *enclosing-action* nil)
+
 (defmacro action (words &body body)
-  "An action which is executed by the VM"
-  `(action-fn t ,words #'(lambda () ,@body)))
+  "An action which is executed by the VM."
+  (let ((words-sym (gensym)))
+    `(progn
+       (let* ((,words-sym ,words)
+	      (*enclosing-action* ,words-sym))
+	 (action-fn t ,words-sym #'(lambda () ,@body))))))
 
 (defmacro custom-action (words &body body)
   "An action which drops into 6502"

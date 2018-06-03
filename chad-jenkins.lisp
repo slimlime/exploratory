@@ -34,16 +34,42 @@
   (defword :EXAMINE :DESCRIBE)
   (defword :LOCK :KEYHOLE))
 
-(defun act1 ()
-  ;;NOTE could probably add &body parameter to dloc which drops into a
-  ;;with-location.
-  (dloc :basement-stairs "BASEMENT STAIRS" "/home/dan/Downloads/cellardoor.bmp"
-	"You are at the bottom of a dank flight of stairs. A mysterious passage, which seems vaguely familiar, runs left and right. Wafting in from the right you can hear the sound of arguments, ironic chortling and the sound of fizzy pop bottles being opened.")
 
-  (with-location :basement-stairs
-    (action '(LEFT)
+#| Chad starts on the basement stairs, the player is unaware of what he is doing
+   or how he got there. He finds out from a group of roleplaying gamers that he
+   is one of their number, and it is his quest to bring snacks. But who is the
+   mysterious (and possibly beautiful) Maxine? Who does the red Porsche with
+   one faulty light belong to?
+
+   Puzzles
+
+   i) The garage is dark, a bulb must be found and inserted into the socket
+      or Chad may slip and fall into a pile of paint cans and other detritus.
+      The bulb is available from the basement stairs. If the basement stairs
+      are dark and the dog is high from the energy drink, it will fall down
+      and break its neck.
+
+   ii) The garage door opener is in the glovebox of the Porsche, but the Porsche
+      is locked. The Porsche can be opened by pushing down the faulty light. The
+      garage door opener will work only if it has batteries. Batteries can be
+      found in the clock radio Maxine throws at your head, when you offer her
+      the tissues.
+
+    iii) The dog is guarding the stairs up to the upper floor. To take care
+      of it, we must feed it Ka-Zow energy drink, the drink for the dog-tired.
+      
+    iv) Maxine has the clock radio, to get it from her, offer her some tissues
+        from the bathroom, because she has been crying. She will hurl the radio
+        at you in a rage.
+
+|#
+
+(defun act1 ()
+  (location :basement-stairs "BASEMENT STAIRS" "/home/dan/Downloads/cellardoor.bmp"
+      "You are at the bottom of a dank flight of stairs. A mysterious passage, which seems vaguely familiar, runs left and right. Wafting in from the right you hear the sound of polyhedral dice being rolled, goblins being slain and fizzy pop bottles being guzzled. Sounds like fun."
+    (action '((LEFT) (SOUTH))
       (navigate :garage))
-    (action '(RIGHT)
+    (action '((RIGHT) (NORTH))
       (navigate :basement))
     (action '(UP)
       (label :go-up)
@@ -52,24 +78,18 @@
       (verb 'CLIMB
 	(goto :go-up))))
 
-  (dloc :garage "GARAGE" "/home/dan/Downloads/porsche.bmp"
-	"Red porsche. Paint can, etc.")
-
-  (with-location :garage
+  (location :garage "GARAGE" "/home/dan/Downloads/porsche.bmp"
+      "Red porsche. Paint can, etc."
     (action '(NORTH)
       (navigate :basement-stairs)))
-
-  (dloc :basement "BASEMENT ANNEX" "/home/dan/Downloads/porsche.bmp"
-	"Nerds' basement")
-
-  (with-location :basement
+  
+  (location :basement "BASEMENT ANNEX" "/home/dan/Downloads/porsche.bmp"
+      "Nerds' basement"
     (action '((SOUTH) (OUT))
       (navigate :basement-stairs)))
 
-  (dloc :kitchen "KITCHEN" "/home/dan/Downloads/porsche.bmp"
-	"Suburban kitchen")
-
-  (with-location :kitchen
+  (location :kitchen "KITCHEN" "/home/dan/Downloads/porsche.bmp"
+      "Suburban kitchen"
     (action '(DOWN)
       (navigate :basement-stairs))
     (action '(WEST)
@@ -77,17 +97,13 @@
     (action '(UP)
       (navigate :upstairs-landing)))
   
-  (dloc :den "DEN" "/home/dan/Downloads/porsche.bmp"
-	"The parents den")
-  
-  (with-location :den
+  (location :den "DEN" "/home/dan/Downloads/porsche.bmp"
+      "The parents den"
     (action '(EAST)
       (navigate :kitchen)))
-
-  (dloc :upstairs-landing "UPSTAIRS LANDING" "/home/dan/Downloads/porsche.bmp"
-	"Landing")
-
-  (with-location :upstairs-landing
+  
+  (location :upstairs-landing "UPSTAIRS LANDING" "/home/dan/Downloads/porsche.bmp"
+      "Landing"
     (action '(DOWN)
       (navigate :kitchen))
     (action '(WEST)
@@ -95,17 +111,13 @@
     (action '(EAST)
       (navigate :maxines-bedroom)))
   
-  (dloc :bathroom "BATHROOM" "/home/dan/Downloads/porsche.bmp"
-	"Bathroom")
-
-  (with-location :bathroom
+  (location :bathroom "BATHROOM" "/home/dan/Downloads/porsche.bmp"
+      "Bathroom"
     (action '(OUT)
       (navigate :upstairs-landing)))
   
-  (dloc :maxines-bedroom "MAXINE'S BEDROOM" "/home/dan/Downloads/porsche.bmp"
-	"Bedroom")
-
-  (with-location :maxines-bedroom
+  (location :maxines-bedroom "MAXINE'S BEDROOM" "/home/dan/Downloads/porsche.bmp"
+      "Bedroom"
     (action '(OUT)
       (navigate :upstairs-landing))))
 

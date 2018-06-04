@@ -11,7 +11,7 @@
 ;; There is a bug that means that space and newline are confused if
 ;; none of the strings wrap. This should not be a problem in practice
 ;; BUG enter NORTH when NORTH is not a valid action gives the respons "I don't see that"
-;; There is no response to the user navigation- probably should be
+;; Handlers of the form (? X) are not valid
 
 (defparameter *game-dictionary* #())
 
@@ -20,6 +20,7 @@
 (defparameter *far-out* "Far out!")
 (defparameter *whatyoutalkingabout* "I am sure YOU know what you are talking about.")
 (defparameter *cantdoit* "You can't do that!")
+(defparameter *indeed* "Indeed.")
 
 (defun chad-synonyms ()
   (defword :NORTH :N)
@@ -66,17 +67,27 @@
 
 (defun act1 ()
   (location :basement-stairs "BASEMENT STAIRS" "/home/dan/Downloads/cellardoor.bmp"
-      "You are in a passageway at the bottom of a dank flight of stairs. Wafting in from the right you hear the sound of polyhedral dice being rolled, goblins being slain and fizzy pop bottles being guzzled. Sounds like fun. To the left the mysterious passage disappears round a dark corner."
+      "You are in a grim passageway at the bottom of a dank, evil flight of stairs. Wafting through an alcove to the right you can hear the sound of polyhedral dice being rolled, goblins being slain and fizzy pop being guzzled. The sound of fun. To the left the mysterious passage disappears round a dark corner, to who knows where?"
     (action '((LEFT) (SOUTH))
       (navigate :garage))
     (action '((RIGHT) (NORTH))
-      (navigate :basement))
+      (label :go-right)
+      (navigate :basement "You go through the alcove."))
     (action '(UP)
       (label :go-up)
-      (navigate :kitchen))
-    (fixture "BASEMENT STAIRS" (:description "Just ordinary stairs in an ordinary damp basement." :name-override "Some stairs.")
+      (navigate :kitchen "You go up the stairs."))
+    (action '(SATAN)
+      (respond "You recite some Judas Priest backwards, but nothing happens."))
+    (action '(SATON)
+      (respond "Saton hears you."))
+    (fixture "BASEMENT STAIRS" (:description "Phew! They appear to be regular, non-evil basement stairs of the sort found in many suburban houses.")
       (verb 'CLIMB
-	(goto :go-up))))
+	(goto :go-up)))
+    (fixture "BASEMENT PASSAGEWAY" (:description "It's not mysterious at all! Seems to lead to a car garage to the left and through an alcove to the right to another room."))
+    (fixture "BASEMENT ALCOVE" (:description "Above the alcove, someone has scratched a half-assed pentagram, along with the word `SATON'.")
+      (verb 'ENTER
+	(goto :go-right)))
+    (fixture "ALCOVE PENTAGRAM" (:description "Whoever drew this wasn't really that committed. It's more of a five-and-a-half pointed star.")))
 
   (location :garage "GARAGE" "/home/dan/Downloads/porsche.bmp"
       "Red porsche. Paint can, etc."
@@ -86,12 +97,25 @@
   (location :basement "BASEMENT ANNEX" "/home/dan/Downloads/porsche.bmp"
       "Nerds' basement"
     (action '((SOUTH) (OUT))
-      (navigate :basement-stairs)))
+      (navigate :basement-stairs))
+
+    (object '("ENERGY DRINK" "KAZOW BOTTLE")
+	(:description "A bottle of KaZow! brand energy drink. `Dog-tired? Drink KaZow.'"
+	:place :nowhere))
+
+    (action '(SATON)
+      (respond "The gamers stand-up make a curious hand gesture, turn around three times, then throw back their hoods and shout `Hail Saton!'")
+      (if-bit :saton-hailed
+	      (respond "They sit down and resume their game.")
+	      (progn
+		(respond "One of the gamers tosses you a bottle of KaZow! energy drink.")
+		(setbit :saton-hailed)
+		(move-object "ENERGY DRINK" :inventory)))))
 
   (location :kitchen "KITCHEN" "/home/dan/Downloads/porsche.bmp"
       "Suburban kitchen"
     (action '(DOWN)
-      (navigate :basement-stairs))
+      (navigate :basement-stairs "You go down the stairs."))
     (action '(WEST)
       (navigate :den))
     (action '(UP)

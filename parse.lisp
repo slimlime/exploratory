@@ -143,18 +143,19 @@
 	       (gethash b *word->meaning*)))))
 
 (defun parser ()
+  (db :word-count 0)
   (label :parse)
   (with-namespace :parser
     (alias :word-start :D0)
     (alias :delta :D1)
-    (alias :word-index :D2)
+    
     (alias :inp :A0)
     (alias :index :D3) ;;binary search array index
 
     (sta16.zp :input :inp)
     (label :parse-direct)
     (LDX 0 "X is our word pointer")
-    (STX.ZP :word-index)
+    (STX.AB :word-count)
     (dc "Clear the parsed words buffer")
     (dotimes (i *max-input-words*)
       (STX.AB (+ (resolve :words) i)))
@@ -240,7 +241,7 @@
     (label :not-found)
     (LDA 0)
     (label :store-result)
-    (LDX.ZP :word-index)
+    (LDX.AB :word-count)
     (STA.ABX :words)
     (dc "Advance to the next space")
     (label :seek-space)
@@ -254,7 +255,7 @@
     (BEQ :consume-space)
     (label :found-next)
     (INX)
-    (STX.ZP :word-index)
+    (STX.AB :word-count)
     (CPX *max-input-words*)
     (BNE :next-word)
     (label :done)
@@ -478,10 +479,11 @@
 		  (+ (resolve '(:parser . :words)) *max-input-words*))
 	  'list))
 
-(defun test-parse-input (input expected)
+(defun test-parse-input (count input expected)
   ;;(format t "Testing ~a~%" input)
   (let ((words (parse-words-tester input)))
     ;;(print words)
+    (assert (= count (aref (monitor-buffer) (resolve :word-count))))
     (loop
        for e in expected
        for r in words do
@@ -493,19 +495,19 @@
 		 (format nil "Sentence [~a] parsed to [~a] which has phantom extra words at pos ~a"
 			 input words i)))))
 
-(test-parse-input "" '())
-(test-parse-input "CHAIR" '(CHAIR))
-(test-parse-input "OPEN DOOR" '(OPEN DOOR))
-(test-parse-input "PUSH CYLINDER" '(PUSH CYLINDER))
-(test-parse-input "PRESS CYLINDER" '(PUSH CYLINDER))
-(test-parse-input "OPEN FRABJOUS DOOR" '(OPEN ? DOOR))
-(test-parse-input "OPEN DOOR CLOSE" '(OPEN DOOR CLOSE))
-(test-parse-input " OPEN DOOR" '(OPEN DOOR))
-(test-parse-input "PUSH  CYLINDER" '(PUSH CYLINDER))
-(test-parse-input "PRESS   CYLINDER" '(PUSH CYLINDER))
-(test-parse-input "    OPEN  FRABJOUS  DOOR  " '(OPEN ? DOOR))
-(test-parse-input "OPEN     DOOR      CLOSE    " '(OPEN DOOR CLOSE))
-(test-parse-input "OPEN DOOR WITH CYLINDER" '(OPEN DOOR WITH CYLINDER))
-(test-parse-input "OPEN DOOR WITH CYLINDER IN HORSE"
+(test-parse-input 0 "" '())
+(test-parse-input 1 "CHAIR" '(CHAIR))
+(test-parse-input 2 "OPEN DOOR" '(OPEN DOOR))
+(test-parse-input 2 "PUSH CYLINDER" '(PUSH CYLINDER))
+(test-parse-input 2 "PRESS CYLINDER" '(PUSH CYLINDER))
+(test-parse-input 3 "OPEN FRABJOUS DOOR" '(OPEN ? DOOR))
+(test-parse-input 3 "OPEN DOOR CLOSE" '(OPEN DOOR CLOSE))
+(test-parse-input 2 " OPEN DOOR" '(OPEN DOOR))
+(test-parse-input 2 "PUSH  CYLINDER" '(PUSH CYLINDER))
+(test-parse-input 2 "PRESS   CYLINDER" '(PUSH CYLINDER))
+(test-parse-input 3 "    OPEN  FRABJOUS  DOOR  " '(OPEN ? DOOR))
+(test-parse-input 3 "OPEN     DOOR      CLOSE    " '(OPEN DOOR CLOSE))
+(test-parse-input 4 "OPEN DOOR WITH CYLINDER" '(OPEN DOOR WITH CYLINDER))
+(test-parse-input 6 "OPEN DOOR WITH CYLINDER IN HORSE"
 		  '(OPEN DOOR WITH CYLINDER IN HORSE))
 

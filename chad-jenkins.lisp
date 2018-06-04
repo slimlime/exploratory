@@ -66,7 +66,7 @@
 
 (defun act1 ()
   (location :basement-stairs "BASEMENT STAIRS" "/home/dan/Downloads/cellardoor.bmp"
-      "You are at the bottom of a dank flight of stairs. A mysterious passage, which seems vaguely familiar, runs left and right. Wafting in from the right you hear the sound of polyhedral dice being rolled, goblins being slain and fizzy pop bottles being guzzled. Sounds like fun."
+      "You are in a passageway at the bottom of a dank flight of stairs. Wafting in from the right you hear the sound of polyhedral dice being rolled, goblins being slain and fizzy pop bottles being guzzled. Sounds like fun. To the left the mysterious passage disappears round a dark corner."
     (action '((LEFT) (SOUTH))
       (navigate :garage))
     (action '((RIGHT) (NORTH))

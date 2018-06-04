@@ -152,9 +152,13 @@
       (with-namespace :verb-handler
 	(alias :vtable :A0)
 	(alias :object-id :D0)
+	(LDA.AB :word-count)
+	(CMP 2)
+	(BLT :not-verb-object)	
 	(LDA.AB '(:parser . :words))
 	(BNE :valid-ish-verb)
 	(respond-raw "I don't know that word.")
+	(label :not-verb-object)
 	(RTS)
 	(label :valid-ish-verb)
 	(JSR :parse-objects)

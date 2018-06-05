@@ -207,7 +207,7 @@
     (dc (format nil "~a" text) t)
     (dw nil (dstr text))))
 
-(defun navigate (location &key (message nil))
+(defun navigate (location &optional (message nil))
   "Navigate, with a default message of 'You go north.' etc"
   (unless message
     (setf message (concatenate 'string

@@ -12,6 +12,8 @@
 ;; none of the strings wrap. This should not be a problem in practice
 ;; BUG enter NORTH when NORTH is not a valid action gives the respons "I don't see that"
 ;; Handlers of the form (? X) are not valid
+;; LOOK is broken in the basement stairs
+;; The fixtures, dog and dog-bowl must show up in LOOK.
 
 (defparameter *game-dictionary* #())
 
@@ -29,6 +31,8 @@
   (defword :WEST :W)
   (defword :LEFT :L)
   (defword :RIGHT :R)
+  (defword :DOWN :D)
+  (defword :UP :U)
   (defword :TAKE :GET :PICK :GRAB)
   (defword :EXIT :OUT :GO)
   (defword :ATTACK :KILL :HIT :CLEAVE :PUNCH :BANG)
@@ -84,10 +88,10 @@
       (verb 'CLIMB
 	(goto :go-up)))
     (fixture "BASEMENT PASSAGEWAY" (:description "It's not mysterious at all! Seems to lead to a car garage to the left and through an alcove to the right to another room."))
-    (fixture "BASEMENT ALCOVE" (:description "Above the alcove, someone has scratched a half-assed pentagram, along with the word `SATON'.")
+    (fixture "BASEMENT ALCOVE" (:description "Above the alcove, someone has scratched a half-assed pentagram.")
       (verb 'ENTER
 	(goto :go-right)))
-    (fixture "ALCOVE PENTAGRAM" (:description "Whoever drew this wasn't really that committed. It's more of a five-and-a-half pointed star.")))
+    (fixture "ALCOVE PENTAGRAM" (:description "Underneath the badly drawn pentagram the word `SATON' has been scratched.")))
 
   (location :garage "GARAGE" "/home/dan/Downloads/porsche.bmp"
       "Red porsche. Paint can, etc."
@@ -100,8 +104,22 @@
       (navigate :basement-stairs))
 
     (object '("ENERGY DRINK" "KAZOW BOTTLE")
-	(:description "A bottle of KaZow! brand energy drink. `Dog-tired? Drink KaZow.'"
-	:place :nowhere))
+	(:description "A bottle of KaZow! brand energy juice. `Dog-tired? Drink KaZow.'" :place :nowhere)
+      (verb 'DRINK
+	(if-bit :bottle-empty
+		(respond "It's empty.")
+		(respond "You read the label, `Sick Orange Flavour' and think better of it.")))
+      (verb '(POUR EMPTY TIP)
+	(ensure-has this)
+	(if-bit :bottle-empty
+		(respond "It's empty.")
+		(if-object "DOG BOWL"
+			   (progn
+			     (respond "You pour the fizzing orange liquid into the dog-bowl.")
+			     (respond "The dog laps it up. It runs around in a circle then disappears into the den. You hear barking and screaming...")
+			     (setbit :bottle-empty)
+			     (move-object "VICIOUS DOG" :den))
+		  (respond "You decide not to waste it.")))))
 
     (action '(SATON)
       (respond "The gamers stand-up make a curious hand gesture, turn around three times, then throw back their hoods and shout `Hail Saton!'")
@@ -119,7 +137,10 @@
     (action '(WEST)
       (navigate :den))
     (action '(UP)
-      (navigate :upstairs-landing)))
+      (navigate :upstairs-landing))
+    (fixture "DOG BOWL" (:description "A metal dog bowl.")
+      (verb 'TAKE (respond "It is chained to the sink.")))
+    (fixture "VICIOUS DOG" (:description "A vicious dog, with eyes as big as plates and a heart as black as coal.")))
   
   (location :den "DEN" "/home/dan/Downloads/porsche.bmp"
       "The parents den"

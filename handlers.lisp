@@ -147,7 +147,7 @@
 	(entry 'EXAMINE :examine)
 	(entry 'TAKE :take)
 	(entry 'DROP :drop)))
-    
+
     (custom-action '(? ? ? ?)
       (with-namespace :verb-handler
 	(alias :vtable :A0)

@@ -6,6 +6,7 @@
 ;; genuine assembler label. Probably fine.
 
 (defparameter *donothave* "You don't have that.")
+(defparameter *enclosing-action* nil)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun translate-this (object-name)
@@ -50,6 +51,13 @@
      (with-namespace *current-location*
        ,@body)))
 
+(defmacro location (name title img-file text &body body)
+  (let ((name-sym (gensym)))
+    `(let ((,name-sym ,name))
+       (dloc ,name-sym ,title ,img-file ,text)
+       (with-location ,name-sym
+	 ,@body))))
+       
 ;; TODO refactor these three functions
 
 (defun if-bit-fn (bit then else)
@@ -243,8 +251,6 @@
     (vm-exe))
   (funcall fn)
   (if vm (vm-done) (rts)))
-
-(defparameter *enclosing-action* nil)
 
 (defmacro action (words &body body)
   "An action which is executed by the VM."

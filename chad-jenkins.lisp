@@ -91,7 +91,7 @@
     (fixture "BASEMENT ALCOVE" (:description "Above the alcove, someone has scratched a half-assed pentagram.")
       (verb 'ENTER
 	(goto :go-right)))
-    (fixture "ALCOVE PENTAGRAM" (:description "Underneath the badly drawn pentagram the word `SATON' has been scratched.")))
+    (fixture "ALCOVE PENTAGRAM" (:description "Underneath the badly drawn pentagram the word `SATON' has been inscribed.")))
 
   (location :garage "GARAGE" "/home/dan/Downloads/porsche.bmp"
       "Red porsche. Paint can, etc."
@@ -103,11 +103,15 @@
     (action '((SOUTH) (OUT))
       (navigate :basement-stairs))
 
-    (object '("ENERGY DRINK" "KAZOW BOTTLE")
+    (object '("KAZOW BOTTLE" "ENERGY JUICE" "FIZZY POP" "BOTTLE KAZOW")
 	(:description "A bottle of KaZow! brand energy juice. `Dog-tired? Drink KaZow.'" :place :nowhere)
+      (verb 'OPEN
+	(if-bit :bottle-empty
+		(respond "The bottle is empty.")
+		(respond "The bottle fizzes like boiling acid. Best keep it closed eh?")))
       (verb 'DRINK
 	(if-bit :bottle-empty
-		(respond "It's empty.")
+		(respond "The bottle is empty.")
 		(respond "You read the label, `Sick Orange Flavour' and think better of it.")))
       (verb '(POUR EMPTY TIP)
 	(ensure-has this)
@@ -115,20 +119,19 @@
 		(respond "It's empty.")
 		(if-object "DOG BOWL"
 			   (progn
-			     (respond "You pour the fizzing orange liquid into the dog-bowl.")
-			     (respond "The dog laps it up. It runs around in a circle then disappears into the den. You hear barking and screaming...")
+			     (respond "The dog drinks the liquid. It runs around in a furious circle then disappears into the den. There is barking and screaming...")
 			     (setbit :bottle-empty)
 			     (move-object "VICIOUS DOG" :den))
 		  (respond "You decide not to waste it.")))))
 
     (action '(SATON)
-      (respond "The gamers stand-up make a curious hand gesture, turn around three times, then throw back their hoods and shout `Hail Saton!'")
+      (respond "The gamers stand-up and make a chilling hand gesture. They throw back their hoods, rotate three times and shout `Hail Saton!'")
       (if-bit :saton-hailed
 	      (respond "They sit down and resume their game.")
 	      (progn
-		(respond "One of the gamers tosses you a bottle of KaZow! energy drink.")
+		(respond "Someone tosses you a bottle of fizzy pop.")
 		(setbit :saton-hailed)
-		(move-object "ENERGY DRINK" :inventory)))))
+		(move-object "KAZOW BOTTLE" :inventory)))))
 
   (location :kitchen "KITCHEN" "/home/dan/Downloads/porsche.bmp"
       "Suburban kitchen"

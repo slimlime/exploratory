@@ -16,6 +16,12 @@
   (let ((k (gensym)))
     `(maphash #'(lambda (,k ,v) (declare (ignore ,k)) ,@body) ,table)))
 
+(defun hash-values (table)
+  (let ((values nil))
+    (do-hash-values (v table)
+      (push v values))
+    values))
+
 (defmacro not-nil (value)
   `(aif ,value
 	it

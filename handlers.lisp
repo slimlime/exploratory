@@ -18,6 +18,7 @@
 
     (custom-action '(WHAT)
       (with-namespace :what
+	(dc "What is IT?")
 	(LDY.AB '(:object-table . :it))
 	(BNE :something)
 	(respond-raw "Nothing.")
@@ -34,18 +35,24 @@
     (custom-action '(LOOK)
       (with-namespace :look
 	(respond-raw "You take a look around and see...")
+	(LDA *object-show*)
+	(dc "Don't show objects that don't want to be listed")
+	(STA.AB '(:inventory . :object-property-mask))
 	(LDA.ZP :current-place)
 	(JMP '(:inventory . :scan-objects))))
 
     (custom-action '(INVENTORY)
       (with-namespace :inventory
 	(respond-raw "You have...")
+	(LDA 255)
+	(dc "For inventory, show everything")
+	(STA.AB :object-property-mask)
 	(LDA 1 "Inventory is Place 1")
 	(label :scan-objects)
 	(dc "Reset matching object count to 0")
 	(LDX 0)
 	(STX.AB :object-count)
-	;;Assume that IT is the last entry in the list	
+	;;Assume that IT is the last entry in the list
 	(assert (string= (cadar (sort (mapcar #'(lambda (v) (list (object-id (caar v)) (caar v)))
 					      (hash-values *object-name->data*)) #'> :key #'first)) "IT") nil "IT was not the last thing in the object list")
 	(LDY (1- (hash-table-count *object-name->data*)))
@@ -57,8 +64,9 @@
 	(BNE :object-not-here)
 	(dc "Get object properties")
 	(LDA.ABY (1- (resolve '(:object-table . :properties))))
-	(dc "Non-takeable objects don't appear in the output")
-	(AND.IMM *object-take*)
+	(dc "Apply a mask to filter out undesirables, self modifying.")
+	(label+1 :object-property-mask)
+	(AND.IMM 0)
 	(BEQ :object-not-here)
 	(dc "Save object index")
         (STY.AB '(:object-table . :it))

@@ -108,7 +108,7 @@
 
 (defun defobject-fn (names &key show description initial-place name-override take)
   (when (stringp names)
-    (setf names (list names)))
+    (setf names (list names)))  
   (let ((name (first names)))
     (when (null initial-place)
       (setf initial-place *current-location*))
@@ -118,14 +118,20 @@
     (setf (gethash name *object-name->data*)
 	  (make-object-data name names description initial-place name-override take show))
     ;;ensure all object names and adjectives have words defined for them
-    (dolist (name names)
-      (multiple-value-bind (noun adj)
-	  (split name)
-	(unless (gethash noun *word->meaning*)
-	  (defword noun))
-	(when adj
-	  (unless (gethash adj *word->meaning*)
-	    (defword adj)))))))
+    (let ((nouns (make-hash-table :test 'equal)))
+      (dolist (name names)
+	(multiple-value-bind (noun adj)
+	    (split name)
+	  (assert (null (gethash noun nouns)) nil (format nil"Can't have same noun as alias for same object, ~a ~a and ~a ~a" adj noun (gethash noun nouns) noun))
+	  ;;note, i'm sure we could, if we needed to do this, at the moment
+	  ;;the object searcher thinks it is two different objects and asks
+	  ;;to 'be more specific'
+	  (setf (gethash noun nouns) adj)
+	  (unless (gethash noun *word->meaning*)
+	    (defword noun))
+	  (when adj
+	    (unless (gethash adj *word->meaning*)
+	      (defword adj))))))))
  
 (defun first-or-it (s)
   (if (listp s) (first s) s))

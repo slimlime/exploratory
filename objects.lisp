@@ -24,6 +24,12 @@
 ;;object property bitmasks
 
 (defparameter *object-take* 1)
+(defparameter *object-show* 2)
+
+(defun object-properties (take show)
+  (logior
+   (if take *object-take* 0)
+   (if show *object-show* 0)))
 
 ;; Define a new place, probably not necessary to call from game
 ;; code as the call which actually use the place will call this
@@ -79,7 +85,9 @@
 (assert (string= "An apple." (name-with-indefinite-article "APPLE")))
 (assert (string= "A telephone." (name-with-indefinite-article "TELEPHONE")))
 
-(defun make-object-data (name names description initial-place name-override take)
+;;TODO make a struct for the object data it is becoming too unwieldy as a list
+
+(defun make-object-data (name names description initial-place name-override take show)
   "Return a list of data associated with an object"
   (let* ((text (justify-with-image description
 				   5 4 *act-font*))
@@ -95,9 +103,10 @@
      (dstr text)
      initial-place
      lines
-     take)))
+     take
+     show)))
 
-(defun defobject-fn (names &key description initial-place name-override take)
+(defun defobject-fn (names &key show description initial-place name-override take)
   (when (stringp names)
     (setf names (list names)))
   (let ((name (first names)))
@@ -107,7 +116,7 @@
     (defplace initial-place)
     ;;define the object
     (setf (gethash name *object-name->data*)
-	  (make-object-data name names description initial-place name-override take))
+	  (make-object-data name names description initial-place name-override take show))
     ;;ensure all object names and adjectives have words defined for them
     (dolist (name names)
       (multiple-value-bind (noun adj)
@@ -125,7 +134,7 @@
   `(let ((*current-object* (first-or-it ,object)))
      ,@body))
 
-(defmacro object (names (&key description place name-override) &body body)
+(defmacro object (names (&key description place name-override (take t) (show t)) &body body)
   "Define an object. Initial place may be nil for 'here'. Name-override may be nil for
 standard object display name e.g. 'A golden apple.' Names can be a list of names,
 all of which will refer to the same object."
@@ -136,20 +145,17 @@ all of which will refer to the same object."
 	     :description ,description
 	     :initial-place ,place
 	     :name-override ,name-override
-	     :take t)
+	     :take ,take
+	     :show ,show)
 	 ,@body))))
 
 (defmacro fixture (names (&key description place name-override) &body body)
-  "Define an object than cannot be taken."
-  (let ((names-sym (gensym)))
-    `(let ((,names-sym ,names))
-       (with-object ,names-sym
-	 (defobject-fn ,names-sym
-	     :description ,description
-	     :initial-place ,place
-	     :name-override ,name-override
-	     :take nil)
-	 ,@body))))
+  `(object ,names (:description ,description
+				:place ,place
+				:name-override ,name-override
+				:show nil
+				:take nil)
+     ,@body))
 
 (defun object-id (name)
   (let ((id (gethash name *object-name->index*)))
@@ -366,7 +372,7 @@ all of which will refer to the same object."
 	(apply #'db :description-lines (mapcar #'(lambda (o) (lo (fifth o))) objects))
 	;; object properties
 	(apply #'db :properties
-	       (mapcar #'(lambda (o) (if (sixth o) *object-take* 0)) objects))
+	       (mapcar #'(lambda (o) (object-properties (sixth o) (seventh o))) objects))
 
 	(maphash #'(lambda (object verb-handlers)
 		     (label object :vtable)
@@ -379,7 +385,7 @@ all of which will refer to the same object."
 
 (defun dump-objects ()
   (do-hashtable (name data *object-name->data*)
-    (format t "~3d ~20a $~4,'0x (~d) $~4,'0x ~20a TAKE:~a ~s~%"
+    (format t "~3d ~20a $~4,'0x (~d) $~4,'0x ~20a TAKE:~a SHOW:~a ~s~%"
 	    (object-id name)
 	    name
 	    (second data)
@@ -387,6 +393,7 @@ all of which will refer to the same object."
 	    (third data)
 	    (fourth data)
 	    (if (sixth data) "Y" "N")
+	    (if (seventh data) "Y" "N")
 	    (cdar data))))
 
 (defun dump-places ()

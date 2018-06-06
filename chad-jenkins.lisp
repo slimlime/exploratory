@@ -5,15 +5,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; TODO
-;; Combine dloc with a body parameter which is wrapped in with-location
+;; LOOK is broken in the basement stairs
+;; The fixtures, dog and dog-bowl must show up in LOOK- at the moment dog does not even though show is true.
 ;; Sort out absolute paths in dloc for loading image
 ;; Esnure that correct game dictionary is used
 ;; There is a bug that means that space and newline are confused if
 ;; none of the strings wrap. This should not be a problem in practice
-;; BUG enter NORTH when NORTH is not a valid action gives the respons "I don't see that"
 ;; Handlers of the form (? X) are not valid
-;; LOOK is broken in the basement stairs
-;; The fixtures, dog and dog-bowl must show up in LOOK.
 
 (defparameter *game-dictionary* #())
 
@@ -117,7 +115,7 @@
 	(ensure-has this)
 	(if-bit :bottle-empty
 		(respond "It's empty.")
-		(if-object "DOG BOWL"
+		(if-object "METAL BOWL"
 			   (progn
 			     (respond "The dog drinks the liquid. It runs around in a furious circle then disappears into the den. There is barking and screaming...")
 			     (setbit :bottle-empty)
@@ -141,9 +139,9 @@
       (navigate :den))
     (action '(UP)
       (navigate :upstairs-landing))
-    (fixture "DOG BOWL" (:description "A metal dog bowl.")
+    (object "METAL BOWL" (:description "A metal dog bowl.")
       (verb 'TAKE (respond "It is chained to the sink.")))
-    (fixture "VICIOUS DOG" (:description "A vicious dog, with eyes as big as plates and a heart as black as coal.")))
+    (object "VICIOUS DOG" (:description "A vicious dog, with eyes as big as plates and a heart as black as coal." :take nil)))
   
   (location :den "DEN" "/home/dan/Downloads/porsche.bmp"
       "The parents den"

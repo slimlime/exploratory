@@ -252,6 +252,13 @@
   (funcall fn)
   (if vm (vm-done) (rts)))
 
+(defmacro on-entry (&body body)
+  "Define actions which happen when the player enters the location"
+  `(progn
+     (label :on-entry)
+     ,@body
+     (vm-done)))
+
 (defmacro action (words &body body)
   "An action which is executed by the VM."
   (let ((words-sym (gensym)))

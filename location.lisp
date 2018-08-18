@@ -180,8 +180,18 @@
       (LSR)
       (LSR)
       (STA.ZP '(:decompress-image . :height))
-      (dc "Tail jump to decompress the colours and return")
-      (JMP :decompress-colours))))
+      (dc "Decompress the colours")
+      (JSR :decompress-colours)
+      (LDY 16)
+      (LDA.IZY :loc)
+      (BNE :has-entry-handler)
+      (RTS)
+      (label :has-entry-handler)
+      (STA.ZP (hi-add :vm-pc))
+      (DEY)
+      (LDA.IZY :loc)
+      (STA.ZP (lo-add :vm-pc))
+      (JMP :vm-go "Execute entry handler and return"))))
 
 (defun dloc (name title img-file text)
   (label name)
@@ -215,6 +225,10 @@
       (dw :dispatch (cons :dispatcher name))
       ;;14
       (db :place (defplace name))
+      ;;15
+      (if (resolves (cons name :on-entry))
+	  (dw :on-entry-handler (resolve (cons name :on-entry)))
+	  (dw :on-entry-handler 0))
       (dimg name img-file sx sy))))
 
 (defun location-test ()

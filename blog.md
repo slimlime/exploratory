@@ -1,3 +1,43 @@
+## 18/8/2018 Entry Point
+
+When we enter a room, we might want something to happen. So when our unwitting protagonist enters a room with a vicious dog we can arrange to display a suitably threatening message.
+
+~~~~
+  (location :kitchen "KITCHEN" "kitchen.bmp"
+      "Suburban kitchen"
+    (on-entry
+      (when-in-place "LITTLE DOG" here
+	(respond "You see a little dog scampering around on the linoleum! A very good boy.")))
+~~~~
+
+The `on-entry` macro doesn't actually do anything. Well, it inserts a label and accepts some virtual-machine code in its body, so it is equivalent to the following,
+
+~~~~
+	(label :on-entry)
+	...
+	(vm-done)
+~~~~
+
+When the location definition is built it looks for the special label `:on-entry` in the namespace of the location. If it finds one it drops the address of the code to execute. When we navigate to a new location, we can check for the handler and execute it. Simple.
+
+### Smart Quote
+
+I added smart quotes some time ago. Opening quotes had to be manually specified using a backquote. On the basis of YAGNI I didn't bother writing some code to automatically figure out smartquotes as I thought it would be too complex with too many edge cases. If I was writing a typesetter it probably would be, but I did this,
+
+~~~~
+(defun smart-quote (str)
+  (replace-all (if (char= (elt str 0) #\')
+		   (replace (copy-seq str) "`")
+		   str)
+	       " '" " `"))
+
+(assert (equalp "It's" (smart-quote "It's")))
+(assert (equalp "The dog says `woof.'" (smart-quote "The dog says 'woof.'")))
+(assert (equalp "`woof.'" (smart-quote "'woof.'")))
+~~~~
+
+Literally only two cases of interest. Opening quotes always have a space before them, unless the quote is the first character in the string. I bet you are thinking there are tonnes of strings where this fails, and you would be right, and to you I say YAGNI. I always say YAGNI though and it never does me any good.
+
 ## 25/2/2018 Object orientation
 
 Everything's an object, or so they say. Since OO is something of a dirty word around these parts, it was with some dismay that I have had to accept that when it comes to modeling *objects* then object-oriented design is not a bad idea at all. So those guys were only exaggerating a little when they said everything is an object when what they really meant was that every object is an object, which isn't really saying anything at all. Tautological philosophy aside, we can go from disembodied actions and bits of state like this,

@@ -108,11 +108,10 @@
     (dolist (p pattern)
       (format t "~3d ~8a len:~3a bits:~16,'0b ~a~%"
 	      (incf i)
-	      (if dictionary
-		  (if (>= (char-code (first p)) 256)
-		      (fmt-str (aref dictionary (- (char-code (first p)) 256)))
-		      (fmt-str (string (first p))))
-		  (first p))
+	      (if (and dictionary
+		   (>= (char-code (first p)) 256))
+		  (fmt-str (aref dictionary (- (char-code (first p)) 256)))
+		  (fmt-str (string (first p))))
 	      (second p)
 	      (third p)
 	      (aif (third p)

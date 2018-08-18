@@ -13,6 +13,16 @@
 (defun append-eos (str)
   (format nil "~a~a" str #\nul))
 
+(defun smart-quote (str)
+  (replace-all (if (char= (elt str 0) #\')
+		   (replace (copy-seq str) "`")
+		   str)
+	       " '" " `"))
+
+(assert (equalp "It's" (smart-quote "It's")))
+(assert (equalp "The dog says `woof.'" (smart-quote "The dog says 'woof.'")))
+(assert (equalp "`woof.'" (smart-quote "'woof.'")))
+
 (defun dump-frequency-table (freqs)
   (let ((col 0)
 	(items nil))

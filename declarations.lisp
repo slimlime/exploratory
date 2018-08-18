@@ -193,8 +193,10 @@
     (values text lines)))
 
 (defun respond (message &rest messages)
+  "Respond with message or messages. Applies smart quotes"
   (multiple-value-bind (text lines)
-      (justify-response message messages)
+      (justify-response (smart-quote message)
+			(mapcar #'smart-quote messages))
     (if (gethash text *defined-strings*)
 	  (let ((addr (gethash text *string-table*)))
 	    (case lines
@@ -294,8 +296,9 @@
   "An action for a verb associated with this object"
   `(verb-fn t *current-object* ,verb-or-verbs #'(lambda () ,@body)))
 
-(defun it (object)
-  (vm-it object))
+(defmacro it (object)
+  "Set the it object, for instance if it was mentioned explicitly."
+  `(vm-it ,(translate-this object)))
 
 (defun goto (label)
   (vm-jmp label))

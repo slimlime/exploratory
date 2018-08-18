@@ -195,6 +195,7 @@
 
 (defun dloc (name title img-file text)
   (label name)
+  (setf text (smart-quote text))
   (let ((sx 104) (sy 104))
     (with-namespace name
       (setf text

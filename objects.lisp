@@ -107,6 +107,8 @@
      show)))
 
 (defun defobject-fn (names &key show description initial-place name-override take)
+  (when description
+    (setf description (smart-quote description)))
   (when (stringp names)
     (setf names (list names)))  
   (let ((name (first names)))

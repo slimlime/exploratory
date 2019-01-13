@@ -320,6 +320,8 @@
     (dump-state-base64)))
 
 (defun gogogo ()
+  (princ "q to quit")
+  (terpri)
   (tagbody
    :top
      (let ((line (read-line)))

@@ -255,7 +255,7 @@
 
 	     (sta16.zp (cons :font :present) :font)
 	     
-	     (navigate :rickety-stair)
+	     (navigate :rickety-stair "You climb the rickety stair.")
 	     
 	     (BRK)
 	     

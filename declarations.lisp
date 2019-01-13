@@ -6,7 +6,6 @@
 ;; genuine assembler label. Probably fine.
 
 (defparameter *donothave* "You don't have that.")
-(defparameter *enclosing-action* nil)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun translate-this (object-name)
@@ -217,16 +216,8 @@
     (dc (format nil "~a" text) t)
     (dw nil (dstr text))))
 
-(defun navigate (location &optional (message nil))
-  "Navigate, with a default message of 'You go north.' etc"
-  (unless message
-    (setf message (concatenate 'string
-			       "You go "
-			       (string-downcase
-				(if (listp (first *enclosing-action*))
-				    (first (first *enclosing-action*))
-				    (first *enclosing-action*)))
-			       ".")))
+(defun navigate (location message)
+  "Navigate, and show a message"
   (respond message)
   (vm-nav location))
 
@@ -263,11 +254,7 @@
 
 (defmacro action (words &body body)
   "An action which is executed by the VM."
-  (let ((words-sym (gensym)))
-    `(progn
-       (let* ((,words-sym ,words)
-	      (*enclosing-action* ,words-sym))
-	 (action-fn t ,words-sym #'(lambda () ,@body))))))
+  `(action-fn t ,words #'(lambda () ,@body)))
 
 (defmacro custom-action (words &body body)
   "An action which drops into 6502"

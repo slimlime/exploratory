@@ -1,5 +1,6 @@
 (defun test-input (&rest commands)
-  (mapc #'(lambda (s) (enter-input s :print nil)) commands))
+  "Feed in some commands to the game"
+  (mapc #'(lambda (s) (enter-input s :print nil)) commands))		    
 
 (defun assert-location (location)
    (assert (= (resolve location)
@@ -21,3 +22,8 @@
 	    nil
 	    "Expected the ~a in ~a (~a) was in place ~a"
 	    object location expected-place actual-place)))
+
+;;;; this stack gets each message pushed onto it
+;;;; for testing purposes
+
+(defparameter *output-message-stack* nil)

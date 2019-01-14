@@ -89,17 +89,22 @@
 
 (defun make-object-data (name names description initial-place name-override take show)
   "Return a list of data associated with an object"
+  (unless show
+    (assert (null name-override) nil
+	    "Objects that are not shown in LOOK do not need a name override"))
   (let* ((text (justify-with-image description
 				   5 4 *act-font*))
 	 (lines (1+ (count #\Newline text))))
     (assert (< lines 4) nil (format nil "Object description must be 1-3 lines, was ~a ~a" lines text))
     (list
      names
-     (dstr (if name-override
-	       (progn
-		 (warn-if-not-punctuated name-override)
-		 name-override)
-	       (name-with-indefinite-article name)))
+     (if show ;If we don't show an object, its 'name' can never be seen, e.g in LOOK
+	 (dstr (if name-override
+		   (progn
+		     (warn-if-not-punctuated name-override)
+		     name-override)
+		   (name-with-indefinite-article name)))
+	 nil)
      (dstr text)
      initial-place
      lines
@@ -363,8 +368,8 @@ all of which will refer to the same object."
 	    (apply #'db :places places))
 	  (apply #'db :initial-places places))
 	;; object name strings
-	(apply #'db :name-hi (mapcar #'(lambda (o) (hi (second o))) objects))
-	(apply #'db :name-lo (mapcar #'(lambda (o) (lo (second o))) objects))
+	(apply #'db :name-hi (mapcar #'(lambda (o) (hi (nil->0 (second o)))) objects))
+	(apply #'db :name-lo (mapcar #'(lambda (o) (lo (nil->0 (second o)))) objects))
 	;; object verb handlers
 	(labels ((verb-addr (o)
 		   (let ((name (caar o)))
@@ -425,7 +430,7 @@ all of which will refer to the same object."
   (defplace :nippur)
   (defplace :babylon)
 
-  (fixture "IT" (:place :inventory :name-override "It."))
+  (fixture "IT" (:place :inventory))
   (object "MARDUK STATUE" (:description "A bronze statue" :place :ur))
   (object "STONE STATUE" (:description "A stone statue" :place :ur))
   (object "GINGER BISCUIT" (:description "A tasty snack" :place :ur))

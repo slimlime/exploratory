@@ -11,7 +11,7 @@
   
 (defun generic-generic-handlers ()
 
-  (fixture "IT" (:place :inventory :name-override "It."))
+  (fixture "IT" (:place :inventory))
   
   (with-location :generic
     (defword :INVENTORY :I)

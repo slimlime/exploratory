@@ -117,6 +117,21 @@
   (LDA.ZP (hi-add from))
   (STA.ZP (hi-add to)))
 
+(defun cpy16y.zp (from to)
+  "Copy a zero page word to another using Y"
+  (LDY.ZP (lo-add from))
+  (STY.ZP (lo-add to))
+  (LDY.ZP (hi-add from))
+  (STY.ZP (hi-add to)))
+
+(defun cpy16x.zp (from to)
+  "Copy a zero page word to another using X"
+  (LDX.ZP (lo-add from))
+  (STX.ZP (lo-add to))
+  (LDX.ZP (hi-add from))
+  (STX.ZP (hi-add to)))
+
+
 ;;TODO Pretty sure we can work out whether this is ab or zp
 ;;out since the
 ;;parameters are fixed.

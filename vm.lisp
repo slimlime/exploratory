@@ -9,6 +9,13 @@
 
 ;;; TODO LDA.IZY :xxx should show XXX address in the comment automatically
 
+;;; TODO At the moment vm-fetch requires Y to be 0 and it always increments
+;;;      vm-pc. This takes 6 bytes, and on the common path, an inc and a true branch
+;;;      Given that Y has to be 0, it could be anything else without troubling the
+;;;      implementations, that way we can just do INY and then LDA.IZY rather than
+;;;      LDA.IZY and inc16. Obviously the vm-pc would have to be incremented at some
+;;;      point, but it might make sense
+
 (defparameter *vmops* nil)
 
 (defun vm ()
@@ -40,7 +47,7 @@
     (dc "Execute VM code at :VM-PC. Return when VM-DONE is encountered")
     (dc "This is the normal entry point for an action handler") 
     (label :vm-go nil)
-    (LDY 0)
+    (LDY 0 "Set Y to zero as we want to read from the address in :vm-pc")
     (dc "Get the instruction")
     (LDA.IZY :vm-pc)
     (BEQ :done "VM-DONE")
@@ -98,16 +105,16 @@
     (LDA.IZY :vm-pc)
     (inc16.zp :vm-pc)
     (TAX)
-    (dc "Get offset into bit-table")
+    (dc "Get byte offset into bit-table, i.e. bit number / 8")
     (LSR)
     (LSR)
     (LSR)
     (TAY)
     (TXA)
-    (dc "Get bit number")
+    (dc "Get bit in byte number, i.e. bit number % 8")
     (AND.IMM 7)
     (TAX)
-    (LDA.ZPX :bit-0)
+    (LDA.ZPX :bit-0 "Quick version of ASL, X times.")
     (RTS)))
 
 (defparameter *opcode* 1)
@@ -136,6 +143,7 @@
        (incf *opcode*))))
 
 (defun vm-fetch ()
+  "Fetch a byte from vm-pc and increment it. Requires Y to be 0"
   (LDA.IZY :vm-pc)
   (inc16.zp :vm-pc))
 
@@ -337,66 +345,67 @@ incorrect branch offsets elsewhere
 	  (vm-fetch)
 	  (JMP '(:navigate . :navigate-no-deref))))
 
-(defun vm-print-inline-fn (lines)
-  (dc "The string to print is right after the VM-PR instruction")
-  (cpy16.zp :vm-pc '(:typeset-cs . :str))
-  (LDA lines)
-  (JSR :print-message)
-  (dc "The string printer should have left the pointer")
-  (dc "on the byte immediately following the string")
-  (dc "So we will resume there")
-  (cpy16.zp '(:typeset-cs . :str) :vm-pc)
-  (RTS))
-
 ;;;
 ;;; VM-PRI1 - Print one line string, inlined after the op
 ;;;
 (defvmop vm-pri1 (format nil "VM-PRI1 '~a'" str) (str)
 	 ((dcs nil str))
-	 ((vm-print-inline-fn 1)))
+	 ((LDA 1)
+	  (label :print-inline)
+	  (dc "The string to print is right after the VM-PR instruction")
+	  (cpy16y.zp :vm-pc '(:typeset-cs . :str))
+	  (JSR :print-message)
+	  (dc "The string printer should have left the pointer")
+	  (dc "on the byte immediately following the string")
+	  (dc "So we will resume vm execution there")
+	  (cpy16.zp '(:typeset-cs . :str) :vm-pc)
+	  (RTS)))
 ;;;
 ;;; VM-PRI2 - Print two line string, inlined after the op
 ;;;
 (defvmop vm-pri2 (format nil "VM-PRI2 '~a'" str) (str)
 	 ((dcs nil str))
-	 ((vm-print-inline-fn 2)))
+	 ((LDA 2)
+	  (BNE :print-inline)))
 
 ;;;
 ;;; VM-PRI3 - Print three line string, inlined after the op
 ;;;
 (defvmop vm-pri3 (format nil "VM-PRI3 '~a'" str) (str)
 	 ((dcs nil str))
-	 ((vm-print-inline-fn 3)))
-
-(defun vm-print-string-fn (lines)
-  (dc "The address of the string is after the instruction")
-  (vm-fetch)
-  (STA.ZP (lo-add '(:typeset-cs . :str)))
-  (vm-fetch)
-  (STA.ZP (hi-add '(:typeset-cs . :str)))
-  (LDA lines)
-  (JMP :print-message))
+	 ((LDA 3)
+	  (BNE :print-inline)))
 
 ;;;
 ;;; VM-PR1 - Print one line string
 ;;;
 (defvmop vm-pr1 (format nil "VM-PR1 '~a'" str) (addr str)
 	 ((dw nil addr))
-	 ((vm-print-string-fn 1)))
+	 ((LDX 1)
+	  (label :print)
+	  (dc "Expects X to contain number of lines")
+	  (dc "The address of the string is directly after the instruction")
+	  (vm-fetch)
+	  (STA.ZP (lo-add '(:typeset-cs . :str)))
+	  (vm-fetch)
+	  (STA.ZP (hi-add '(:typeset-cs . :str)))
+	  (TXA)
+	  (JMP :print-message)))
 ;;;
 ;;; VM-PR2 - Print two line string
 ;;;
 (defvmop vm-pr2 (format nil "VM-PR2 '~a'" str) (addr str)
 	 ((dw nil addr))
-	 ((vm-print-string-fn 2)))
+	 ((LDX 2)
+	  (BNE :print)))
 
 ;;;
 ;;; VM-PR3 - Print three line string
 ;;;
 (defvmop vm-pr3 (format nil "VM-PR3 '~a'" str) (addr str)
 	 ((dw nil addr))
-	 ((vm-print-string-fn 3)))
-
+	 ((LDX 3)
+	  (BNE :print)))
 ;;
 ;;VM-CLR - Clear bit
 ;;

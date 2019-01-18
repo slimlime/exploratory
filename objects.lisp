@@ -27,6 +27,7 @@
 (defparameter *object-show* 2)
 
 (defun object-properties (take show)
+  "Return a bitmask for the non-null properties specified"
   (logior
    (if take *object-take* 0)
    (if show *object-show* 0)))

@@ -213,7 +213,8 @@
   "Raw code response function"
   (multiple-value-bind (text lines)
       (justify-response message messages)
-    (JSR (cons :print-message lines))
+    (LDY lines)
+    (JSR :print-message)
     (dc (format nil "~a" text) t)
     (dw nil (dstr text))))
 

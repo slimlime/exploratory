@@ -16,6 +16,17 @@
 ;;     Using 1/4 of the INY instructions. Got to be worth 3*256 microseconds!
 ;;     Could add up, at least when clearing the screen.
 
+;; TODO get-aliased-labels can now discover which values are being used.
+;;      theoretically we can now do something like (get-unused-zpg-b called-namespaces)
+;;      which will just get the next in the list.
+ 
+;; TODO all functions which 'install' a function in 6502, should have a naming convention
+;;      as it is easy to confuse the function which installs the code with the function
+;;      which is just a wrapper around the code which emits a call to that routine.
+
+(defparameter *aregs* '(:A0 :A1 :A2 :A3 :A4 :A5 :A6 :A7))
+(defparameter *dregs* '(:D0 :D1 :D2 :D3 :D4 :D5 :D6 :D7))
+
 (defun zeropage ()
 
   ;; Scratch Area
@@ -31,21 +42,21 @@
   ;; TODO have it execute some code on start up to initialize
   ;; values.
   
-  (zp-w :A0)
-  (zp-w :A1)
-  (zp-w :A2)
-  (zp-w :A3)
-  (zp-w :A4)
-  (zp-w :A5)
-  
-  (zp-b :D0)
-  (zp-b :D1)
-  (zp-b :D2)
-  (zp-b :D3)
-  (zp-b :D4)
-  (zp-b :D5)
-  (zp-b :D6))
+  (mapc #'zp-w *aregs*)
+  (mapc #'zp-b *dregs*))
 
+(defun is-dreg (label)
+  (find label *dregs*))
+
+(defun is-areg (label)
+  (find label *aregs*))
+
+(defun free-dregs (&rest called-namespaces)
+  "Find a free zero-page 'data-registers' which are not used in
+   any of the specified namespaces"
+  (sort (set-difference *dregs* (apply #'get-aliased-labels called-namespaces))
+	#'string< :key #'symbol-name))
+  
 (defun inc16.zp (label)
   "Increment a zero-page word"
   (with-local-namespace
@@ -111,26 +122,32 @@
     (label :no-carry)))
   
 (defun cpy16.zp (from to)
-  "Copy a zero page word to another using A"
+  "Copy a zero page word to another using A as temporary"
   (LDA.ZP (lo-add from))
   (STA.ZP (lo-add to))
   (LDA.ZP (hi-add from))
   (STA.ZP (hi-add to)))
 
-(defun cpy16y.zp (from to)
-  "Copy a zero page word to another using Y"
+(defun cpy16.zp_y (from to)
+  "Copy a zero page word to another using Y as temporary"
   (LDY.ZP (lo-add from))
   (STY.ZP (lo-add to))
   (LDY.ZP (hi-add from))
   (STY.ZP (hi-add to)))
 
-(defun cpy16x.zp (from to)
-  "Copy a zero page word to another using X"
+(defun cpy16.zp_x (from to)
+  "Copy a zero page word to another using X as temporary"
   (LDX.ZP (lo-add from))
   (STX.ZP (lo-add to))
   (LDX.ZP (hi-add from))
   (STX.ZP (hi-add to)))
 
+(defun cpy16aby.zp_x (from to)
+  "Copy a word, absolute+Y to zeropage, using X as temporary"
+  (LDX.ABY (lo-add from))
+  (STX.ZP (lo-add to))
+  (LDX.ABY (hi-add from))
+  (STX.ZP (hi-add to)))
 
 ;;TODO Pretty sure we can work out whether this is ab or zp
 ;;out since the
@@ -158,6 +175,7 @@
   (STA.AB (hi-add loc)))
 
 (defun call-memcpy (src dst len)
+  "This is pretty bad as it takes a lot of space"
   (assert (> len 0))
   (assert (< len 65536))
   (with-namespace :memcpy
@@ -174,6 +192,9 @@
 	  (JSR :memcpy)))))
 
 (defun memcpy ()
+  "JSR to :mempcy, requires :A0=src, :A1=dst
+   A=lo(len) X=hi(len). For less than 256 bytes
+   JSR to '(:memcpy . :copy-remainder) with Y=0 X=len"
   (label :memcpy)
   (with-namespace :memcpy
     (alias :src :A0)
@@ -222,6 +243,7 @@
 	  (JSR :memset)))))
 
 (defun memset ()
+  "JSR to :memset A0=dst D0=lo(len) X=hi(len)"
   (label :memset)
   (with-namespace :memset
     (alias :dst :A0)

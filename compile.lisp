@@ -488,14 +488,18 @@
 
 ;;return the aliases labels for a namespace
 ;;might be useful in seeing which are used in a 'function'
-(defun get-aliased-labels (namespace)
-  (let ((labels nil))
-    (maphash #'(lambda (k v)
-		 (when (equal (label-namespace k)
-			      namespace)
-		   (push v labels)))
-	     *compiler-aliases*)
-    labels))
+(defun get-aliased-labels (&rest namespaces)
+  (let ((labels (make-hash-table))
+	(labels-list nil))
+    (dolist (namespace namespaces)
+      (maphash #'(lambda (k v)
+		   (when (equal (label-namespace k)
+				namespace)
+		     (unless (gethash v labels)
+		       (setf (gethash v labels) t)
+		       (push v labels-list))))
+	       *compiler-aliases*))
+    labels-list))
 
 (defun dump-aliases ()
   (maphash #'(lambda (k v) (format t "~a -> ~a~%" (fmt-label k t) v)) *compiler-aliases*))

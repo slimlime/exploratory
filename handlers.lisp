@@ -29,14 +29,14 @@
 	(STA.AB (hi-add '(:typeset-cs . :str)))
 	(LDA.ABY (1- (resolve '(:object-table . :name-lo))))
 	(STA.AB (lo-add '(:typeset-cs . :str)))
-	(LDA 1 "Object names are one line")
-	(JMP :print-message)))
+	(LDY 1 "Object names are one line")
+	(JMP :print-message-no-deref)))
     
     (custom-action '(LOOK)
       (with-namespace :look
 	(respond-raw "You take a look around and see...")
 	(LDA *object-show*)
-	(dc "Don't show objects that don't want to be listed")
+	(dc "Do NOT show objects that do not want to be listed")
 	(STA.AB '(:inventory . :object-property-mask))
 	(LDA.ZP :current-place)
 	(JMP '(:inventory . :scan-objects))))
@@ -44,6 +44,7 @@
     (custom-action '(INVENTORY)
       (with-namespace :inventory
 	(respond-raw "You have...")
+	(RTS) ;;NOCOMMIT
 	(LDA 255)
 	(dc "For inventory, show everything")
 	(STA.AB :object-property-mask)
@@ -75,9 +76,9 @@
 	(STA.AB (hi-add '(:typeset-cs . :str)))
 	(LDA.ABY (1- (resolve '(:object-table . :name-lo))))
 	(STA.AB (lo-add '(:typeset-cs . :str)))
-	(LDA 1 "Object names are one line")
-	(JSR :print-message)
-	(dc "Restore Y and A")
+	(LDY 1 "Object names are one line")
+	(JSR :print-message-no-deref)
+	(dc "Restore Y and A, i.e. IT and object-count")
 	(LDY.AB '(:object-table . :it))
 	(INC.AB :object-count)
 	(label :object-not-here)
@@ -143,7 +144,8 @@
       (LDA.ABY (1- (resolve '(:object-table . :description-lo))))
       (STA.AB (lo-add '(:typeset-cs . :str)))
       (LDA.ABY (1- (resolve '(:object-table . :description-lines))))
-      (JSR :print-message)
+      (TAY)
+      (JSR :print-message-no-deref)
       (RTS))
 
     (with-namespace :verb-handler

@@ -2,8 +2,6 @@
 ;; it will also have a bunch of responses to user input, and responses to timed
 ;; events etc.
 
-;;todo intern strings
-
 ;;TODO render live message
 ;;TODO enter user character, delete user character
 ;;TODO left image align
@@ -12,14 +10,6 @@
 ;;TODO get image size in dloc
 
 (defparameter *max-lines* 12)
-
-(defun call-typeset (str font line)
-  ;;this is in reality a terrible way to call it
-  ;;as it takes so many bytes, this is just for testing
-  (sta16.zp (cons :font font) :font)
-  (sta16.zp str '(:typeset-cs . :str))
-  (sta16.zp (scradd line 0) '(:typeset . :raster))
-  (JSR :typeset-cs))
 
 (defparameter *text-line-offset* 1)
 

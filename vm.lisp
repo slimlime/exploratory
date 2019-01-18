@@ -16,6 +16,8 @@
 ;;;      LDA.IZY and inc16. Obviously the vm-pc would have to be incremented at some
 ;;;      point, but it might make sense
 
+;;; TODO Move the string comments for the vmops to the emitter function documentation
+
 (defparameter *vmops* nil)
 
 (defun vm ()
@@ -35,7 +37,7 @@
     (STA.ZP (hi-add :vm-pc))
 
     (JSR :vm-go)
-    (dc "Resume 6502 execution immediately after the virual code")
+    (dc "Resume 6502 execution immediately after the virtual code")
     (LDA.ZP (hi-add :vm-pc))
     (PHA)
     (LDA.ZP (lo-add :vm-pc))
@@ -125,6 +127,10 @@
 ;; Don't forget variadic op-codes are possible. Because we can, we should.
 
 (defmacro defvmop (name hint lambda-list (&body emitter) (&body definition))
+  "Define a virtual machine op-code. Emitter declares a function which can be
+   called to emit this instruction in the code, using the specified lambda-list
+   as parameters. Definition is the actual 6502 which will be executed when 
+   the VM executes this instruction."
   (let ((opcode (gensym))
 	(start-ptr (gensym)))
     `(progn
@@ -167,12 +173,13 @@
 	(format nil "~a:~a" (car l) (cdr l)))))
 
 (defun register-vm-done ()
+  "We register VM-DONE usages as branches to DONE can be replaced with DONE"
   (dolist (label (gethash (1- *compiler-ptr*) *compiler-address-labels*))
     (setf (gethash label *vm-done-optimizations*) t)))
 
 ;;
 ;; VM-DONE Finish the VM code and return to where we came from
-;;
+;; 
 (defvmop vm-done "VM-DONE" ()
 	 ((register-vm-done))
 	 ())
@@ -213,7 +220,7 @@
   ((if (can-omit-branch addr optimize)
        (progn
 	 (decf *compiler-ptr*)
-	 (push-byte 0)
+	 (push-byte 0) ;vm-done
 	 (register-vm-done))
        (push-byte (forward-branch-offset addr))))
   ((BNE '(:vm-branch . :branch))
@@ -350,11 +357,11 @@ incorrect branch offsets elsewhere
 ;;;
 (defvmop vm-pri1 (format nil "VM-PRI1 '~a'" str) (str)
 	 ((dcs nil str))
-	 ((LDA 1)
+	 ((LDY 1)
 	  (label :print-inline)
-	  (dc "The string to print is right after the VM-PR instruction")
-	  (cpy16y.zp :vm-pc '(:typeset-cs . :str))
-	  (JSR :print-message)
+	  (dc "The string to print is right after the VM-PR instruction. Expects Y=lines")
+	  (cpy16.zp :vm-pc '(:typeset-cs . :str))
+	  (JSR :print-message-no-deref)
 	  (dc "The string printer should have left the pointer")
 	  (dc "on the byte immediately following the string")
 	  (dc "So we will resume vm execution there")
@@ -365,7 +372,7 @@ incorrect branch offsets elsewhere
 ;;;
 (defvmop vm-pri2 (format nil "VM-PRI2 '~a'" str) (str)
 	 ((dcs nil str))
-	 ((LDA 2)
+	 ((LDY 2)
 	  (BNE :print-inline)))
 
 ;;;
@@ -373,7 +380,7 @@ incorrect branch offsets elsewhere
 ;;;
 (defvmop vm-pri3 (format nil "VM-PRI3 '~a'" str) (str)
 	 ((dcs nil str))
-	 ((LDA 3)
+	 ((LDY 3)
 	  (BNE :print-inline)))
 
 ;;;
@@ -390,7 +397,8 @@ incorrect branch offsets elsewhere
 	  (vm-fetch)
 	  (STA.ZP (hi-add '(:typeset-cs . :str)))
 	  (TXA)
-	  (JMP :print-message)))
+	  (TAY)
+	  (JMP :print-message-no-deref)))
 ;;;
 ;;; VM-PR2 - Print two line string
 ;;;

@@ -12,6 +12,8 @@
     
   (zp-w :font)
 
+  ;;TODO the namespaces here are a bit arbitrary, might want to clean it up
+
   ;;need to profile this
   (with-namespace :typeset-cs
     (alias :sym :D2)
@@ -214,72 +216,93 @@
 (defun live-row (i)
   (+ 3 (* (+ i 13) *line-height*)))
 
-;;; TODO
-;;; The control flow and size of the code here is a bit rubbish
-;;; the memcpy, memset and sta16 could be worked out from a table
-;;; rather than the entire function being instantiated 3 times
+(defun print-message ()
 
-(defun inline-scroll (lines)
-  (label (cons :print-message lines))
+  ;; TODO The calling convention for this is terrible.
+  ;; a) The number of lines should be stored in the string itself
+  ;; b) VM-PR1 etc should be removed. This will vastly simplify things
+  ;; c) All calls to print-message should either go through
+  ;;     print-message           (address in registers) 
+  ;;     print-message-inline    (address by deref-w)
+  
+  ;; Both entry points expect 1, 2 or 3 in Y for the number of lines
+  ;; :print-message-no-deref we expect the typesetter already has the address
+  ;; of the string in '(:typeset-cs . :str)
+  ;; :print-message we expect the string address to be interned after the
+  ;; call site so it can be retrieved with JSR :deref-w
+    
+  (labels ((cpy-src (lines) (scradd (live-row lines) 0))
+	   (cpy-len (lines) (* (- 4 lines) +screen-width-bytes+ *line-height*))
+	   (set-dst (lines) (scradd (live-row (- 4 lines)) 0))
+	   (set-len (lines) (* lines +screen-width-bytes+ *line-height*)))
+    
+    (mapc #'(lambda (table-name fn)
+	      (apply #'db (cons table-name :lo) (mapcar #'lo (mapcar fn '(1 2 3))))
+	      (apply #'db (cons table-name :hi) (mapcar #'hi (mapcar fn '(1 2 3)))))
+	  '(:scrcpy-src :scrcpy-len :scrset-dst :scrset-len)
+	  (list #'cpy-src #'cpy-len #'set-dst #'set-len)))
 
+  (label :print-message)
+
+  (STY.ZP :lines)
   (JSR :deref-w)
   (STX.ZP (lo-add '(:typeset-cs . :str)))
   (STA.ZP (hi-add '(:typeset-cs . :str)))
-
-  (label (cons :print-message-no-deref lines))
+  (LDY.ZP :lines)
   
-  (call-memcpy (scradd (live-row lines) 0)
-	       (scradd (live-row 0) 0)
-	       (* (- 4 lines) +screen-width-bytes+ *line-height*))
+  (label :print-message-no-deref)
   
-  (call-memset 0 (scradd (live-row (- 4 lines)) 0)
-	       (* lines +screen-width-bytes+ *line-height*))
-
-  (sta16.zp (scradd (live-row (- 4 lines)) 0) '(:typeset . :raster))
-  
-  (JMP '(:print-message . :print)))
-
-(defun print-message ()
-
-  ;; define three entry points, one for
-  ;; each of the sizes of messages we can have.
-  ;; not happy with the amount of code this expands into
-  
-  (inline-scroll 3)
-  (inline-scroll 2)
-  (inline-scroll 1)
-
-  ;; this entry point expects the number of lines, 1, 2 or 3
-  ;; to be in A. The address of the string to be printed should
-  ;; be in '(:typeset-cs . :str)
-  
-  (label :print-message)
-  
-  (CMP 2)
-  (BEQ '(:print-message-no-deref . 2))
-  (CMP 1)
-  (BEQ '(:print-message-no-deref . 1))
-  (dc "Must be a three line message")
-  (JMP '(:print-message-no-deref . 3))
-  
+  ;;Note that scrset-len is not strictly needed
+  ;;as scrset-len+scrcpy-len=C
+  ;;Call with number of lines 1, 2 or 3 in Y
   (with-namespace :print-message
-    (label :print)
-    (alias :str '(:typeset-cs . :str))
+    (alias :lines (first (free-dregs :memcpy :memset)))
+    ;;scroll out the number of lines we need 
+    ;;note that the tables are 1 based, so we take one off
+    ;;the addresses.
+    (STY.ZP :lines)
+    (LDA.ABY (1- (resolve '(:scrcpy-src . :lo))))
+    (STA.ZP (lo-add :A0))
+    (LDA.ABY (1- (resolve '(:scrcpy-src . :hi))))
+    (STA.ZP (hi-add :A0))
+    (sta16.zp (scradd (live-row 0) 0) :A1)
+    (LDA.ABY (1- (resolve '(:scrcpy-len . :lo))))
+    (LDX.ABY (1- (resolve '(:scrcpy-len . :hi))))
+    (JSR :memcpy)
+    ;;now erase the gap for the new text
+    (LDY.ZP :lines)
+    (LDA.ABY (1- (resolve '(:scrset-dst . :lo))))
+    (STA.ZP (lo-add :A0))
+    (LDA.ABY (1- (resolve '(:scrset-dst . :hi))))
+    (STA.ZP (hi-add :A0))    
+    (LDA.ABY (1- (resolve '(:scrset-len . :lo))))
+    (LDX.ABY (1- (resolve '(:scrset-len . :hi))))
+    (STA.ZP :D0)
+    (LDA 0)
+    (JSR :memset)
+    ;;now print the text- we can use the same address as the
+    ;;place we started erasing...
+    (LDY.ZP :lines)
+    (LDA.ABY (1- (resolve '(:scrset-dst . :lo))))
+    (STA.ZP (lo-add '(:typeset . :raster)))
+    (STA.ZP (lo-add '(:typeset-cs . :tmp-raster)))
+    (LDA.ABY (1- (resolve '(:scrset-dst . :hi))))
+    (STA.ZP (hi-add '(:typeset . :raster)))
+    (STA.ZP (hi-add '(:typeset-cs . :tmp-raster)))
+    ;;first render the prompt
     (sta16.zp :prompt '(:typeset . :char))
-    (cpy16.zp '(:typeset . :raster) '(:typeset-cs . :tmp-raster))
     (LDA 0)
     (STA.ZP '(:typeset . :prev-width))
     (STA.ZP '(:typeset . :shift))
     (JSR :typeset)
-    
-    ;;put the raster back where it started. This is a bit boring.
+    ;;put the raster back where it started
     (cpy16.zp '(:typeset-cs . :tmp-raster) '(:typeset . :raster))
-
+    ;;now draw the text with and offset of 5 pixels which we
+    ;;all know is the width of the prompt
     (LDA 0)
     (STA.ZP '(:typeset . :prev-width))
     (LDA 5)
     (STA.ZP '(:typeset . :shift))
-
     (JMP :typeset-cs-continue)))
 
 ;;TODO make this build specific to this file, and make specific versions
@@ -372,8 +395,8 @@
 	   (sta16.zp #x80F0 '(:typeset . :raster))
 
 	   (JSR :typeset-cs)
-
-	   (JSR '(:print-message . 2))
+	   (LDY 2)
+	   (JSR :print-message)
 	   (dw nil :str1)
 
 	   (BRK)

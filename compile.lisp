@@ -487,7 +487,8 @@
       nil))
 
 ;;return the aliases labels for a namespace
-;;might be useful in seeing which are used in a 'function'
+;;not that useful in seeing which are used in a 'function'
+;;as it doesn't nest
 (defun get-aliased-labels (&rest namespaces)
   (let ((labels (make-hash-table))
 	(labels-list nil))

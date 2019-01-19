@@ -16,13 +16,11 @@
 ;;     Using 1/4 of the INY instructions. Got to be worth 3*256 microseconds!
 ;;     Could add up, at least when clearing the screen.
 
-;; TODO get-aliased-labels can now discover which values are being used.
-;;      theoretically we can now do something like (get-unused-zpg-b called-namespaces)
-;;      which will just get the next in the list.
- 
+
 ;; TODO all functions which 'install' a function in 6502, should have a naming convention
 ;;      as it is easy to confuse the function which installs the code with the function
 ;;      which is just a wrapper around the code which emits a call to that routine.
+;;      e.g. -code
 
 (defparameter *aregs* '(:A0 :A1 :A2 :A3 :A4 :A5 :A6 :A7))
 (defparameter *dregs* '(:D0 :D1 :D2 :D3 :D4 :D5 :D6 :D7))
@@ -44,46 +42,6 @@
   
   (mapc #'zp-w *aregs*)
   (mapc #'zp-b *dregs*))
-
-(defun is-dreg (label)
-  (find label *dregs*))
-
-(defun is-areg (label)
-  (find label *aregs*))
-
-;;TODO this doesn't nest, so its pretty useless!
-;;Need to take out all usages and replace with something that says
-
-;;Here is an example
-
-#|
-(with-namespace :fna
-  (uses :fnb)
-  (uses :fnc)
-  (areg :my-ptr)
-  (dreg :my-char))
-
-(with-namespace :fnb
-  (uses :fnc)
-  (areg ...
-
-This way the usages can be explicit and it can be nested.
-
-|#
-
-(defun free-regs (registers &rest called-namespaces)
-  (sort (set-difference registers (apply #'get-aliased-labels called-namespaces))
-	#'string< :key #'symbol-name))
-
-(defun free-dregs (&rest called-namespaces)
-  "Find a free zero-page 'data-registers' which are not used in
-   any of the specified namespaces"
-  (apply #'free-regs *dregs* called-namespaces))
-
-(defun free-aregs (&rest called-namespaces)
-  "Find a free zero-page 'address-registers' which are not used in
-   any of the specified namespaces"
-  (apply #'free-regs *aregs* called-namespaces))
 
 (defun inc16.zp (label)
   "Increment a zero-page word"

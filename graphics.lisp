@@ -124,12 +124,10 @@
   (label :typeset)
   
   (with-namespace :typeset
-    (let ((registers (free-aregs :memcpy :memset)))
-      (alias :char (first registers))
-      (alias :raster (second registers)))
-    (let ((registers (free-dregs :memcpy :memset)))
-      (alias :shift (first registers))
-      (alias :prev-width (second registers))) ;;note that the 'width' includes the kerning bit, so it's not just a length
+    (alias :char :A2)
+    (alias :raster :A3)
+    (alias :shift :D1)
+    (alias :prev-width :D2)
     
     (zp-b :left-shift)
     
@@ -248,18 +246,6 @@
    JSR :print-message-inline DW string-address
    or JSR :print-message X=(lo) A=(hi)"
 
-  (labels ((cpy-src (lines) (scradd (live-row lines) 0))
-	   (cpy-len (lines) (* (- 4 lines) +screen-width-bytes+ *line-height*))
-	   (set-dst (lines) (scradd (live-row (- 4 lines)) 0))
-	   (set-len (lines) (* lines +screen-width-bytes+ *line-height*)))
-    
-    (mapc #'(lambda (table-name fn)
-	      (apply #'db (cons table-name :lo) (mapcar #'lo (mapcar fn '(1 2 3))))
-	      (apply #'db (cons table-name :hi) (mapcar #'hi (mapcar fn '(1 2 3)))))
-	  '(:scrcpy-src :scrcpy-len :scrset-dst :scrset-len)
-	  (list #'cpy-src #'cpy-len #'set-dst #'set-len)))
-
-
   (label :scroll)
   (dc "Scroll one line up, erasing the fourth row (i.e. last but one)")
   (call-memcpy (scradd (live-row 1) 0)
@@ -281,11 +267,12 @@
     (STA.ZP (hi-add '(:typeset-cs . :str)))
     
     (JSR :scroll)
+    
     (LDY 1)
-    (LDA.ABY (1- (resolve '(:scrset-dst . :lo))))
+    (LDA (lo (scradd (live-row 3) 0)))
     (STA.ZP (lo-add '(:typeset . :raster)))
     (STA.ZP (lo-add '(:typeset-cs . :tmp-raster)))
-    (LDA.ABY (1- (resolve '(:scrset-dst . :hi))))
+    (LDA (hi (scradd (live-row 3) 0)))
     (STA.ZP (hi-add '(:typeset . :raster)))
     (STA.ZP (hi-add '(:typeset-cs . :tmp-raster)))
     ;;first render the prompt

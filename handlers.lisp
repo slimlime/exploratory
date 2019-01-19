@@ -41,7 +41,6 @@
     (custom-action '(INVENTORY)
       (with-namespace :inventory
 	(respond-raw "You have...")
-	(RTS) ;;NOCOMMIT
 	(LDA 255)
 	(dc "For inventory, show everything")
 	(STA.AB :object-property-mask)

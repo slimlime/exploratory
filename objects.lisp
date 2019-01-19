@@ -108,7 +108,6 @@
 	 nil)
      (dstr text)
      initial-place
-     lines
      take
      show)))
 
@@ -130,7 +129,7 @@
       (dolist (name names)
 	(multiple-value-bind (noun adj)
 	    (split name)
-	  (assert (null (gethash noun nouns)) nil (format nil"Can't have same noun as alias for same object, ~a ~a and ~a ~a" adj noun (gethash noun nouns) noun))
+	  (assert (null (gethash noun nouns)) nil (format nil "Can't have same noun as alias for same object, ~a ~a and ~a ~a" adj noun (gethash noun nouns) noun))
 	  ;;note, i'm sure we could, if we needed to do this, at the moment
 	  ;;the object searcher thinks it is two different objects and asks
 	  ;;to 'be more specific'
@@ -383,10 +382,9 @@ all of which will refer to the same object."
 	
 	(apply #'db :description-hi (mapcar #'(lambda (o) (hi (third o))) objects))
 	(apply #'db :description-lo (mapcar #'(lambda (o) (lo (third o))) objects))
-	(apply #'db :description-lines (mapcar #'(lambda (o) (lo (fifth o))) objects))
 	;; object properties
 	(apply #'db :properties
-	       (mapcar #'(lambda (o) (object-properties (sixth o) (seventh o))) objects))
+	       (mapcar #'(lambda (o) (object-properties (fifth o) (sixth o))) objects))
 
 	(maphash #'(lambda (object verb-handlers)
 		     (label object :vtable)
@@ -399,15 +397,14 @@ all of which will refer to the same object."
 
 (defun dump-objects ()
   (do-hashtable (name data *object-name->data*)
-    (format t "~3d ~20a $~4,'0x (~d) $~4,'0x ~20a TAKE:~a SHOW:~a ~s~%"
+    (format t "~3d ~20a $~4,'0x $~4,'0x ~20a TAKE:~a SHOW:~a ~s~%"
 	    (object-id name)
 	    name
 	    (second data)
-	    (fifth data)
 	    (third data)
 	    (fourth data)
+	    (if (fifth data) "Y" "N")
 	    (if (sixth data) "Y" "N")
-	    (if (seventh data) "Y" "N")
 	    (cdar data))))
 
 (defun dump-places ()

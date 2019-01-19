@@ -353,67 +353,32 @@ incorrect branch offsets elsewhere
 	  (JMP '(:navigate . :navigate-no-deref))))
 
 ;;;
-;;; VM-PRI1 - Print one line string, inlined after the op
+;;; VM-PRI - Print string with the date inlined after the op-code
 ;;;
-(defvmop vm-pri1 (format nil "VM-PRI1 '~a'" str) (str)
+(defvmop vm-pri (format nil "VM-PRI1 '~a'" str) (str)
 	 ((dcs nil str))
-	 ((LDY 1)
-	  (label :print-inline)
-	  (dc "The string to print is right after the VM-PR instruction. Expects Y=lines")
-	  (cpy16.zp :vm-pc '(:typeset-cs . :str))
-	  (JSR :print-message-no-deref)
+	 ((label :print-inline)
+	  (dc "The string to print is right after the VM-PR instruction.")
+	  (LDX.ZP (lo-add :vm-pc))
+	  (LDA.ZP (hi-add :vm-pc))
+	  (JSR :print-message)
 	  (dc "The string printer should have left the pointer")
 	  (dc "on the byte immediately following the string")
 	  (dc "So we will resume vm execution there")
 	  (cpy16.zp '(:typeset-cs . :str) :vm-pc)
 	  (RTS)))
-;;;
-;;; VM-PRI2 - Print two line string, inlined after the op
-;;;
-(defvmop vm-pri2 (format nil "VM-PRI2 '~a'" str) (str)
-	 ((dcs nil str))
-	 ((LDY 2)
-	  (BNE :print-inline)))
 
 ;;;
-;;; VM-PRI3 - Print three line string, inlined after the op
+;;; VM-PR - Print a string with the address inlined after the op-code
 ;;;
-(defvmop vm-pri3 (format nil "VM-PRI3 '~a'" str) (str)
-	 ((dcs nil str))
-	 ((LDY 3)
-	  (BNE :print-inline)))
-
-;;;
-;;; VM-PR1 - Print one line string
-;;;
-(defvmop vm-pr1 (format nil "VM-PR1 '~a'" str) (addr str)
+(defvmop vm-pr (format nil "VM-PR1 '~a'" str) (addr str)
 	 ((dw nil addr))
-	 ((LDX 1)
-	  (label :print)
-	  (dc "Expects X to contain number of lines")
+	 ((label :print)
 	  (dc "The address of the string is directly after the instruction")
 	  (vm-fetch)
-	  (STA.ZP (lo-add '(:typeset-cs . :str)))
+	  (TAX)
 	  (vm-fetch)
-	  (STA.ZP (hi-add '(:typeset-cs . :str)))
-	  (TXA)
-	  (TAY)
-	  (JMP :print-message-no-deref)))
-;;;
-;;; VM-PR2 - Print two line string
-;;;
-(defvmop vm-pr2 (format nil "VM-PR2 '~a'" str) (addr str)
-	 ((dw nil addr))
-	 ((LDX 2)
-	  (BNE :print)))
-
-;;;
-;;; VM-PR3 - Print three line string
-;;;
-(defvmop vm-pr3 (format nil "VM-PR3 '~a'" str) (addr str)
-	 ((dw nil addr))
-	 ((LDX 3)
-	  (BNE :print)))
+	  (JMP :print-message)))
 ;;
 ;;VM-CLR - Clear bit
 ;;

@@ -51,12 +51,40 @@
 (defun is-areg (label)
   (find label *aregs*))
 
+;;TODO this doesn't nest, so its pretty useless!
+;;Need to take out all usages and replace with something that says
+
+;;Here is an example
+
+#|
+(with-namespace :fna
+  (uses :fnb)
+  (uses :fnc)
+  (areg :my-ptr)
+  (dreg :my-char))
+
+(with-namespace :fnb
+  (uses :fnc)
+  (areg ...
+
+This way the usages can be explicit and it can be nested.
+
+|#
+
+(defun free-regs (registers &rest called-namespaces)
+  (sort (set-difference registers (apply #'get-aliased-labels called-namespaces))
+	#'string< :key #'symbol-name))
+
 (defun free-dregs (&rest called-namespaces)
   "Find a free zero-page 'data-registers' which are not used in
    any of the specified namespaces"
-  (sort (set-difference *dregs* (apply #'get-aliased-labels called-namespaces))
-	#'string< :key #'symbol-name))
-  
+  (apply #'free-regs *dregs* called-namespaces))
+
+(defun free-aregs (&rest called-namespaces)
+  "Find a free zero-page 'address-registers' which are not used in
+   any of the specified namespaces"
+  (apply #'free-regs *aregs* called-namespaces))
+
 (defun inc16.zp (label)
   "Increment a zero-page word"
   (with-local-namespace

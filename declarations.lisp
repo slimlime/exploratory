@@ -192,28 +192,22 @@
     (values text lines)))
 
 (defun respond (message &rest messages)
-  "Respond with message or messages. Applies smart quotes"
+  "Issue VM Respond with message or messages. Applies smart quotes"
   (multiple-value-bind (text lines)
       (justify-response (smart-quote message)
 			(mapcar #'smart-quote messages))
+    (declare (ignore lines))
     (if (gethash text *defined-strings*)
 	  (let ((addr (gethash text *string-table*)))
-	    (case lines
-	      (1 (vm-pr1 addr text))
-	      (2 (vm-pr2 addr text))
-	      (3 (vm-pr3 addr text))))
-	  (progn
-	    (case lines
-	      (1 (vm-pri1 text))
-	      (2 (vm-pri2 text))
-	      (3 (vm-pri3 text)))))))
+	    (vm-pr addr text))
+	  (vm-pri text))))
 
 (defun respond-raw (message &rest messages)
-  "Raw code response function"
+  "Raw call to print a message, with the address of the string inlined after call"
   (multiple-value-bind (text lines)
       (justify-response message messages)
-    (LDY lines)
-    (JSR :print-message)
+    (declare (ignore lines))
+    (JSR :print-message-inline)
     (dc (format nil "~a" text) t)
     (dw nil (dstr text))))
 

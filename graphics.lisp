@@ -14,13 +14,17 @@
 
   ;;TODO the namespaces here are a bit arbitrary, might want to clean it up
 
-  ;;need to profile this
+  ;;This is the chunk of code that peels off symbols from the string
+  ;;characters are passed to the :typeset chunk for rendering. Words
+  ;;are split into characters and then individually passed. EOL and EOS
+  ;;are handled here too.
   (with-namespace :typeset-cs
-    (alias :sym :D2)
-    (alias :tmp-raster :A3)
+    (alias :sym :D3)
+    (alias :tmp-raster :A4)
     (alias :str :huffman-ptr)
     (label :typeset-cs nil)
     (LDA 0)
+    (STA.AB :scroll-on-newline "At this entry point we do not scroll the message")
     (STA.ZP '(:typeset . :shift))
     (STA.ZP '(:typeset . :prev-width))
     (label :typeset-cs-continue nil) ;;but with a new string
@@ -58,12 +62,16 @@
     (DEC.AB (1+ (resolve :word-offset)))
     (BMI :next)
     (label :word-ptr)
-    ;;THE end of string marker does not have to appear in the dictionary
+    ;;The end of string marker does not have to appear in the dictionary
     ;;it could be omitted and the length reduced by one
     (LDA.ABY 0 "Word address -1");;self modified parameter
     (TAX)
     (JSR :emit)
     (JMP :next-character)
+
+    ;;emit a single character
+    ;;handling eos and newlines as appropriate
+    
     (label :emit)
     (CPX (nil->0 (eos-index)))
     (BEQ :done)
@@ -76,8 +84,23 @@
     (LDA.ABX :hi-char-offsets)
     (ADC.ZP (hi-add :font))
     (STA.ZP (hi-add '(:typeset . :char)))
-    (JMP :typeset)
+    (JMP :typeset "Emit a single character and return")
+
     (label :newline)
+    
+    (LDA 0)
+    (STA.ZP '(:typeset . :shift))
+    (STA.ZP '(:typeset . :prev-width))
+    (label+1 :scroll-on-newline)
+    (ORA 0 "If zero, scroll, otherwise, go to next row")
+    (BEQ :next-line)
+    (dc "Go back to the beginning of the line")
+    (dc "then scroll up, so we are writing on the same row")
+    (cpy16.zp :tmp-raster '(:typeset . :raster))
+    (JMP :scroll)
+    
+    (label :next-line)
+    (dc "Move the raster to the next row")
     (LDA 0)
     (STA.ZP '(:typeset . :shift))
     (STA.ZP '(:typeset . :prev-width))
@@ -91,6 +114,7 @@
     (STA.ZP (hi-add :tmp-raster))
     (STA.ZP (hi-add '(:typeset . :raster)))
     (RTS)
+
     (label :done)
     (dc "Directly return to caller")
     (PLA)
@@ -100,11 +124,13 @@
   (label :typeset)
   
   (with-namespace :typeset
-    (alias :char :A0)
-    (alias :raster :A1)
-
-    (alias :shift :D0)
-    (alias :prev-width :D1) ;;note that the 'width' includes the kerning bit
+    (let ((registers (free-aregs :memcpy :memset)))
+      (alias :char (first registers))
+      (alias :raster (second registers)))
+    (let ((registers (free-dregs :memcpy :memset)))
+      (alias :shift (first registers))
+      (alias :prev-width (second registers))) ;;note that the 'width' includes the kerning bit, so it's not just a length
+    
     (zp-b :left-shift)
     
     (LDX 0 "Ensure we can use X indexed addressing later")
@@ -218,19 +244,10 @@
 
 (defun print-message ()
 
-  ;; TODO The calling convention for this is terrible.
-  ;; a) The number of lines should be stored in the string itself
-  ;; b) VM-PR1 etc should be removed. This will vastly simplify things
-  ;; c) All calls to print-message should either go through
-  ;;     print-message           (address in registers) 
-  ;;     print-message-inline    (address by deref-w)
-  
-  ;; Both entry points expect 1, 2 or 3 in Y for the number of lines
-  ;; :print-message-no-deref we expect the typesetter already has the address
-  ;; of the string in '(:typeset-cs . :str)
-  ;; :print-message we expect the string address to be interned after the
-  ;; call site so it can be retrieved with JSR :deref-w
-    
+  "Install a 6502 print message function which can be called by either
+   JSR :print-message-inline DW string-address
+   or JSR :print-message X=(lo) A=(hi)"
+
   (labels ((cpy-src (lines) (scradd (live-row lines) 0))
 	   (cpy-len (lines) (* (- 4 lines) +screen-width-bytes+ *line-height*))
 	   (set-dst (lines) (scradd (live-row (- 4 lines)) 0))
@@ -242,47 +259,29 @@
 	  '(:scrcpy-src :scrcpy-len :scrset-dst :scrset-len)
 	  (list #'cpy-src #'cpy-len #'set-dst #'set-len)))
 
-  (label :print-message)
 
-  (STY.ZP :lines)
-  (JSR :deref-w)
-  (STX.ZP (lo-add '(:typeset-cs . :str)))
-  (STA.ZP (hi-add '(:typeset-cs . :str)))
-  (LDY.ZP :lines)
+  (label :scroll)
+  (dc "Scroll one line up, erasing the fourth row (i.e. last but one)")
+  (call-memcpy (scradd (live-row 1) 0)
+	       (scradd (live-row 0) 0)
+	       (* 4 +screen-width-bytes+ *line-height*))
+  (call-memset 0 (scradd (live-row 3) 0)
+	       (* 1 +screen-width-bytes+ *line-height*))
+  (RTS)
   
-  (label :print-message-no-deref)
-  
-  ;;Note that scrset-len is not strictly needed
-  ;;as scrset-len+scrcpy-len=C
-  ;;Call with number of lines 1, 2 or 3 in Y
+  (label :print-message-inline)
+
   (with-namespace :print-message
-    (alias :lines (first (free-dregs :memcpy :memset)))
-    ;;scroll out the number of lines we need 
-    ;;note that the tables are 1 based, so we take one off
-    ;;the addresses.
-    (STY.ZP :lines)
-    (LDA.ABY (1- (resolve '(:scrcpy-src . :lo))))
-    (STA.ZP (lo-add :A0))
-    (LDA.ABY (1- (resolve '(:scrcpy-src . :hi))))
-    (STA.ZP (hi-add :A0))
-    (sta16.zp (scradd (live-row 0) 0) :A1)
-    (LDA.ABY (1- (resolve '(:scrcpy-len . :lo))))
-    (LDX.ABY (1- (resolve '(:scrcpy-len . :hi))))
-    (JSR :memcpy)
-    ;;now erase the gap for the new text
-    (LDY.ZP :lines)
-    (LDA.ABY (1- (resolve '(:scrset-dst . :lo))))
-    (STA.ZP (lo-add :A0))
-    (LDA.ABY (1- (resolve '(:scrset-dst . :hi))))
-    (STA.ZP (hi-add :A0))    
-    (LDA.ABY (1- (resolve '(:scrset-len . :lo))))
-    (LDX.ABY (1- (resolve '(:scrset-len . :hi))))
-    (STA.ZP :D0)
-    (LDA 0)
-    (JSR :memset)
-    ;;now print the text- we can use the same address as the
-    ;;place we started erasing...
-    (LDY.ZP :lines)
+    
+    (JSR :deref-w)
+    
+    (label :print-message nil)
+
+    (STX.ZP (lo-add '(:typeset-cs . :str)))
+    (STA.ZP (hi-add '(:typeset-cs . :str)))
+    
+    (JSR :scroll)
+    (LDY 1)
     (LDA.ABY (1- (resolve '(:scrset-dst . :lo))))
     (STA.ZP (lo-add '(:typeset . :raster)))
     (STA.ZP (lo-add '(:typeset-cs . :tmp-raster)))
@@ -303,241 +302,6 @@
     (STA.ZP '(:typeset . :prev-width))
     (LDA 5)
     (STA.ZP '(:typeset . :shift))
+    (STA.AB '(:typeset-cs . :scroll-on-newline) "Scroll on newline")
     (JMP :typeset-cs-continue)))
-
-;;TODO make this build specific to this file, and make specific versions
-;;for elsewhere
-(defun build (pass)
-  (funcall pass)
-  (funcall pass)
-  (setf *compiler-final-pass* t)
-  (funcall pass))
-
-(defun odyssey (&optional (dictionary #()))
-  (reset-compiler)
-  (reset-strings)
-  (let ((font :past))
-    (flet ((pass ()
-	     (zeropage)	     
-	     (org #x600)
-	     (label :start)
-	     (CLD)
-	     (label :render-test2)
-	     (sta16.zp :str '(:typeset-cs . :str))
-	     (sta16.zp (cons :font font) :font)
-	     (sta16.zp #x8000 '(:typeset . :raster))
-	     (JSR :typeset-cs)
-	     (BRK)
-	     (typeset)
-	     (dcs :str (justify *odyssey* :width (font-width font)))
-	     (huffman-decoder)
-	     (string-table dictionary)
-	     (label :end)
-	     (font-data)))
-      (build #'pass))) 
-  
-  (monitor-reset #x600)
-  (monitor-run)
-  (update-vicky))
-
-(defun render-test3 ()
-
-  ;;Test an OBOE error where the M is being overwritten, presumably by the
-  ;;thing that clears the next position.
-  (reset-compiler)
-  (reset-strings)
-
-  (flet ((pass ()
-	   (zeropage)
-	   (org #x600)
-	   (CLD)
-	   (label :render-test3)
-   
-	   (sta16.zp :str1 '(:typeset-cs . :str))
-	   (sta16.zp '(:font . :present) :font)
-	   (sta16.zp #x80F0 '(:typeset . :raster))
-
-	   (JSR :typeset-cs)
-
-	   (LDA 5)
-	   (STA.ZP '(:typeset . :shift))
-	   (sta16.zp :str1 '(:typeset-cs . :str))
-           (sta16.zp (+ #x80F0 *line-spacing*) '(:typeset . :raster))
-
-	   (JSR :typeset-cs-preserve-shift)
-
-	   (BRK)
-
-	   (typeset)
-	   (font-data)
-
-	   (dcs :str1 "Millions of sad eyes peer out from the slime.")))
-    
-    (build #'pass))
-  
-  (monitor-reset #x600)
-  (monitor-run)
-  (update-vicky))
-
-(defun render-test4 ()
-
-  (reset-compiler)
-  (reset-strings)
-
-  (flet ((pass ()
-	   (zeropage)
-	   (org #x600)
-	   (CLD)
-	   (label :render-test4)
-
-	   (sta16.zp :str1 '(:typeset-cs . :str))
-	   (sta16.zp '(:font . :present) :font)
-	   (sta16.zp #x80F0 '(:typeset . :raster))
-
-	   (JSR :typeset-cs)
-	   (LDY 2)
-	   (JSR :print-message)
-	   (dw nil :str1)
-
-	   (BRK)
-
-	   (typeset)
-	   (font-data)
-	   (print-message)
-	   (memcpy)
-	   (memset)
-	   (deref-w)
-	   (dcs :str1 "Millions of sad eyes peer out from the
-slime.")))
-    
-    (build #'pass))
-  
-  (monitor-reset #x600)
-  (monitor-run)
-  (update-vicky))
-
-(defun render-test2 ()
-  (reset-compiler)
-  (reset-strings)
-
-  (flet ((pass ()
-	   (zeropage)
-	   (org #x600)
-	   (CLD)
-	   (label :render-test2)
-   
-	   (sta16.zp :str1 '(:typeset-cs . :str))
-	   (sta16.zp '(:font . :present) :font)
-	   (sta16.zp #x80F0 '(:typeset . :raster))
-
-	   (JSR :typeset-cs)
-
-	   (sta16.zp :str2 '(:typeset-cs . :str))
-	   (sta16.zp '(:font . :past) :font)
-           (sta16.zp (+ #x80F0 *line-spacing*) '(:typeset . :raster))
-
-	   (JSR :typeset-cs)
-
-	   (sta16.zp :str3 '(:typeset-cs . :str))
-	   (sta16.zp '(:font . :future) :font)
-	   (sta16.zp (+ #x80F0 (* 2 *line-spacing*)) '(:typeset . :raster))
-
-	   (JSR :typeset-cs)
-
-	   (sta16.zp :kern '(:typeset-cs . :str))
-	   (sta16.zp '(:font . :present) :font)
-	   (sta16.zp (+ #x80F0 (* 3 *line-spacing*)) '(:typeset . :raster))
-
-	   (JSR :typeset-cs)
-	   
-	   (sta16.zp :kern '(:typeset-cs . :str))
-	   (sta16.zp '(:font . :past) :font)
-	   (sta16.zp (+ #x80F0 (* 4 *line-spacing*)) '(:typeset . :raster))
-
-	   (JSR :typeset-cs)
-	 
-	   (sta16.zp :kern '(:typeset-cs . :str))
-	   (sta16.zp '(:font . :future) :font)
-	   (sta16.zp (+ #x80F0 (* 5 *line-spacing*)) '(:typeset . :raster))
-
-	   (JSR :typeset-cs)
-
-	   (BRK)
-
-	   (typeset)
-	   (font-data)
-
-	   (dcs :str1 "Chad Jenkins and his red Porsche.")
-	   (dcs :str2 "King Chadric and his russet steed, Portia.")
-	   (dcs :str3 "Galacto Imperator Chadrix.")
-	   (dcs :kern "To The fefifof Potato Flibbly Tomato V,V.Vo")))
-    
-    (build #'pass))
-  
-  (monitor-reset #x600)
-  (monitor-run)
-  (update-vicky))
-
-(defun render-test ()
-  
-  (reset-compiler)
-  (reset-strings)
-  
-  (flet ((pass ()
-	   (zeropage)
-	   (org #x600)
-	   (CLD)
-	   (label :render-test)
-
-	   (zp-b :count)
-	   (zp-w :y)
-	   
-      	   (sta16.zp '(:font . :present) :font)
-	   (sta16.zp #x80F0 :y)
-
-	   (LDA 7)
-	   (STA.ZP :count)
-	   (label :doit)
-	   (LDA.ZP :count)
-	   (STA.ZP (cons :typeset :shift))
-
-	   (LDA.ZP (lo-add :y))
-	   (CLC)
-	   (ADC #xB8)
-	   (STA.ZP (lo-add :y))
-	   (LDA.ZP (hi-add :y))
-	   (ADC #x01)
-	   (STA.ZP (hi-add :y))
-
-	   (cpy16.zp :y (cons :typeset :raster))
-
-	   (sta16.zp :covefefe '(:typeset-cs . :str))
-
-	   (LDA 0)
-	   (STA.ZP '(:typeset . :prev-width))
-	   
-	   ;; call into the entry point that does not
-	   ;; reset the shift position so we can check
-	   ;; the rendering at every bit offset
-	   (JSR :typeset-cs-cont-test)
-
-	   (DEC.ZP :count)
-	   (BNE :doit)
-
-	   (BRK)
-
-	   (dcs :covefefe "Covefefe")
-	   (dcs :fluff " ")
-
-	   (typeset)
-	   
-	   (font-data)))
-
-    (build #'pass))
-
-  (monitor-reset #x600)
-  (monitor-run)
-  (update-vicky))
-
-
 

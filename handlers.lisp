@@ -297,7 +297,6 @@
   (monitor-setpc :test-input)
   (monitor-run :break-on break-on :print (and print
 					      (eq break-on 'brk)))
-
   (when print
     (unless (eq break-on 'brk)
       (monitor-go)))
@@ -305,7 +304,7 @@
   (when print
     (dump-state-base64)))
 
-(defun gogogo ()
+(defun gogogo (&key (echo t))
   (princ "q to quit")
   (terpri)
   (tagbody
@@ -313,8 +312,9 @@
      (let ((line (read-line)))
        (if (equalp line "q")
 	   (return-from gogogo))
-       (enter-input line :print nil)
-       (go :top))))
+       (let ((*echo-print* echo))
+	 (enter-input line :print nil)
+	 (go :top)))))
 
 (defun restore-game (str &key (break-on 'brk))
   (restore-state-base64 str)

@@ -8,6 +8,11 @@
 	  nil
 	  "Was not in location ~a" location))
 
+(defun assert-msg (message)
+  "Assert that the last message was as the parameter"
+  (assert (equal message (first *print-transcript*))
+	  nil "Expected '~a' but was '~a'" message (first *print-transcript*)))
+
 (defun assert-set (&rest bits)
   (assert-bits bits t))
 
@@ -22,8 +27,3 @@
 	    nil
 	    "Expected the ~a in ~a (~a) was in place ~a"
 	    object location expected-place actual-place)))
-
-;;;; this stack gets each message pushed onto it
-;;;; for testing purposes
-
-(defparameter *output-message-stack* nil)

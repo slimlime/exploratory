@@ -1,6 +1,8 @@
 (defparameter *line-spacing* (* (1+ *font-height*) 40))
 (defparameter *act-font* :present)
 (defparameter *act-colour* #x10)
+(defparameter *print-transcript* nil)
+(defparameter *echo-print* nil)
 
 (defun update-vicky ()
   (let ((buf (monitor-buffer))) ;need to abstract out the memory, ditch cl-6502
@@ -73,6 +75,16 @@
     ;;handling eos and newlines as appropriate
     
     (label :emit)
+    ;;in the debugger, gather up the characters so they can be printed
+    (let ((string nil))
+      (dbg (if (= x (nil->0 (eos-index)))
+	       (progn
+		 (push (coerce (nreverse string) 'string) *print-transcript*)
+		 (when *echo-print*
+		   (princ (car *print-transcript*))
+		   (terpri))
+		 (setf string nil))
+	       (push (car (nth x *huffman-table*)) string))))
     (CPX (nil->0 (eos-index)))
     (BEQ :done)
     (CPX (nil->0 (eol-index)))
@@ -268,7 +280,6 @@
     
     (JSR :scroll)
     
-    (LDY 1)
     (LDA (lo (scradd (live-row 3) 0)))
     (STA.ZP (lo-add '(:typeset . :raster)))
     (STA.ZP (lo-add '(:typeset-cs . :tmp-raster)))

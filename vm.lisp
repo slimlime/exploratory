@@ -353,7 +353,7 @@ incorrect branch offsets elsewhere
 	  (JMP '(:navigate . :navigate-no-deref))))
 
 ;;;
-;;; VM-PRI - Print string with the date inlined after the op-code
+;;; VM-PRI - Print string with the string data inlined after the op-code
 ;;;
 (defvmop vm-pri (format nil "VM-PRI1 '~a'" str) (str)
 	 ((dcs nil str))

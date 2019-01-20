@@ -13,6 +13,7 @@
   (font-data)
   (reset-compiler)
   (reset-vm)
+  (monitor-reset-debug-hooks)
   (flet ((pass ()
 	   (reset-dispatcher)  
 	   (org origin)
@@ -80,4 +81,5 @@
   (build-game initial-location game-fn dictionary)
   (monitor-reset #x600)
   (monitor-run :break-on break-on :print print)
+  (setf *print-transcript* nil)
   (setmem-copy (monitor-buffer)))

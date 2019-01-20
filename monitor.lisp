@@ -4,7 +4,10 @@
 ;; a watch variable function
 ;; a local variables dump, which basically sees which namespace we
 ;; are in and dumps all aliased zero-page variables
-
+;; TODO monitor-reset-debug-hooks would not be necessary if the compiler were
+;; modular and each module could be registered. Having said that, all that will
+;; happen is that a call to monitor-reset will be replaced with a call to
+;; monitor-register with compiler ;-
 
 ;;step function
 (defparameter *monitor-step* nil)
@@ -17,7 +20,30 @@
 (defparameter *monitor-poke-fn* nil)
 (defparameter *monitor-label-watches* nil)
 (defparameter *monitor-profile* nil)
+(defparameter *monitor-debug-hooks* (make-hash-table))
 
+(defun monitor-reset-debug-hooks ()
+  (clrhash *monitor-debug-hooks*))
+
+(defun monitor-add-debug-hook-fn (addr fn)
+  "Add a hook which will be executed when the label is reached"
+  (when *compiler-final-pass*
+    (push fn (gethash addr *monitor-debug-hooks*))))
+
+(defmacro dbg (&body body)
+  "Execute the body of the hook when the address is reached
+   The following variables are bound buffer, pc, sp, sr, a, x, y and cc"
+  `(monitor-add-debug-hook-fn *compiler-ptr*
+     #'(lambda (buffer pc sp sr a x y cc)
+	 (declare (ignorable buffer pc sp sr a x y cc))
+	 ,@body)))
+
+(defun monitor-execute-hooks (buffer pc sp sr a x y cc)
+  "Execute all hooks at the address"
+  (aif (gethash pc *monitor-debug-hooks*)
+       (dolist (hook it)
+	   (funcall hook buffer pc sp sr a x y cc))))
+  
 (defun monitor-reset-profile ()
   (setf *monitor-profile* (make-hash-table)))
 
@@ -140,20 +166,19 @@
       (do ()
 	  ((> total-cycles max-cycles))
 	(multiple-value-bind (buffer pc sp sr a x y cc)
-	       (funcall *monitor-get-state* nil)
-	     (declare (ignore buffer sp sr a x y))
-	     (setf total-cycles (- cc start-cycles))
-	     ;;THIS IS USING THE COMPILER BUFFER IT SHOULD PROBABLY
-	     ;;LOOK INTO THE 6502 BUFFER...
-	     (let ((op (gethash (aref *compiler-buffer* pc)
-				*reverse-opcodes*)))
-	       ;(format t "~2,'0X ~a~%" pc op)
-	       (when (or (= pc (resolve break-on :no-assert t))
-			 (and op (eq break-on (car op))))
-		 (return)))
-	     (let ((step-cycles (monitor-cc)))
-	       (funcall *monitor-step*)
-	       (monitor-profile-address pc (- (monitor-cc) step-cycles)))))
+	    (funcall *monitor-get-state* nil)
+	  (monitor-execute-hooks buffer pc sp sr a x y cc)
+	  (setf total-cycles (- cc start-cycles))
+	  ;;THIS IS USING THE COMPILER BUFFER IT SHOULD PROBABLY
+	  ;;LOOK INTO THE 6502 BUFFER AS IT WON'T WORK FOR SELF MODDING
+	  (let ((op (gethash (aref *compiler-buffer* pc)
+			     *reverse-opcodes*)))
+	    (when (or (= pc (resolve break-on :no-assert t))
+		      (and op (eq break-on (car op))))
+	      (return)))
+	  (let ((step-cycles (monitor-cc)))
+	    (funcall *monitor-step*)
+	    (monitor-profile-address pc (- (monitor-cc) step-cycles)))))
       (when print
 	(format t "Cycles:~a~%" total-cycles)
 	(monitor-print)))))

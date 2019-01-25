@@ -91,15 +91,8 @@
     ;; And some stuff those functions need
     ;; Like this bit mask table
 
-    (zp-b :bit-0 1)
-    (zp-b :bit-1 2)
-    (zp-b :bit-2 4)
-    (zp-b :bit-3 8)
-    (zp-b :bit-4 16)
-    (zp-b :bit-5 32)
-    (zp-b :bit-6 64)
-    (zp-b :bit-7 128)
-
+    (bit-lookup)
+    
     (label :get-bit-mask)
     (dc "Get the address of the bit and leave it in Y")
     (dc "then get the single-bit mask for that bit and")

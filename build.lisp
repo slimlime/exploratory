@@ -13,7 +13,6 @@
   (font-data)
   (reset-compiler)
   (reset-vm)
-  (monitor-reset-debug-hooks)
   (flet ((pass ()
 	   (reset-dispatcher)  
 	   (org origin)

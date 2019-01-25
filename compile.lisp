@@ -20,6 +20,7 @@
 (defparameter *compiler-namespace-sizes* nil)
 (defparameter *compiler-local-namespace-count* 0)
 (defparameter *compiler-address-labels* 0)
+(defparameter *compiler-reset-hooks* (make-hash-table :test 'equal))
 
 ; todo A way of providing a 'spare byte/word' to the compile
 ; which can then be used later e.g.
@@ -46,6 +47,11 @@
 ;;      without the client build having to do things like put the string
 ;;      table at the end or reset various flags.
 
+(defun set-compiler-reset-hook (name fn)
+  (if fn
+      (setf (gethash name *compiler-reset-hooks*) fn)
+      (remhash name *compiler-reset-hooks*)))
+      
 (defun reset-compiler (&optional (buffer-size 65536))
   (setf *compiler-ptr* 0)
   (setf *compiler-disassembler-hints* (make-hash-table))
@@ -62,6 +68,11 @@
   (setf *compiler-namespace-stack* nil)
   (setf *compiler-namespace-sizes* (make-hash-table :test 'equal))
   (setf *compiler-local-namespace-count* 0)
+
+  ;;now execute compiler reset hooks
+
+  (do-hash-values (hook *compiler-reset-hooks*)
+    (funcall hook))
   
   (values))
 

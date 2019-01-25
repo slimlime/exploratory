@@ -25,6 +25,9 @@
 (defun monitor-reset-debug-hooks ()
   (clrhash *monitor-debug-hooks*))
 
+(set-compiler-reset-hook "monitor-reset-debug-hooks"
+			 #'monitor-reset-debug-hooks)
+
 (defun monitor-add-debug-hook-fn (addr fn)
   "Add a hook which will be executed when the label is reached"
   (when *compiler-final-pass*
@@ -183,7 +186,9 @@
 	(format t "Cycles:~a~%" total-cycles)
 	(monitor-print)))))
 
-(defun monitor-go ()
+(defun monitor-go (&optional (address nil address-supplied-p))
+  (when address-supplied-p
+    (monitor-reset address))
   (monitor-print)
   (tagbody
    :prompt
@@ -214,6 +219,9 @@
 (defun monitor-peek-addr (addr)
   (logior (monitor-peek addr)
 	  (ash (monitor-peek (1+ addr)) 8)))
+
+(defun monitor-peek16 (addr)
+  (monitor-peek-addr addr))
 
 (defun monitor-poke (address byte)
   (funcall *monitor-poke-fn* address byte))

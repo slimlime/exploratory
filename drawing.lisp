@@ -42,25 +42,26 @@ axis distance must be greater or equal to the minor axis distance."
 ;;;                 |        320,200
 
 ;;; cycles for 0,0 319,199 = 95762
+;;; remove extraneous TXA -> 95364
+;;; set gradient absolute ->
 
 (defun draw-line-code ()
   (label :draw-line)
   (zp-w :x)
   (zp-w :y)
-  (zp-w :grad)
   (zp-w :width)
   (zp-w :delta)
     
   (label :draw-line1)
-  (dc "For this entry point we require x, y, grad and width
+  (dc "For this entry point we require x, y and width
        all set in the zero-page, and A to contain the direction
-       in which the vertical changes")
+       in which the vertical changes. grad-hi and grad-lo absolute
+       should also be set.")
 
   (with-namespace :draw-line
     ;;debugging variables
     (let ((xval nil)
 	  (yval nil)
-	  (grad nil)
 	  (width nil)
 	  (steps nil)
 	  (delta nil)
@@ -70,7 +71,6 @@ axis distance must be greater or equal to the minor axis distance."
 	(setf steps 0) ;;how many x steps did we take so far?
 	(setf xval (monitor-peek16 :x))
 	(setf yval (monitor-peek16 :y))
-	(setf grad (monitor-peek16 :grad))
 	(setf delta (monitor-peek16 :delta))
 	(setf width (monitor-peek16 :width))
 	(setf last-bit nil)
@@ -116,8 +116,8 @@ axis distance must be greater or equal to the minor axis distance."
       (dc "Now we are into Bresenham's algorithm")
       (dc "We increment x, and add the gradient to the accumulator")
       (dc "also decrement the width until it is zero")
-      (label :plot-point)
       (TAX)
+      (label :plot-point)
       (dc "A should hold the bit pattern of the point we wish to plot")
       ;;some assertions to ensure the bit pattern rotates from left to
       ;;right
@@ -142,10 +142,12 @@ axis distance must be greater or equal to the minor axis distance."
       (label :add-gradient)
       (dc "Add the gradient")
       (CLC)
-      (LDA.ZP (lo-add :grad))
+      (label+1 :grad-lo)
+      (LDA 0)
       (ADC.ZP (lo-add :delta))
       (STA.ZP (lo-add :delta))
-      (LDA.ZP (hi-add :grad))
+      (label+1 :grad-hi)
+      (LDA 0)
       (ADC.ZP (hi-add :delta))
       (STA.ZP (hi-add :delta))
       (dc "Now, if the carry is set, then we went over and need to increment Y")
@@ -154,6 +156,7 @@ axis distance must be greater or equal to the minor axis distance."
       (dc "We advance the X by a bit, then a byte if necessary")
       (TXA)
       (LSR)
+      (TAX)
       (BNE :plot-point)
       (dc "Advance by one screen byte")
       (inc16.zp :y)
@@ -204,7 +207,8 @@ axis distance must be greater or equal to the minor axis distance."
 	   (label :start)
 	   (sta16.zp x :x)
 	   (sta16.zp y :y)
-	   (sta16.zp grad :grad)
+	   (STA.AB (lo grad) :grad-lo)
+	   (STA.AB (hi grad) :grad-hi)
 	   (sta16.zp width :width)
 	   (JSR :draw-line1)
 	   (BRK)

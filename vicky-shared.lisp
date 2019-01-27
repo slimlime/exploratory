@@ -22,3 +22,31 @@
 
 (defun scradd (row col)
   (+ *screen-memory-address* (* +screen-width-bytes+ row) col))
+
+(defun scrxy (addr)
+  "Get the xy byte offsets from a screen memory pointer"
+  (multiple-value-bind (y x)
+      (floor (- addr *screen-memory-address*) +screen-width-bytes+)
+    (values x y)))
+
+(defun scrpxy (addr &optional bit)
+  "Get the xy pixel offsets from a screen memory pointer and
+an optional bit position, i.e. 0-7"
+  (multiple-value-bind (x y)
+      (scrxy addr)
+    (values (+ (* 8 x) (nil->0 bit)) y)))
+
+(let ((*screen-memory-address* 1000))
+  (assert (multiple-value-bind (x y)
+	      (scrxy 1001)
+	    (and (= x 1) (= y 0))))
+  (assert (multiple-value-bind (x y)
+	      (scrxy 1042)
+	    (and (= x 2) (= y 1))))
+  (assert (multiple-value-bind (x y)
+	      (scrpxy 1001)
+	    (and (= x 8) (= y 0))))
+  (assert (multiple-value-bind (x y)
+	      (scrpxy 1042)
+	    (and (= x 16) (= y 1)))))
+

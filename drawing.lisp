@@ -6,6 +6,22 @@
 ;;significant bits, thought this mask will only be important when we want to
 ;;store the delta in some compact form.
 
+;;TODO could be a problem in the first pixel where #x7fff is insufficient to
+;;     breach into the next y step for diagonal lines. Will need to add a test
+;;     case for that.
+
+(defun calculate-grad (maj1 min1 maj2 min2)
+  "Calculate the 16 bit integer gradient between two points. The major
+axis distance must be greater or equal to the minor axis distance."
+  (assert (>= (abs (- maj1 maj2))
+	      (abs (- min1 min2))))
+  (assert (> (abs (- maj1 maj2)) 0))
+  (floor (* #xffff (abs (/ (- min1 min2)
+			   (- maj1 maj2))))))
+
+(assert (= #x0 (calculate-grad 0 0 100 0)))
+(assert (= #xffff (calculate-grad 0 0 100 100)))
+(assert (= #x7fff (calculate-grad 0 0 100 50)))
 
 (defun draw-line-code ()
   (label :draw-line)
@@ -91,6 +107,7 @@
 			  (= a (/ last-bit 2))))
 		  (format nil "Last Bit = ~a a = ~a" last-bit a))
       (dbg (setf last-bit a))
+      (dbg (setf last-scr (monitor-peek16 :y)))
       ;;some assertions to ensure that if the bit pattern rotated to
       ;;the next byte, we are ahead by one byte in the screen address    
       (EOR.IZY :y);;DO WE HAVE TO GET AND READ THE SCREEN WHILE WE ARE
@@ -124,6 +141,10 @@
       (BPL :add-gradient)
       (dc "we are done")
       (dbg-assert (= steps width))
+      (dbg
+	(multiple-value-bind (x y)
+	    (scrpxy last-scr (floor (- 7 (log last-bit 2))))
+	  (format t "x2=~a y2=~a~%" x y)))
       (RTS)
       (label :step)
       (dc "Advance the X by a bit, then a byte if necessary")
@@ -144,7 +165,7 @@
       (label :xystep)
       (dc "Take a step in both x and y")
       (CLC)
-      (LDA 41)
+      (LDA (1+ +screen-width-bytes+))
       (ADC.ZP (lo-add :y))
       (STA.ZP (lo-add :y))
       (LDA.ZP (hi-add :y))
@@ -161,7 +182,6 @@
 	   (zeropage)
 	   (CLD)
 	   (label :draw-test)
-
 	   (call-memset 0 (scradd 0 0) +screen-memory-length+)
 	   (call-memset 43 *char-memory-address* +char-memory-length+)
 	   (label :start)
@@ -188,3 +208,6 @@
   (monitor-reset #x600)
   (monitor-run)
   (update-vicky))
+
+(defun draw-test1 (x1 y1 x2 y2)
+  (draw-test x1 y1 (- x2 x1 -1) (calculate-grad x1 y1 x2 y2)))

@@ -4,10 +4,9 @@
 ;; a watch variable function
 ;; a local variables dump, which basically sees which namespace we
 ;; are in and dumps all aliased zero-page variables
-;; TODO monitor-reset-debug-hooks would not be necessary if the compiler were
-;; modular and each module could be registered. Having said that, all that will
-;; happen is that a call to monitor-reset will be replaced with a call to
-;; monitor-register with compiler ;-
+
+;;TODO MAKE THE MONITOR HOOK FUNCTION RETURN A VALUE- IE STOP EXECUTION
+;;TODO ENSURE THE DBG HOOKS EXECUTE AFTER THE SINGLE STEP
 
 ;;step function
 (defparameter *monitor-step* nil)
@@ -21,6 +20,8 @@
 (defparameter *monitor-label-watches* nil)
 (defparameter *monitor-profile* nil)
 (defparameter *monitor-debug-hooks* (make-hash-table))
+(defparameter *monitor-debug-mode* :assert)
+(defparameter *monitor-debug-break* nil "break the debugger after the debug hook")
 
 (defun monitor-reset-debug-hooks ()
   (clrhash *monitor-debug-hooks*))
@@ -40,6 +41,9 @@
      #'(lambda (buffer pc sp sr a x y cc)
 	 (declare (ignorable buffer pc sp sr a x y cc))
 	 ,@body)))
+
+(defun dbg-break ()
+  (setf *monitor-debug-break* t))
 
 (defun monitor-execute-hooks (buffer pc sp sr a x y cc)
   "Execute all hooks at the address"
@@ -114,6 +118,32 @@
       (format t "-------------------------------------------------------------~%")
       (disassemble-6502 pc (+ pc *monitor-context-bytes*)))))
 
+(defun dbg-assert-fn (pc test-form msg)
+  (let ((error-msg (format nil "~a ~a"
+			   test-form
+			   (if (null msg) "" msg))))
+    (case *monitor-debug-mode*
+      (:silent nil)
+      (:warn-only
+       (format t "Debug Warning PC:~4,'0X ~a~%" pc error-msg))
+      (:break
+       (format t "Debug Break PC:~4,'0X ~a~%" pc error-msg)
+       (dbg-break))
+      (:assert
+       (error "Debug Assert PC:~4,'0X ~a~%" pc error-msg))
+      (otherwise (error "Debug mode must be :warn-only :break or :assert, was ~a" *monitor-debug-mode*)))))
+
+(defmacro dbg-assert (test-form &optional msg)
+  `(dbg	(unless ,test-form (dbg-assert-fn pc (quote ,test-form) ,msg))))
+
+(defun dbg-cc ()
+  "Assert that the carry is clear"
+  (dbg-assert (= 0 (logand sr 1))) "Carry not clear")
+
+(defun dbg-cs ()
+  "Assert that the carry is set"
+  (dbg-assert (= 1 (logand sr 1)) "Carry not set"))
+
 (defun monitor-unwatch (addr)
   (if (numberp addr)
       (setf *monitor-watches* 
@@ -170,8 +200,11 @@
 	  ((> total-cycles max-cycles))
 	(multiple-value-bind (buffer pc sp sr a x y cc)
 	    (funcall *monitor-get-state* nil)
+	  (setf *monitor-debug-break* nil)
 	  (monitor-execute-hooks buffer pc sp sr a x y cc)
 	  (setf total-cycles (- cc start-cycles))
+	  (when *monitor-debug-break*
+	    (return))
 	  ;;THIS IS USING THE COMPILER BUFFER IT SHOULD PROBABLY
 	  ;;LOOK INTO THE 6502 BUFFER AS IT WON'T WORK FOR SELF MODDING
 	  (let ((op (gethash (aref *compiler-buffer* pc)
@@ -213,10 +246,14 @@
 (defun monitor-buffer ()
   (funcall *monitor-buffer*))
 
-(defun monitor-peek (address)
-  (funcall *monitor-peek-fn* address))
+(defun monitor-peek (addr)
+  (unless (numberp addr)
+    (setf addr (resolve addr)))
+  (funcall *monitor-peek-fn* addr))
 
 (defun monitor-peek-addr (addr)
+  (unless (numberp addr)
+    (setf addr (resolve addr)))
   (logior (monitor-peek addr)
 	  (ash (monitor-peek (1+ addr)) 8)))
 

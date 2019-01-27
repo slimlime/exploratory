@@ -1,3 +1,5 @@
+;;TODO See if inc16 is better done as adds rather than branchin
+
 ;;TODO rationalise the tests and make an automated build which calls them
 ;;TODO In memcpy and memset, why use just two pointers? For copying a page
 ;;     at least we can do
@@ -15,7 +17,7 @@
 ;;     INY
 ;;     Using 1/4 of the INY instructions. Got to be worth 3*256 microseconds!
 ;;     Could add up, at least when clearing the screen.
-
+;; TODO The bit-lookup seems a bit expensive
 
 ;; TODO all functions which 'install' a function in 6502, should have a naming convention
 ;;      as it is easy to confuse the function which installs the code with the function
@@ -41,6 +43,7 @@
 
   ;; TODO have it execute some code on start up to initialize
   ;; values.
+  
   
   (mapc #'zp-w *aregs*)
   (mapc #'zp-b *dregs*))

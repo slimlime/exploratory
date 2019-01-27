@@ -7,6 +7,7 @@
 
 ;;TODO MAKE THE MONITOR HOOK FUNCTION RETURN A VALUE- IE STOP EXECUTION
 ;;TODO ENSURE THE DBG HOOKS EXECUTE AFTER THE SINGLE STEP
+;;TODO ENSURE THE HOOKS EXECUTE IN THE ORDER THEY APPEAR IN THE LISP
 
 ;;step function
 (defparameter *monitor-step* nil)
@@ -48,7 +49,7 @@
 (defun monitor-execute-hooks (buffer pc sp sr a x y cc)
   "Execute all hooks at the address"
   (aif (gethash pc *monitor-debug-hooks*)
-       (dolist (hook it)
+       (dolist (hook (reverse it))
 	   (funcall hook buffer pc sp sr a x y cc))))
   
 (defun monitor-reset-profile ()

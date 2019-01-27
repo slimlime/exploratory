@@ -24,7 +24,9 @@
 	  (grad nil)
 	  (width nil)
 	  (steps nil)
-	  (delta nil))
+	  (delta nil)
+	  (last-scr nil)
+	  (last-bit nil))
       (dbg
 	(setf steps 0) ;;how many x steps did we take so far?
 	(setf xval (monitor-peek16 :x))
@@ -32,6 +34,8 @@
 	(setf grad (monitor-peek16 :grad))
 	(setf delta (monitor-peek16 :delta))
 	(setf width (monitor-peek16 :width))
+	(setf last-bit nil)
+	(setf last-scr nil)
 	(dbg-assert (/= 0 width))
 	(dbg-assert (<= (+ xval width) +screen-width+))
 	(dbg-assert (< xval +screen-width+))
@@ -63,17 +67,32 @@
       (dc ":y now contains the address of the screen byte containing our first pixel")
       (dbg-assert (= (scradd yval (floor xval 8)) (monitor-peek16 :y)))
       (LDA.ABX :bits)
-      (TXA "X holds the bit pattern")
+      (dbg-assert (= a (expt 2 (- 7 (logand xval 7))))
+		  (format nil "a=~a xval=~a xval%7=~a" a xval (logand xval 7)))
+      ;;the middle of the pixel is at 32768 in our fractional scheme
       (LDY 0)
       (STY.ZP (lo-add :delta))
-      (STY.ZP (hi-add :delta))
+      (LDX #x80)
+      (STX.ZP (hi-add :delta))
       (dc "Now we are into Bresenham's algorithm")
       (dc "We increment x, and add the gradient to the accumulator")
       (dc "also decrement the width until it is zero")
       (label :plot-point)
       (TAX)
       (dc "A should hold the bit pattern of the point we wish to plot")
+      ;;some assertions to ensure the bit pattern rotates from left to
+      ;;right
+      (dbg-assert (find a '(128 64 32 16 8 4 2 1)))
       (dbg (incf steps))
+      (dbg-assert (/= a 0))
+      (dbg-assert (or (null last-bit)
+		      (or (and (= last-bit 1)
+			       (= a 128))
+			  (= a (/ last-bit 2))))
+		  (format nil "Last Bit = ~a a = ~a" last-bit a))
+      (dbg (setf last-bit a))
+      ;;some assertions to ensure that if the bit pattern rotated to
+      ;;the next byte, we are ahead by one byte in the screen address    
       (EOR.IZY :y);;DO WE HAVE TO GET AND READ THE SCREEN WHILE WE ARE
       ;;JUST SETTING THE BYTE? I THINK NOT!
       (STA.IZY :y "plot")
@@ -113,6 +132,7 @@
       (BEQ :xystep)
       (dc "Take a step in y only- x only moved one bit")
       (TAX)
+      (CLC)
       (LDA 40)
       (ADC.ZP (lo-add :y))
       (STA.ZP (lo-add :y))
@@ -123,6 +143,7 @@
       (BNE :plot-point)
       (label :xystep)
       (dc "Take a step in both x and y")
+      (CLC)
       (LDA 41)
       (ADC.ZP (lo-add :y))
       (STA.ZP (lo-add :y))

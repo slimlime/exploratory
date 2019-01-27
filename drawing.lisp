@@ -23,6 +23,26 @@ axis distance must be greater or equal to the minor axis distance."
 (assert (= #xffff (calculate-grad 0 0 100 100)))
 (assert (= #x7fff (calculate-grad 0 0 100 50)))
 
+;;; 0,0             |
+;;;                 |
+;;;                 |
+;;;                 |
+;;;                 |
+;;;                 |           XMAJ
+;;;                 |            -VE
+;;;                 |
+;;; ----------------+---------------
+;;;                 |
+;;;                 |           XMAJ
+;;;                 |            +VE
+;;;                 |
+;;;                 |
+;;;                 |
+;;;                 | 
+;;;                 |        320,200
+
+;;; cycles for 0,0 319,199 = 95762
+
 (defun draw-line-code ()
   (label :draw-line)
   (zp-w :x)
@@ -30,8 +50,11 @@ axis distance must be greater or equal to the minor axis distance."
   (zp-w :grad)
   (zp-w :width)
   (zp-w :delta)
-  
+    
   (label :draw-line1)
+  (dc "For this entry point we require x, y, grad and width
+       all set in the zero-page, and A to contain the direction
+       in which the vertical changes")
 
   (with-namespace :draw-line
     ;;debugging variables
@@ -146,15 +169,19 @@ axis distance must be greater or equal to the minor axis distance."
 	    (scrpxy last-scr (floor (- 7 (log last-bit 2))))
 	  (format t "x2=~a y2=~a~%" x y)))
       (RTS)
+
       (label :step)
-      (dc "Advance the X by a bit, then a byte if necessary")
+      (dc "This mysterious two-step is so that we roll off the bit")
+      (dc "then do it again, but bringing in the carry from last time")
+      (dc "if the carry is set, then it means step another byte, which")
+      (dc "is convenient because we are about to do an add to step in the")
+      (dc "y direction.")
       (TXA)
       (LSR)
-      (BEQ :xystep)
-      (dc "Take a step in y only- x only moved one bit")
+      (TXA)
+      (ROR)
       (TAX)
-      (CLC)
-      (LDA 40)
+      (LDA +screen-width-bytes+)
       (ADC.ZP (lo-add :y))
       (STA.ZP (lo-add :y))
       (LDA.ZP (hi-add :y))
@@ -162,17 +189,7 @@ axis distance must be greater or equal to the minor axis distance."
       (STA.ZP (hi-add :y))
       (TXA)
       (BNE :plot-point)
-      (label :xystep)
-      (dc "Take a step in both x and y")
-      (CLC)
-      (LDA (1+ +screen-width-bytes+))
-      (ADC.ZP (lo-add :y))
-      (STA.ZP (lo-add :y))
-      (LDA.ZP (hi-add :y))
-      (ADC 0)
-      (STA.ZP (hi-add :y))
-      (LDA 128)
-      (BNE :plot-point)
+
       (db :bits 128 64 32 16 8 4 2 1))))
 
 (defun draw-test (x y width grad)

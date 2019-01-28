@@ -57,9 +57,9 @@ TODO Make work for y major"
 ;;;                 | 
 ;;;                 |        320,200
 
-;;; cycles for 0,0 319,199 = 19744 (if we do 8 bit accumulator, can knock off 2000 cycles)
-;;;                          19150 (re-ordered to avoid branch)
-;;;                          18752 (removed CLC)
+;;; cycles for draw-test2 '(0 0 319 199) '(0 0 319 0) = 34552
+;;;                                  branch less take = 34515
+;;;                                  bcc              = 33706
 
 
 (defun draw-line-code ()
@@ -149,9 +149,10 @@ TODO Make work for y major"
       (LDA +screen-width-bytes+)
       (ADC.ZP (lo-add :y))
       (STA.ZP (lo-add :y))
-      (LDA.ZP (hi-add :y))
-      (ADC 0)
-      (STA.ZP (hi-add :y))
+      (BCC :skip-add) 
+      (INC.ZP (hi-add :y))
+      (CLC)
+      (label :skip-add)
       (TXA)
       (label :plot-point)
       (dc "A should hold the bit pattern of the point we wish to plot")
@@ -169,8 +170,7 @@ TODO Make work for y major"
       (dbg (setf last-scr (monitor-peek16 :y)))
       ;;some assertions to ensure that if the bit pattern rotated to
       ;;the next byte, we are ahead by one byte in the screen address    
-      (EOR.IZY :y);;DO WE HAVE TO GET AND READ THE SCREEN WHILE WE ARE
-      ;;JUST SETTING THE BYTE? I THINK NOT!
+      (ORA.IZY :y)
       (STA.IZY :y "plot")
       (DEC.ZP (lo-add :width))
       (dc "branch less taken for this to check hi byte")
@@ -197,7 +197,13 @@ if we only did an x step, and for a y step it is clear as a side-effect.")
       (CLC "Clear the carry here in readiness for the add gradient")
       (BNE :plot-point)
       (dc "Advance by one screen byte")
-      (inc16.zp :y)
+      (INC.ZP (lo-add :y))
+      (BEQ :inc-hi)
+      (LDA 128)
+      (TAX)
+      (BNE :plot-point)
+      (label :inc-hi)
+      (INC.ZP (hi-add :y))
       (LDA 128)
       (TAX)
       (BNE :plot-point)
@@ -260,6 +266,56 @@ if we only did an x step, and for a y step it is clear as a side-effect.")
   (multiple-value-bind (x y w grad)
       (x1y1x2y2-xywgrad x1 y1 x2 y2)
     (draw-test x y w grad)))
+
+(defun draw-test2 (&rest lines)
+  "Lines in format (x1 y1 x2 y2)"
+  (reset-compiler)
+  (flet ((pass ()
+	   (org #x600)
+	   (zeropage)
+	   (CLD)
+	   (label :draw-test)
+	   (call-memset 0 (scradd 0 0) +screen-memory-length+)
+	   (call-memset 43 *char-memory-address* +char-memory-length+)
+	   (label :start)
+	   (let ((cycles 0))
+	     (dbg
+	       (monitor-reset-profile)
+	       (setf cycles (monitor-cc)))
+	   
+	     (dolist (line lines)
+	       (multiple-value-bind (x y w grad)
+		   (apply #'x1y1x2y2-xywgrad line)
+		 (sta16.zp x :x)
+		 (sta16.zp y :y)
+		 (LDA (lo grad))
+		 (STA.AB '(:draw-line . :grad-lo))
+		 (LDA (hi grad))
+		 (STA.AB '(:draw-line . :grad-hi))
+		 (sta16.zp w :width)
+		 (JSR :draw-line1)))
+	     (dbg (format t "Drawing ~a lines Cycles: ~a~%"
+			  (length lines)
+			  (- (monitor-cc) cycles))))
+	   (BRK)
+	   (draw-line-code)
+	   (label :end)
+	   (BRK)
+	   
+	   (memset)))
+
+	 (pass)
+	 (let ((end *compiler-ptr*))
+	   (pass)
+	   (assert (= end *compiler-ptr*) nil "Build was not stable"))
+	 (setf *compiler-final-pass* t)
+	 (pass)
+	 (format t "Build size ~a~%" (- *compiler-ptr* origin)))
+
+  (monitor-reset #x600)
+  (monitor-run)
+  (update-vicky))
+
 
 (let ((*monitor-debug-mode* :assert))
   (draw-test1 10 10 200 11) ;;this one tests rotating the pixel when we don't y step

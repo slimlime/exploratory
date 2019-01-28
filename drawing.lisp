@@ -10,6 +10,11 @@
 ;;     breach into the next y step for diagonal lines. Will need to add a test
 ;;     case for that.
 
+;;IDEA For 8 bit error accumulator, we can work out if we will land on the
+;;     wrong pixel at the end and supply an offset. Even if we do land on
+;;     the right pixel we might want to supply an offset so that it looks
+;;     symmetrical, e.g. for long shallow lines.
+
 (defun calculate-grad (maj1 min1 maj2 min2)
   "Calculate the 16 bit integer gradient between two points. The major
 axis distance must be greater or equal to the minor axis distance."
@@ -22,6 +27,17 @@ axis distance must be greater or equal to the minor axis distance."
 (assert (= #x0 (calculate-grad 0 0 100 0)))
 (assert (= #xffff (calculate-grad 0 0 100 100)))
 (assert (= #x7fff (calculate-grad 0 0 100 50)))
+
+(defun x1y1x2y2-xywgrad (x1 y1 x2 y2)
+  "This function converts x1 y1 x2 y2 coordinates into
+   values x y width gradient. Additionally, it re-orders
+   the points so that x1 < x2.
+TODO Make work for y major"
+  (assert (/= x1 x2))
+  (if (> x1 x2)
+      (x1y1x2y2-xywgrad x2 y2 x1 y1)
+      (values x1 y1 (- x2 x1 -1)
+	      (calculate-grad x1 y1 x2 y2))))
 
 ;;; 0,0             |
 ;;;                 |
@@ -41,9 +57,7 @@ axis distance must be greater or equal to the minor axis distance."
 ;;;                 | 
 ;;;                 |        320,200
 
-;;; cycles for 0,0 319,199 = 95762
-;;; remove extraneous TXA -> 95364
-;;; set gradient absolute -> 94728
+;;; cycles for 0,0 319,199 = 19744 (if we do 8 bit accumulator, can knock off 2000 cycles)
 
 (defun draw-line-code ()
   (label :draw-line)
@@ -161,6 +175,7 @@ axis distance must be greater or equal to the minor axis distance."
       (dc "Advance by one screen byte")
       (inc16.zp :y)
       (LDA 128)
+      (TAX)
       (BNE :plot-point)
       (label :done)
       (DEC.ZP (hi-add :width))
@@ -213,7 +228,9 @@ axis distance must be greater or equal to the minor axis distance."
 	   (STA.AB '(:draw-line . :grad-hi))
 	   (sta16.zp width :width)
 	   (let ((cycles 0))
-	     (dbg (setf cycles (monitor-cc)))
+	     (dbg
+	       (monitor-reset-profile)
+	       (setf cycles (monitor-cc)))
 	     (JSR :draw-line1)
 	     (dbg (format t "Draw Line Cycles: ~a~%" (- (monitor-cc) cycles))))
 	   (BRK)
@@ -236,4 +253,10 @@ axis distance must be greater or equal to the minor axis distance."
   (update-vicky))
 
 (defun draw-test1 (x1 y1 x2 y2)
-  (draw-test x1 y1 (- x2 x1 -1) (calculate-grad x1 y1 x2 y2)))
+  (multiple-value-bind (x y w grad)
+      (x1y1x2y2-xywgrad x1 y1 x2 y2)
+    (draw-test x y w grad)))
+
+(let ((*monitor-debug-mode* :assert))
+  (draw-test1 10 10 200 11) ;;this one tests rotating the pixel when we don't y step
+  )

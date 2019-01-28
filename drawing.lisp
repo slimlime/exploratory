@@ -43,7 +43,7 @@ axis distance must be greater or equal to the minor axis distance."
 
 ;;; cycles for 0,0 319,199 = 95762
 ;;; remove extraneous TXA -> 95364
-;;; set gradient absolute ->
+;;; set gradient absolute -> 94728
 
 (defun draw-line-code ()
   (label :draw-line)
@@ -207,10 +207,15 @@ axis distance must be greater or equal to the minor axis distance."
 	   (label :start)
 	   (sta16.zp x :x)
 	   (sta16.zp y :y)
-	   (STA.AB (lo grad) :grad-lo)
-	   (STA.AB (hi grad) :grad-hi)
+	   (LDA (lo grad))
+	   (STA.AB '(:draw-line . :grad-lo))
+	   (LDA (hi grad))
+	   (STA.AB '(:draw-line . :grad-hi))
 	   (sta16.zp width :width)
-	   (JSR :draw-line1)
+	   (let ((cycles 0))
+	     (dbg (setf cycles (monitor-cc)))
+	     (JSR :draw-line1)
+	     (dbg (format t "Draw Line Cycles: ~a~%" (- (monitor-cc) cycles))))
 	   (BRK)
 	   (draw-line-code)
 	   (label :end)

@@ -4,8 +4,7 @@
 ;; a watch variable function
 ;; a local variables dump, which basically sees which namespace we
 ;; are in and dumps all aliased zero-page variables
-
-;;TODO MAKE THE MONITOR HOOK FUNCTION RETURN A VALUE- IE STOP EXECUTION
+;;TODO Add a switch to disable the execution of the monitor hooks when we run
 ;;TODO ENSURE THE DBG HOOKS EXECUTE AFTER THE SINGLE STEP
 ;;TODO ENSURE THE HOOKS EXECUTE IN THE ORDER THEY APPEAR IN THE LISP
 ;;TODO LABEL BREAKPOINT DOESN'T SEEM TO WORK FOR NAMESPACES

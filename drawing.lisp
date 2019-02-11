@@ -1,27 +1,24 @@
-;; 8 bit accumulator Bresenham's algorithm with adjusted offset
-;; should be end-point accurate for small screens.
+;; 16 bit error accumulator line drawing
 
-;;TODO. Y overflows on certain values, we don't want to handle that every byte!
-;;0,0 319,174!!! 
+;; It is my opinion that an 8 bit error accumulator solution is possible
+;; that can be end-point accurate. It would be significantly faster-
+;; however for the use case where the gradients are pre-computed, it is
+;; hard to see why a faster but less accurate solution would be better.
+;; An additional bit would need to be supplied to correct the Y pos,
+;; this can probably be achieved by changing the start offset from .5 to .25
 
 (defun calculate-grad (maj1 min1 maj2 min2)
   (let ((dx (abs (- maj1 maj2)))
 	(dy (abs (- min1 min2))))
-  (assert (>= dx dy))
-  (assert (> dx 0))
-  (let* ((grad (min #xff (ceiling (* #x100 dy) dx))))
-    ;; we have the grad, but if we actually do Bresenham here
-    ;; then we will potentially land on the wrong pixel.
-    ;; Now, we know there is an algorithm to tell us how far
-    ;; off we are, and in the worst case it is to run the
-    ;; 6502 under test and actually see where it takes us!
-    ;; Rather than do that let us see if we can calculate it
-    (values grad
-	    (- dy (floor (+ #x80 (* dx grad)) 256))))))
+    (assert (>= dx dy))
+    (assert (> dx 0))
+    (max 0 (min #xffff (ceiling (- (* #x10000 dy) #x8000) dx)))))
 
-(assert (= #x00 (calculate-grad 0 0 100 0)))
-(assert (= #xff (calculate-grad 0 0 100 100)))
-(assert (= #x80 (calculate-grad 0 0 100 50)))
+;; Actual Y2 will be given by
+;; y2 = (floor (+ 32768 (* dx grad)) 65536)
+;; () <= (* y2 65536) <= (+ 32768 (* dx grad))
+;; (- (* y2 65536) 32768) <= (* dx grad)
+;; (/ (- (* y2 65536) 32768) dx) < grad
 
 (defun x1y1x2y2-xywgrad (x1 y1 x2 y2)
   "This function converts x1 y1 x2 y2 coordinates into
@@ -69,8 +66,11 @@ TODO Make work for y major"
   (with-namespace :draw-line-fast
     (alias :x :A0)
     (alias :y :A1)
+    (alias :grad-lo :D0)
+    (alias :grad-hi :D1)
+    (alias :error-lo :D2)
+    (alias :error-hi :D3)
     (alias :width :A2)
-    (alias :gradient "delta:0")
     (alias :ptr :A1)
     (mul40.zp :ptr)
     (adc16.zp (scradd 0 0) :ptr)
@@ -93,22 +93,10 @@ TODO Make work for y major"
     (LSR)
     (LSR)
     (TAY "Y now contains the x pixel byte offset")
-    (LDA.AB "delta:0")
-    (dc "Copy the delta into the immediate adds")
-    ;;this takes 32 cycles, saving 1 cycle per bit, so it only pays
-    ;;off for lines > 32 horizontal pixels.
-    (STA.AB "delta:1")
-    (STA.AB "delta:2")
-    (STA.AB "delta:3")
-    (STA.AB "delta:4")
-    (STA.AB "delta:5")
-    (STA.AB "delta:6")
-    (STA.AB "delta:7")
     (LDA.ABX :entry-points-hi)
     (PHA)
     (LDA.ABX :entry-points-lo)
     (PHA)
-    (label+1 :offset-adjust)
     (LDX #x80)
     (CLC)
     (dbg (setf *ycount* 0)
@@ -127,6 +115,9 @@ TODO Make work for y major"
     (label+1 "delta:0")
     (ADC 0)
     (TAX)
+    (LDA.ZP :grad-)
+    (ADC.ZP :error-lo
+    (label :no-overflow)
     (BCS :xy-step)
     (INY)
     (BNE :plot)
@@ -152,7 +143,7 @@ TODO Make work for y major"
 	 (with-local-namespace
 	   (TXA)
 	   (dbg-cc)
-	   (label+1 (format nil "delta:~a" bit) :draw-line-fast)
+	   (label+1 (format nil "delta:~a" bit) :draw-line)
 	   (ADC 0)
 	   (TAX)
 	   (BCC :plot)
@@ -165,7 +156,7 @@ TODO Make work for y major"
 	   (INC.ZP (hi-add :ptr))
 	   (CLC)
 	   (label :plot)
-	   (label (format nil "bit:~a" bit) :draw-line-fast)
+	   (label (format nil "bit:~a" bit) :draw-line)
 	   (dbg (incf *xcount*))
 	   (LDA (expt 2 (- 7 bit)))
 	   (ORA.IZY :ptr)
@@ -183,7 +174,7 @@ TODO Make work for y major"
     (dc "Now lets draw the straggly end bits")
     (RTS)))
 
-(defun draw-line-fast-test (&rest lines)
+(defun draw-line-test (&rest lines)
   "Lines in format (x1 y1 x2 y2)"
   (reset-compiler)
   (flet ((pass ()
@@ -203,12 +194,16 @@ TODO Make work for y major"
 	       (multiple-value-bind (x y w grad offset)
 		   (apply #'x1y1x2y2-xywgrad line)
 		 (dbg (setf cycles (monitor-cc)))
-		 (sta16.zp x '(:draw-line-fast . :x))
-		 (sta16.zp y '(:draw-line-fast . :y))
+		 (sta16.zp x '(:draw-line . :x))
+		 (sta16.zp y '(:draw-line . :y))
 		 (LDA grad)
-		 (STA.AB '(:draw-line-fast . :gradient))
-		 (sta16.zp w '(:draw-line-fast . :width))
-		 (JSR :draw-line-fast)
+		 (STA.AB '(:draw-line . :gradient))
+		 (LDA (if (= offset 0)
+			  #x80
+			  #x40))
+		 (STA.AB '(:draw-line . :offset-adjust))
+		 (sta16.zp w '(:draw-line . :width))
+		 (JSR :draw-line)
  		 
 		 (let ((x1 (first line))
 		       (y1 (second line))
@@ -223,7 +218,7 @@ TODO Make work for y major"
 			  (length lines)
 			  (- (monitor-cc) total-cycles))))
 	   (BRK)
-	   (draw-line-fast)
+	   (draw-line)
 	   (label :end)
 	   (BRK)
 	   
@@ -241,3 +236,5 @@ TODO Make work for y major"
   (monitor-run)  
   (update-vicky))
 
+(defun fill-top-r ()
+  (apply #'draw-line-test (mapcar #'(lambda (y2) (list 0 0 319 y2)) (loop for i from 0 to 199 collect i))))

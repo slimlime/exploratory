@@ -39,7 +39,8 @@
 		(char= c #\Newline)
 		(char= c #\ )))
 	     (next-word ()
-	       (let ((w (make-array 16 
+	       (let ((w (make-array 16
+				    :initial-element #\Space
 				    :element-type 'standard-char 
 				    :fill-pointer 0
 				    :adjustable t)))
@@ -56,6 +57,7 @@
 		      (incf i))
 		 (if (> (length w) 0) w nil))))
       (let ((js (make-array 16 :element-type 'standard-char
+			    :initial-element #\Space
 			    :fill-pointer 0
 			    :adjustable t))
 	    (w nil)

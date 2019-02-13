@@ -1,14 +1,17 @@
 (ql:quickload 'lispbuilder-sdl)
 
-(load "sharedmem.lisp")
 (load "vicky-shared.lisp")
-(load "vicky.lisp"))
 
 (defparameter *colours* (make-array 16))
 (defparameter *render-width* (* 2 +screen-width+))
 (defparameter *render-height* (* 2 +screen-height+))
 (defparameter *sx* 2)
 (defparameter *sy* 2)
+
+(defun getmem (addr)
+  (assert (>= addr 0))
+  (assert (< addr 65536))
+  (sb-sys:sap-ref-8 *buffer-sap* addr))
 
 (defun map-colour (surface-fp r g b)
   (sdl-cffi::sdl-map-rgb (sdl-base:pixel-format surface-fp)
@@ -23,7 +26,7 @@
 			   (logand #xff colour))))))
 
 (defun vicky ()
-  (map-memory)
+  (enable-vicky)
   (sdl:window *render-width* *render-height* :title-caption "VICKY")
   (sdl:with-init ()
     (let ((surface (sdl:create-surface *render-width*
@@ -70,5 +73,3 @@
 		       t)
 	  (:video-expose-event ()
 			       (sdl:update-display)))))))
-
-;(dolist (timer (list-all-timers)) (unschedule-timer timer))

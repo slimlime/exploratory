@@ -18,7 +18,6 @@
 (load "state.lisp")
 (load "huffman.lisp")
 (load "string.lisp")
-(load "sharedmem.lisp")
 (load "chars.lisp")
 (load "vicky-shared.lisp")
 (load "justify.lisp")

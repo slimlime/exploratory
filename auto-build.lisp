@@ -1,16 +1,30 @@
 #!/usr/bin/sbcl --script
 ;;;
-;;; auto build monitor
+;;; background builder
 ;;;
 ;;; uses inotifywait
 ;;;
 ;;; and git check-ignore
 ;;;
+;;; builds by creating an SBCL executable with the shared libraries already pre-loaded
+;;;
 ;;; TODO if project.lisp is modified then delete build/project-builder
 ;;; TODO remove vicky hack below
 ;;; TODO clean shutdown
 ;;; TODO pass standard output to thread
-;;; TODO add index.lock to additional ignores
+
+(defparameter *preload-file* "preload.lisp")
+(defparameter *project-file* "project.lisp")
+(defparameter *success-file* "build/success")
+(defparameter *project-builder* "build/build")
+(defparameter *project-builder-script* "build/build-script.lisp")
+(defparameter *version* 1)
+(defparameter *built-version* 0)
+(defparameter *inotifywait-handle* nil)
+(defparameter *build-thread* nil)
+(defparameter *build-interval* 10)
+(defparameter *ignore-files* ;;in addition to the gitignore files
+  '("index.lock" "index"))
 
 (setf *debugger-hook* #'(lambda (c h)
 			  (declare (ignore h))
@@ -38,17 +52,6 @@
 
 (load "../quicklisp/setup.lisp")
 
-(defparameter *preload-file* "preload.lisp")
-(defparameter *project-file* "project.lisp")
-(defparameter *success-file* "build.success")
-(defparameter *project-builder* "build/build")
-(defparameter *project-builder-script* "build/build-script.lisp")
-(defparameter *version* 1)
-(defparameter *built-version* 0)
-(defparameter *inotifywait-handle* nil)
-(defparameter *build-thread* nil)
-(defparameter *build-interval* 10)
-
 (ensure-directories-exist "build")
 
 (ql:quickload "external-program")
@@ -70,8 +73,8 @@
 			 :direction :output
 			 :if-exists :supersede
 			 :if-does-not-exist :create)
-	(write-line (now) f)
-      (ignore-errors (delete-file *success-file*)))))
+	(write-line (now) f))
+      (ignore-errors (delete-file *success-file*))))
 
 (defparameter *project-script*
   `(progn
@@ -86,8 +89,6 @@
      
      (defun run-project-builder ()
        (let ((err nil))
-	 ;;HACK- need vicky headless mode
-	 (defvar *vicky-instance* "build")
 	 (handler-case (load ,*project-file*)
 	   (error (e) (setf err e)))
 	 (when err (log-line (format nil "Build error: ~a~%" err)))
@@ -131,6 +132,9 @@
     code))
 
 (defun ignore-file (file)
+  (when (find file *ignore-files* :test 'equal)
+    (return-from ignore-file t))
+  
   (let ((handle (external-program:start "/usr/bin/git" (list "check-ignore" file) :output :stream)))
     (loop for line = (read-line (external-program:process-output-stream handle) nil nil)
        while line
@@ -156,9 +160,10 @@
 					(when (/= version *built-version*)
 					  (log-line (format nil "Building mod ~a..." version))
 					  (let ((result (build)))
-					    (if (= 0 result)
-						(log-line (format nil "Build mod ~a succeeded." version))
-						(log-line (format nil "Build mod ~a failed, exit code ~a" version result)))))
+					    (log-line (if (= 0 result)
+							  (format nil "Build mod ~a succeeded." version)
+							  (format nil "Build mod ~a failed, exit code ~a" version result)))
+					    (set-build-status (= 0 result))))
 					(setf *built-version* version))
 				      (sleep *build-interval*)
 				      (go :go)))))
@@ -181,6 +186,5 @@
       (sb-thread:terminate-thread *build-thread*)
       (ignore-errors (sb-thread:join-thread *build-thread* :timeout 5)))
     (exit :code 0 :abort t)))
-
 
 

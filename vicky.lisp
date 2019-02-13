@@ -1,3 +1,9 @@
+(ql:quickload 'lispbuilder-sdl)
+
+(load "sharedmem.lisp")
+(load "vicky-shared.lisp")
+(load "vicky.lisp"))
+
 (defparameter *colours* (make-array 16))
 (defparameter *render-width* (* 2 +screen-width+))
 (defparameter *render-height* (* 2 +screen-height+))

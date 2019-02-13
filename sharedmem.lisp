@@ -1,8 +1,10 @@
-;; map the entire memory space
+;; map the entire memory space for VICKY
+;; todo make a headless mode
 
 (defparameter *buffer-fd* nil)
 (defparameter *buffer-sap* nil)
 (defparameter *buffer-length* #x10000)
+(defvar *vicky-instance* "6502-instance-0")
 
 (defun setmem (addr byte)
   (assert (>= addr 0))
@@ -24,9 +26,12 @@
 
 (defun map-memory ()
   (unmap-memory)
-  (setf *buffer-fd* (open "/dev/shm/6502-instance-0" :direction :io :element-type '(unsigned-byte 8)
-				 :if-exists :overwrite
-				 :if-does-not-exist :create))
+  (setf *buffer-fd* (open (concatenate 'string
+				       "/dev/shm/"
+				       *vicky-instance*)
+			  :direction :io :element-type '(unsigned-byte 8)
+			  :if-exists :overwrite
+			  :if-does-not-exist :create))
   (file-position *buffer-fd* *buffer-length*)
   (write-byte 0 *buffer-fd*)
   (file-position *buffer-fd* 0)

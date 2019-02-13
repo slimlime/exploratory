@@ -52,7 +52,7 @@
     (LSR)
     (LSR)
     (LSR)
-    (dc "Now we have a page offset to the dictionary, 1 based")
+    (dc "Now we have a page offset to the dictionary, 1 based.")
     (CLC)
     (ADC (1- (hi :dictionary)))
     (STA.AB (hi-add (1+ (resolve :word-ptr))))

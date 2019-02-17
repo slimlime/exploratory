@@ -8,6 +8,18 @@
 ;; Test-game stuff also in here
 
 (defparameter *be-more-specific* "You'll have to be more specific...")
+(defparameter *unknown-word* "I don't know that word.")
+(defparameter *do-not-have* "You don't have that.")
+(defparameter *cant-do-that* "You can't do that to it!")
+(defparameter *already-have* "You already have that.")
+(defparameter *cant-take-that* "You can't take that.")
+(defparameter *you-took-it* "You took it!")
+(defparameter *you-dropped-it* "You dropped it!")
+(defparameter *dont-see-that* "I don't see that.")
+(defparameter *you-take-a-look* "You take a look around and see...")
+(defparameter *you-have* "You have...")
+(defparameter *nothing* "Nothing.")
+(defparameter *it-is-nothing* "Nothing.")
   
 (defun generic-generic-handlers ()
 
@@ -21,7 +33,7 @@
 	(dc "What is IT?")
 	(LDY.AB '(:object-table . :it))
 	(BNE :something)
-	(respond-raw "Nothing.")
+	(respond-raw *it-is-nothing*)
 	(RTS)
 	(label :something)
 	(dc "Now print the object name")
@@ -31,7 +43,7 @@
     
     (custom-action '(LOOK)
       (with-namespace :look
-	(respond-raw "You take a look around and see...")
+	(respond-raw *you-take-a-look*)
 	(LDA *object-show*)
 	(dc "Do NOT show objects that do not want to be listed")
 	(STA.AB '(:inventory . :object-property-mask))
@@ -40,7 +52,7 @@
 
     (custom-action '(INVENTORY)
       (with-namespace :inventory
-	(respond-raw "You have...")
+	(respond-raw *you-have*)
 	(LDA 255)
 	(dc "For inventory, show everything")
 	(STA.AB :object-property-mask)
@@ -80,7 +92,7 @@
 	(BNE :next-object)
 	(LDX.AB :object-count)
 	(BNE :not-empty)
-	(respond-raw "Nothing.")
+	(respond-raw *nothing*)
 	(label :not-empty)
 	(CPX 1)
 	(BEQ :unique)
@@ -99,18 +111,18 @@
       (LDA 1)
       (CMP.ABY (1- (resolve '(:object-table . :places))))
       (BNE :can-take-it?)
-      (respond-raw "You already have that.")
+      (respond-raw *already-have*)
       (RTS)
       (label :can-take-it?)
       (LDA *object-take*)
       (AND.ABY (1- (resolve '(:object-table . :properties))))
       (BNE :take-it)
-      (respond-raw "You can't take that.")
+      (respond-raw *cant-take-that*)
       (RTS)
       (label :take-it)
       (dc "Set the place to inventory")
       (STA.ABY (1- (resolve '(:object-table . :places))))
-      (respond-raw "You took it!")
+      (respond-raw *you-took-it*)
       (RTS))
 
     (with-namespace :drop
@@ -123,10 +135,10 @@
       (dc "Now set its place to the current place")
       (LDA.ZP :current-place)
       (STA.ABY (1- (resolve '(:object-table . :places))))
-      (respond-raw "You dropped it!")
+      (respond-raw *you-dropped-it*)
       (RTS)
       (label :do-not-have)
-      (respond-raw "You don't have that.")
+      (respond-raw *do-not-have*)
       (RTS))
 
     (with-namespace :examine
@@ -159,7 +171,7 @@
 	(BLT :not-verb-object)	
 	(LDA.AB '(:parser . :words))
 	(BNE :valid-ish-verb)
-	(respond-raw "I don't know that word.")
+	(respond-raw *unknown-word*)
 	(label :not-verb-object)
 	(RTS)
 	(label :valid-ish-verb)
@@ -200,7 +212,7 @@
 	(STA.ZP (hi-add :vtable))
 	(BNE :scan-vtable)
 	(label :definitely-nope)
-	(respond-raw "You can't do that to it!")
+	(respond-raw *cant-do-that*)
 	(RTS)
 	(label :duplicate-found)
 	(respond-raw *be-more-specific*)
@@ -221,7 +233,7 @@
 	(label :vm-handler)
 	(JMP :vm-go "Execute VM code and return to grandparent")
 	(label :not-found)
-	(respond-raw "I don't see that.")
+	(respond-raw *dont-see-that*)
 	(RTS)))))
 
 (defun test-render-input ()

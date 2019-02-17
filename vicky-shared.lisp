@@ -35,7 +35,7 @@
 (defun setmem (addr byte)
   (assert (>= addr 0))
   (assert (< addr 65536))
-  (unless *buffer-sap*
+  (when *buffer-sap*
     (setf (sb-sys:sap-ref-8 *buffer-sap* addr) byte)))
 
 (defun unenable-vicky ()

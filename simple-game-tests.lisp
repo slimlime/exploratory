@@ -2,7 +2,7 @@
 ;;;TESTING;;;
 ;;;;;;;;;;;;;
 
-(defparameter *warn-only* nil)
+(defvar *tests-warn-only* t)
 
 (defmacro test (description &body body)
   `(progn
@@ -13,16 +13,61 @@
 	   ,@body)
        (error (e)
 	 (let ((msg (format nil "~a FAILED~%~t'~a'" ,description e)))
-	   (if *warn-only*
+	   (if *tests-warn-only*
 	       (format t "~a~%" msg)
 	       (assert nil nil msg)))))))
+
+(defmacro test-pending (description &body body)
+  "For tests that don't yet pass but we want to keep them anyway"
+  `(let ((*tests-warn-only* t))
+    (test ,description ,@body)))
 
 ;; this compiles the game, each time a test is run it resets the monitor
 ;; to the original state so each test is independent.
 
 (run-simple-game :print nil)
 
-(test "After an inventoy with one item, does EXAMINE IT show correct message"
+(test "Unknown word gives error"
+  (test-input "FLIBBLE WIBBLE")
+  (assert-msg *unknown-word*))
+
+(test-pending "Unknown word gives error"
+  (test-input "RUN")
+  (assert-msg *unknown-word*))
+
+(test "Drop object we don't have"
+  (test-input "DROP BONE")
+  (assert-msg *do-not-have*))
+
+(test "Do something weird to an object"
+  (test-input "TAKE BONE" "KILL IT")
+  (assert-msg *cant-do-that*))
+
+(test "Do something weird to an object, with an override"
+  (test-input "TAKE BONE" "EAT IT")
+  (assert-msg *thegodslookaway*))
+
+(test "Take object you already have"
+  (test-input "TAKE BONE" "TAKE BONE")
+  (assert-msg *already-have*))
+
+(test "Take a fixture"
+  (test-input "TAKE SLIME")
+  (assert-msg *cant-take-that*))
+
+(test "Take message works"
+  (test-input "TAKE BONE")
+  (assert-msg *you-took-it*))
+
+(test "Dropped it message"
+  (test-input "TAKE BONE" "DROP IT")
+  (assert-msg *you-dropped-it*))
+
+(test "I don't see that message"
+  (test-input "TAKE BALL")
+  (assert-msg *dont-see-that*))
+
+(test "After an inventory with one item, does EXAMINE IT show correct message"
       (test-input "TAKE FINGER BONE" "I" "EXAMINE IT")
       (assert-object-in "FINGER BONE" :inventory)
       (assert-msg "The long, slender digit of a long since

@@ -41,4 +41,3 @@
 ;; tests
 
 (load "simple-game-tests.lisp")
-

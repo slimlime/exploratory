@@ -10,4 +10,8 @@
   (ql:quickload 'cl-6502)
   (ql:quickload 'lispbuilder-sdl))
 
+;;; now variables which we want set during the build
+
+(defvar *tests-warn-only* nil)
+
 (setf *preloaded* t)

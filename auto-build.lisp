@@ -12,6 +12,8 @@
 ;;; TODO remove vicky hack below
 ;;; TODO clean shutdown
 ;;; TODO pass standard output to thread
+;;; TODO shenanighans with git temporary files- they should be ignored
+;;; by the inotifywait exclude
 
 (defparameter *preload-file* "preload.lisp")
 (defparameter *project-file* "project.lisp")
@@ -55,7 +57,6 @@
 (ensure-directories-exist "build")
 
 (ql:quickload "external-program")
-(ql:quickload "trivial-signal")
 
 ;; On start-up, delete the project builder so we can go afresh
 

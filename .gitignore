@@ -21,3 +21,4 @@
 *.wx32fsl
 build/
 images/
+.git/

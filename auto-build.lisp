@@ -8,12 +8,6 @@
 ;;;
 ;;; builds by creating an SBCL executable with the shared libraries already pre-loaded
 ;;;
-;;; TODO if project.lisp is modified then delete build/project-builder
-;;; TODO remove vicky hack below
-;;; TODO clean shutdown
-;;; TODO pass standard output to thread
-;;; TODO shenanighans with git temporary files- they should be ignored
-;;; by the inotifywait exclude.
 
 (defparameter *preload-file* "preload.lisp")
 (defparameter *project-file* "project.lisp")
@@ -25,8 +19,6 @@
 (defparameter *inotifywait-handle* nil)
 (defparameter *build-thread* nil)
 (defparameter *build-interval* 10)
-(defparameter *ignore-files* ;;in addition to the gitignore files
-  '("index.lock" "index"))
 
 (setf *debugger-hook* #'(lambda (c h)
 			  (declare (ignore h))
@@ -133,20 +125,18 @@
     code))
 
 (defun ignore-file (file)
-  (when (find file *ignore-files* :test 'equal)
-    (return-from ignore-file t))
-  
   (let ((handle (external-program:start "/usr/bin/git" (list "check-ignore" file) :output :stream)))
     (loop for line = (read-line (external-program:process-output-stream handle) nil nil)
        while line
        do
+	 ;;(format t "git says ignore ~a ~%" file)
 	 (return-from ignore-file t)))
   nil)
 
 (log-line "Watching directory...")
 
 (setf *inotifywait-handle* (external-program:start "/usr/bin/inotifywait"
-						   (list "-mrq" "--format" "%f" "--exclude"
+						   (list "-mrq" "--format" "%w%f" "--exclude"
 							 "^.\/build\/" "-e" "close_write,move,delete" ".")
 						   :output :stream))
 
@@ -173,6 +163,7 @@
     (loop for filename = (read-line (external-program:process-output-stream *inotifywait-handle*) nil nil)
        while filename
        do
+	 ;;(log-line (format nil "DEBUG ~a changed~%" filename))
 	 (unless (handle-special-file filename)
 	   (unless (ignore-file filename)
 	     (incf *version*)
@@ -187,5 +178,3 @@
       (sb-thread:terminate-thread *build-thread*)
       (ignore-errors (sb-thread:join-thread *build-thread* :timeout 5)))
     (exit :code 0 :abort t)))
-
-

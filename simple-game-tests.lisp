@@ -4,29 +4,37 @@
 
 (defvar *tests-warn-only* t)
 
-(defmacro test (description &body body)
-  `(progn
-     (monitor-reset :start)
-     (monitor-run :break-on 'BRK :print nil)
-     (handler-case
-	 (progn
-	   ,@body)
-       (error (e)
-	 (let ((msg (format nil "~a FAILED~%~t'~a'" ,description e)))
-	   (if *tests-warn-only*
-	       (format t "~a~%" msg)
-	       (assert nil nil msg)))))))
+(defun test-fn (description body-fn deferred)
+  ;;deferred tests will show a warning, unless
+  ;;they pass, in which case they will assert :-)
+  ;;non-deferred tests will assert, unless *tests-warn-only*
+  ;;is set to true.
+  (monitor-reset :start)
+  (monitor-run :break-on 'BRK :print nil)
+  (let ((result t))
+    (handler-case
+	(funcall body-fn)
+      (error (e)
+	(progn
+	  (setf result nil)
+	  (let ((msg (format nil "~a FAILED~%~t'~a'" description e)))
+	    (if (or *tests-warn-only* deferred)
+		(format t "~a~%" msg)
+		(error "~S" msg))))))
+    (when (and result deferred)
+      (error "The deferred test '~S' actually passed. Undefer it." description)))
+  (values))
 
-(defmacro test-pending (description &body body)
-  "For tests that don't yet pass but we want to keep them anyway"
-  `(let ((*tests-warn-only* t))
-    (test ,description ,@body)))
+(defmacro test (description &body body)
+  `(test-fn ,description #'(lambda () ,@body) nil))
+
+(defmacro deferred-test (description &body body)
+  `(test-fn ,description #'(lambda () ,@body) t))
 
 ;; this compiles the game, each time a test is run it resets the monitor
 ;; to the original state so each test is independent.
 
 (run-simple-game :print nil)
-
 
 (test "Unknow three word gives error"
   (test-input "BAA BAB BDE")

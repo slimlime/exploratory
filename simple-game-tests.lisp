@@ -27,13 +27,18 @@
 
 (run-simple-game :print nil)
 
-(test "Unknown word gives error"
+
+(test "Unknow three word gives error"
+  (test-input "BAA BAB BDE")
+  (assert-msg *unknown-word*))
+
+(test "Unknown two word gives error"
   (test-input "FLIBBLE WIBBLE")
   (assert-msg *unknown-word*))
 
-(test-pending "Unknown word gives error"
+(test "Unknown single word gives error"
   (test-input "RUN")
-  (assert-msg *unknown-word*))
+  (assert-msg *dont-understand*))
 
 (test "Drop object we don't have"
   (test-input "DROP BONE")
@@ -66,6 +71,10 @@
 (test "I don't see that message"
   (test-input "TAKE BALL")
   (assert-msg *dont-see-that*))
+
+(test "I don't see that with override"
+  (test-input "TAKE KEY")
+  (assert-msg *whatyoutalkingabout*))
 
 (test "After an inventory with one item, does EXAMINE IT show correct message"
       (test-input "TAKE FINGER BONE" "I" "EXAMINE IT")

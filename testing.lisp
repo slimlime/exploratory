@@ -9,9 +9,10 @@
 	  "Was not in location ~a" location))
 
 (defun assert-msg (message)
-  "Assert that the last message was as the parameter"
-  (assert (equal message (first *print-transcript*))
-	  nil "Expected '~a' but was '~a'" message (first *print-transcript*)))
+  "Assert that the last message was as the parameter."
+  (let ((message (justify-response message nil)))
+    (assert (equal message (first *print-transcript*))
+	    nil "Expected '~a' but was '~a'" message (first *print-transcript*))))
 
 (defun assert-set (&rest bits)
   (assert-bits bits t))

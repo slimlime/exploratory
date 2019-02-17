@@ -7,6 +7,8 @@
 
 ;; Test-game stuff also in here
 
+;; TODO Better error reporting could be done.
+
 (defparameter *be-more-specific* "You'll have to be more specific...")
 (defparameter *unknown-word* "I don't know that word.")
 (defparameter *do-not-have* "You don't have that.")
@@ -20,6 +22,7 @@
 (defparameter *you-have* "You have...")
 (defparameter *nothing* "Nothing.")
 (defparameter *it-is-nothing* "Nothing.")
+(defparameter *dont-understand* "I don't understand.")
   
 (defun generic-generic-handlers ()
 
@@ -172,7 +175,9 @@
 	(LDA.AB '(:parser . :words))
 	(BNE :valid-ish-verb)
 	(respond-raw *unknown-word*)
+	(RTS)
 	(label :not-verb-object)
+	(respond-raw *dont-understand*)
 	(RTS)
 	(label :valid-ish-verb)
 	(JSR :parse-objects)

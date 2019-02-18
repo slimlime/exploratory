@@ -7,17 +7,6 @@
 
 (defparameter *donothave* "You don't have that.")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun translate-this (object-name)
-    (if (eq 'this object-name)
-	'*current-object*
-	object-name))
-
-  (defun translate-here (place)
-    (if (eq 'here place)
-	'*current-location*
-	place)))
-
 (defun defbits (initially-set &rest bits)
   (dolist (bit bits)
     (defbit bit :initially-set initially-set)))
@@ -32,22 +21,18 @@
   (defbit bit)
   (vm-clr bit))
 
-(defun move-object-fn (object place)
+(defun move-object (object place)
   "Set the place of the object to be a new place"
   (defplace place)
   (vm-mov object place))
-
-(defmacro move-object (object place)
-  `(move-object-fn ,(translate-this object)
-		   ,(translate-here place)))
 
 (defun set-act (font colour)
   (setf *act-font* font)
   (setf *act-colour* colour))
 
 (defmacro with-location (location &body body)
-  `(let ((*current-location* ,location))
-     (with-namespace *current-location*
+  `(let ((here ,location))
+     (with-namespace here
        ,@body)))
 
 (defmacro location (name title img-file text &body body)
@@ -119,19 +104,19 @@
       (label :end-if))))
 
 (defmacro if-object (object then &optional (else nil else-supplied-p))
-  `(if-object-fn ,(translate-this object)
-	       #'(lambda () ,then)
-	       (if ,else-supplied-p #'(lambda () ,else) nil)))
+  `(if-object-fn ,object
+		 #'(lambda () ,then)
+		 (if ,else-supplied-p #'(lambda () ,else) nil)))
 
 (defmacro when-object (object &body then)
   `(if-object-fn ,object
-	       #'(lambda () ,then)
-	       nil))
+		 #'(lambda () ,then)
+		 nil))
 
 (defmacro if-bit (bit then &optional (else nil else-supplied-p))
   `(if-bit-fn ,bit
-	     #'(lambda () ,then)
-	     (if ,else-supplied-p #'(lambda () ,else) nil)))
+	      #'(lambda () ,then)
+	      (if ,else-supplied-p #'(lambda () ,else) nil)))
 
 (defmacro when-bit (bit &body then)
   `(if-bit-fn ,bit
@@ -149,27 +134,27 @@
 	     #'(lambda () ,then)))
 
 (defmacro if-has (object-name then &optional (else nil else-supplied-p))
-  `(if-in-place-fn ,(translate-this object-name) :inventory
+  `(if-in-place-fn ,object-name :inventory
 		   #'(lambda () ,then)
 		   (if ,else-supplied-p #'(lambda () ,else) nil)))
 
 (defmacro when-has (object-name &body body)
-  `(if-in-place-fn ,(translate-this object-name) :inventory
+  `(if-in-place-fn ,object-name :inventory
 		   #'(lambda () ,@body)
 		   nil))
 
 (defmacro if-in-place (object-name place then &optional (else nil else-supplied-p))
-  `(if-in-place-fn ,(translate-this object-name) ,(translate-here place)
+  `(if-in-place-fn ,object-name ,place
 		   #'(lambda () ,then)
 		   (if ,else-supplied-p #'(lambda () ,else) nil)))
 
 (defmacro when-in-place (object-name place &body then)
-  `(if-in-place-fn ,(translate-this object-name) ,(translate-here place)
+  `(if-in-place-fn ,object-name ,place
 		   #'(lambda () ,@then)
 		   nil))
 
 (defmacro if-not-in-place (object-name place then &optional (else nil else-supplied-p))
-  `(if-in-place-fn ,(translate-this object-name) ,(translate-here place)
+  `(if-in-place-fn ,object-name ,place
 		   (if ,else-supplied-p #'(lambda () ,else) nil)
 		   #'(lambda () ,then)))
 
@@ -232,9 +217,9 @@
     (dc (format nil "ON ~{~a ~}" sentence))
     (let ((label (words2label sentence)))
       (defsentence sentence
-	  (cons *current-location* label)
-	*current-location*)
-      (label label *current-location*)))
+	  (cons here label)
+	here)
+      (label label here)))
   (unless vm
     (vm-exe))
   (funcall fn)
@@ -276,11 +261,11 @@
 
 (defmacro verb (verb-or-verbs &body body)
   "An action for a verb associated with this object"
-  `(verb-fn t *current-object* ,verb-or-verbs #'(lambda () ,@body)))
+  `(verb-fn t this ,verb-or-verbs #'(lambda () ,@body)))
 
-(defmacro it (object)
+(defun set-it (object)
   "Set the it object, for instance if it was mentioned explicitly."
-  `(vm-it ,(translate-this object)))
+  `(vm-it ,object))
 
 (defun goto (label)
   (vm-jmp label))

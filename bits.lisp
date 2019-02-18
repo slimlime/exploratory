@@ -12,16 +12,16 @@
 
 (defun bit-modified (bit)
   (unless (consp bit)
-    (setf bit (cons *current-location* bit)))
+    (setf bit (cons here bit)))
   (setf (gethash bit *bits-modified*) t))
 
 (defun bit-read (bit)
   (unless (consp bit)
-    (setf bit (cons *current-location* bit)))
+    (setf bit (cons here bit)))
   (setf (gethash bit *bits-read*) t))
 
 (defun defbit (bit &key (initially-set :not-specified initially-set-supplied-p)
-		     (namespace *current-location*))
+		     (namespace here))
   (let* ((key (cons namespace bit))
 	 (previous-state (gethash key *bits*)))
     ;; It's ok to do defbit multiple times, but we
@@ -74,7 +74,7 @@ bits will only match at the location they are defined."
 
 (defun bit-index (bit)
   (unless (consp bit)
-    (setf bit (cons *current-location* bit)))
+    (setf bit (cons here bit)))
   (aif (gethash bit *bit->index*)
        it
        (progn

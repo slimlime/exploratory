@@ -23,6 +23,7 @@
 (defparameter *nothing* "Nothing.")
 (defparameter *it-is-nothing* "Nothing.")
 (defparameter *dont-understand* "I don't understand.")
+(defparameter *cant-go-that-way* "You can't go that way.")
   
 (defun generic-generic-handlers ()
 
@@ -165,6 +166,9 @@
 	(entry 'TAKE :take)
 	(entry 'DROP :drop)))
 
+    (when (> (hash-table-count *exit-words*) 0)
+      (apply #'db :exit-words (mapcar #'word-id (hash-keys *exit-words*))))
+    
     (custom-action '(? ? ? ?)
       (with-namespace :verb-handler
 	(alias :vtable :A0)
@@ -176,7 +180,21 @@
 	(BNE :valid-ish-verb)
 	(respond-raw *unknown-word*)
 	(RTS)
+	(label :unknown-exit)
+	(respond-raw *cant-go-that-way*)
+	(RTS)
 	(label :not-verb-object)
+	(CMP 1)
+	(BNE :dont-understand)
+	(dc "Is this an 'exit' word?")
+	(LDA.AB '(:parser . :words))
+	(LDY (hash-table-count *exit-words*))
+	(label :check-for-exit-word)
+	(CMP.ABY (1+ (resolve :exit-words)))
+	(BEQ :unknown-exit)
+	(DEY)
+	(BNE :check-for-exit-word)
+	(label :dont-understand)
 	(respond-raw *dont-understand*)
 	(RTS)
 	(label :valid-ish-verb)

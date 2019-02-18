@@ -36,6 +36,18 @@
 
 (run-simple-game :print nil)
 
+(test "Unknown exit message"
+  (test-input "N")
+  (assert-msg *cant-go-that-way*))
+
+(test "Unknown exit synonym message"
+  (test-input "NORTH")
+  (assert-msg *cant-go-that-way*))
+
+(test "Known, but blocked exit"
+  (test-input "OUT")
+  (assert-msg *snickering*))
+
 (test "Unknow three word gives error"
   (test-input "BAA BAB BDE")
   (assert-msg *unknown-word*))

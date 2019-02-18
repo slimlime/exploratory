@@ -209,6 +209,8 @@ is replaced with replacement."
       (values best-total best-compressed dict))))
 
 (defun create-dictionary (max-entries strings min max dictionary)
+  "Create the game word compression dictionary- don't forget don't paste nuls into
+the source as it breaks them for grep and git"
   (let ((last-size 1000000))
     (dotimes (_ 10000000)
       (multiple-value-bind (total size dict)
@@ -287,11 +289,10 @@ is replaced with replacement."
 		(let ((code (char-code c)))
 		  (if (> code 255) ;this is a word not a letter
 		      ;;we push 1- the word address as we use a decrementing Y index
-		      
 		      (let* ((word (aref dictionary (- code 256)))
 			     (w (1- (resolve (cons :word (fmt-str word))))))
 			(push (lo w) lo)
-			(assert (>= (length word) 2))
+			(assert (>= (length word) 2) nil "Words should be 2 or more characters '~a'" word)
 			;;hi address is a 1 based offset << 3 | (length - 2)
 			(push (logior (ash (1+ (- (hi w) (hi :dictionary))) 3)
 				      (- (length word) 2)) 

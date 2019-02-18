@@ -13,12 +13,13 @@
 ;; TODO The lower level parser should probably not return any index
 ;; if the there is a duplicate
 
-(defparameter *current-location* nil)
+(defparameter here nil "The current location")
+(defparameter this nil "The current object")
+
 (defparameter *object-name->data* nil)
 (defparameter *object-name->index* nil)
 (defparameter *place->id* nil)
 (defparameter *next-place-id* nil)
-(defparameter *current-object* nil)
 (defparameter *object->vtable* nil)
 
 ;;object property bitmasks
@@ -118,7 +119,7 @@
     (setf names (list names)))  
   (let ((name (first names)))
     (when (null initial-place)
-      (setf initial-place *current-location*))
+      (setf initial-place here))
     ;;firstly ensure the place exists
     (defplace initial-place)
     ;;define the object
@@ -144,7 +145,7 @@
   (if (listp s) (first s) s))
 
 (defmacro with-object (object &body body)
-  `(let ((*current-object* (first-or-it ,object)))
+  `(let ((this ,object))
      ,@body))
 
 (defmacro object (names (&key description place name-override (take t) (show t)) &body body)
@@ -153,7 +154,7 @@ standard object display name e.g. 'A golden apple.' Names can be a list of names
 all of which will refer to the same object."
   (let ((names-sym (gensym)))
     `(let ((,names-sym ,names))
-       (with-object ,names-sym
+       (with-object (first-or-it ,names-sym)
 	 (defobject-fn ,names-sym
 	     :description ,description
 	     :initial-place ,place

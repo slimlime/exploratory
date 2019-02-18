@@ -22,6 +22,12 @@
       (push v values))
     values))
 
+(defun hash-keys (table)
+  (let ((keys nil))
+    (do-hash-keys (k table)
+      (push k keys))
+    keys))
+
 (defmacro not-nil (value)
   `(aif ,value
 	it

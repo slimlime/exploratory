@@ -35,15 +35,9 @@
 
 (defparameter *exit-words* (make-hash-table :test 'equal))
 
-(defun defexit-word (word &rest synonyms)
-  "Define a word as being an exit word so that we can
-show a decent message if you can't got that way."
-  (let ((words (append (list word) synonyms)))
-    (apply #'defword words)
-    (setf (gethash word *exit-words*) t)))
-
 (defun synonyms ()
   (defexit-word :EXIT :OUT :GO)
+  (defexit-word :N :NORTH)
   (defword :TAKE :GET :PICK :GRAB)
   (defword :LICK :EAT :TASTE)
   (defword :SLIME :OOZE)
@@ -286,8 +280,8 @@ preventing closed-minded mortals from seeing what is really there."))))
   
   (with-location :corridor
 
-    (object "RED BALL" (:description "An unimportant red ball."))
-    (object "GREEN BALL" (:description "An unimportant green ball."))
+    (object "RED BALL" (:description "Just an unimportant red ball."))
+    (object "GREEN BALL" (:description "Just an unimportant green ball."))
     
     (object "IMAGINARY BISCUIT"
 	(:description "A biscuit that exists only in your head."
@@ -295,17 +289,28 @@ preventing closed-minded mortals from seeing what is really there."))))
       (verb 'EAT
 	(respond "Mmmm! Satisfying.")
 	(move-object this :nowhere)))
-    
-    (action '((EXAMINE TORCHES) (EXAMINE TORCH))
-      (progn
-	(setbit :torches-examined)
-	(respond "The flickering shadows make you think of something profound, like a packet of Cheezows caught in the wind.")))
-    
-    (action '(TAKE TORCH)
-      (progn
-	(setbit :torch-carried)
-	(respond "You take one of the torches.")))
-    
+
+    (fixture "FLICKERING TORCHES" (:description "A row of flickering torches.")
+      (verb 'EXAMINE
+	(if-bit :torches-examined
+		(delegate-action)
+		(progn
+		  (setbit :torches-examined)
+		  (respond "The flickering shadows make you think of something profound, like a packet of Cheezows caught in the wind."))))
+      (verb 'TAKE
+	(respond "Don't be greedy.")))
+ 
+    ;; this is for an object which is hidden from look initially, but we can just
+    ;; take it as its presence is implied by the row of torches.
+
+    (object "FEEBLE TORCH" (:description "The torch gives out a feeble light." :place :nowhere)
+      (action '(TAKE TORCH)
+	(if-in-place this :nowhere
+	  (progn
+	    (respond "You take one of the torches from the wall.")
+	    (move-object this :inventory))
+	  (delegate-action))))
+
     (action '((CHEEZOWS) (PACKET))
       (if-bit :torches-examined
 	      (respond "There are no Cheezows! It was a metaphor for your situation.")

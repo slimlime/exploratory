@@ -43,6 +43,13 @@
   (mapc #'zp-w *aregs*)
   (mapc #'zp-b *dregs*))
 
+(defun hilo-table (label-hi label-lo words)
+  "Builds a split hi/lo table."
+  (let ((hi (mapcar #'hi words))
+	(lo (mapcar #'lo words)))
+    (apply #'db label-hi hi)
+    (apply #'db label-lo lo)))
+
 (defun inc16.zp (label)
   "Increment a zero-page word"
   (with-local-namespace

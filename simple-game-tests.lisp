@@ -32,7 +32,7 @@
   `(test-fn ,description #'(lambda () ,@body) t))
 
 ;; this compiles the game, each time a test is run it resets the monitor
-;; to the original state so each test is independent.
+;; by copying the compile buffer into the monitor buffer so each test is independent.
 
 (run-simple-game :print nil)
 
@@ -44,7 +44,7 @@
   (test-input "NORTH")
   (assert-msg *cant-go-that-way*))
 
-(test "Known, but blocked exit"
+(test "Known exit, override message"
   (test-input "OUT")
   (assert-msg *snickering*))
 
@@ -279,8 +279,17 @@ Human? YOU decide."))
       (test-input "BANG DOOR" "EAT SLOP")
       (assert-object-in "INEDIBLE SLOP" :nowhere))
 
+(defparameter *corridor-state* nil)
+
 (test "Can escape"
-      (test-input "LICK SLIME" "EXAMINE FLOOR" "EXAMINE CRACK"
-		  "TAKE KEY" "TAKE FINGER BONE" "POKE BONE IN LOCK"
-		  "KNOCK DOOR" "UNLOCK DOOR" "OPEN DOOR" "USE DOOR")
-      (assert-location :corridor))
+  (test-input "LICK SLIME" "EXAMINE FLOOR" "EXAMINE CRACK"
+	      "TAKE KEY" "TAKE FINGER BONE" "POKE BONE IN LOCK"
+	      "KNOCK DOOR" "UNLOCK DOOR" "OPEN DOOR" "USE DOOR")
+  (assert-location :corridor)
+  (setf *corridor-state* (dump-state-base64)))
+
+(test "Test restoring state"
+  (restore-game *corridor-state* :print nil)
+  (assert-object-in "SHINY KEY" :inventory)
+ 
+  (assert-location :corridor))

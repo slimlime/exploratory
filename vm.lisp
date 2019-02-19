@@ -17,6 +17,7 @@
 ;;;      point, but it might make sense
 
 ;;; TODO Move the string comments for the vmops to the emitter function documentation
+;;; TODO remove the bit table from the zero page
 
 (defparameter *vmops* nil)
 

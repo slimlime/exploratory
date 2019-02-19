@@ -276,3 +276,10 @@
 	   (progn
 	     (respond *donothave*)
 	     (vm-done))))
+
+(defun defexit-word (word &rest synonyms)
+  "Define a word as being an exit word so that we can
+show a decent message if you can't got that way."
+  (let ((words (append (list word) synonyms)))
+    (apply #'defword words)
+    (setf (gethash word *exit-words*) t)))

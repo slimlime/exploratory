@@ -190,7 +190,7 @@
 	(LDA.AB '(:parser . :words))
 	(LDY (hash-table-count *exit-words*))
 	(label :check-for-exit-word)
-	(CMP.ABY (1+ (resolve :exit-words)))
+	(CMP.ABY (1- (resolve :exit-words)))
 	(BEQ :unknown-exit)
 	(DEY)
 	(BNE :check-for-exit-word)
@@ -351,11 +351,11 @@
 	 (enter-input line :print nil)
 	 (go :top)))))
 
-(defun restore-game (str &key (break-on 'brk))
+(defun restore-game (str &key (break-on 'brk) (print t))
   (restore-state-base64 str)
   (monitor-setpc :restore-game)
-  (monitor-run :break-on break-on)
+  (monitor-run :break-on break-on :print print)
   (setmem-copy (monitor-buffer))
-  (enter-input "LOOK")
+  (enter-input "LOOK" :print print)
   (values))
   

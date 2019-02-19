@@ -12,6 +12,8 @@
 
 ;; TODO The lower level parser should probably not return any index
 ;; if the there is a duplicate
+;; TODO The show property can be inferred and doesn't need to be a bit
+;;      as if the name is null then it can't be shown.
 
 (defparameter here nil "The current location")
 (defparameter this nil "The current object")
@@ -369,8 +371,10 @@ all of which will refer to the same object."
 	    (apply #'db :places places))
 	  (apply #'db :initial-places places))
 	;; object name strings
-	(apply #'db :name-hi (mapcar #'(lambda (o) (hi (nil->0 (second o)))) objects))
-	(apply #'db :name-lo (mapcar #'(lambda (o) (lo (nil->0 (second o)))) objects))
+	(hilo-table :name-hi :name-lo (mapcar #'(lambda (o) (nil->0 (second o))) objects))
+	
+	;;(apply #'db :name-hi (mapcar #'(lambda (o) (hi (nil->0 (second o)))) objects))
+	;;(apply #'db :name-lo (mapcar #'(lambda (o) (lo (nil->0 (second o)))) objects))
 	;; object verb handlers
 	(labels ((verb-addr (o)
 		   (let ((name (caar o)))

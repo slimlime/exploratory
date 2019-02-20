@@ -1,5 +1,10 @@
 (defparameter *handlers* nil)
 
+;;;TODO we go to a lot of effort to dispatch on arbitrary sentences
+;;      whereas the vast majority of 'true' verb object sentences
+;;      will go to the generic handler which will to verb-object
+;;      dispatch itself.
+
 (defun reset-dispatcher ()
   (setf *handlers* (make-hash-table)))
 

@@ -7,6 +7,8 @@
 
 (defparameter *donothave* "You don't have that.")
 
+(defparameter *action-context* nil "This is either :generic or :object")
+
 (defun defbits (initially-set &rest bits)
   (dolist (bit bits)
     (defbit bit :initially-set initially-set)))
@@ -203,7 +205,9 @@
 
 (defun delegate-action ()
   "Call the generic handler for the current action, if it exists"
-  (vm-del))
+  (case *action-context*
+    (:generic (vm-del))
+    (:verb (vm-delo))))
 
 ;;define a action handler for a sentence
 (defun words2label (words)
@@ -222,7 +226,8 @@
       (label label here)))
   (unless vm
     (vm-exe))
-  (funcall fn)
+  (let ((*action-context* :generic))
+    (funcall fn))
   (if vm (vm-done) (rts)))
 
 (defmacro on-entry (&body body)
@@ -256,7 +261,8 @@
 	  (push (cons verb label) (gethash object *object->vtable*)))))
     (label object (first verbs))
     (unless vm (vm-exe))
-    (funcall fn)
+    (let ((*action-context* :verb))
+      (funcall fn))
     (if vm (vm-done) (rts))))
 
 (defmacro verb (verb-or-verbs &body body)

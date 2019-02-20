@@ -32,6 +32,3 @@
   `(aif ,value
 	it
 	(assert nil nil ,(format nil "~s was nil" value))))
-
-
-	       

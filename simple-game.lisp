@@ -56,6 +56,7 @@
     (object "SHINY KEY" (:description "It's a key, man."
 				      :place :nowhere)
       (action '(TAKE KEY)
+	(format t "~a~%" *action-context*)
 	(if-in-place "SHINY KEY" :nowhere
 	  (respond *whatyoutalkingabout*)
 	  (delegate-action)))
@@ -293,12 +294,12 @@ preventing closed-minded mortals from seeing what is really there."))))
     (fixture "FLICKERING TORCHES" (:description "A row of flickering torches.")
       (verb 'EXAMINE
 	(if-bit :torches-examined
-		(delegate-action)
+		(delegate-action))
 		(progn
 		  (setbit :torches-examined)
 		  (respond "The flickering shadows make you think of something profound, like a packet of Cheezows caught in the wind."))))
       (verb 'TAKE
-	(respond "Don't be greedy.")))
+	(respond "Don't be greedy."))
  
     ;; this is for an object which is hidden from look initially, but we can just
     ;; take it as its presence is implied by the row of torches.

@@ -291,5 +291,20 @@ Human? YOU decide."))
 (test "Test restoring state"
   (restore-game *corridor-state* :print nil)
   (assert-object-in "SHINY KEY" :inventory)
- 
   (assert-location :corridor))
+
+(test "Entering cell goes back to cell"
+  (restore-game *corridor-state* :print nil)
+  (test-input "ENTER CELL")
+  (assert-location :dungeon-cell))
+
+(test "Entering cell goes back to cell- don't see balls."
+  (restore-game *corridor-state* :print nil)
+  (test-input "ENTER CELL" "LOOK")
+  (assert (string/= "A red ball." (first *print-transcript*))))
+
+(test "Second examine action is delegated"
+  ;;testing whether a verb-action can be delegated.
+  (restore-game *corridor-state* :print nil)
+  (test-input "ENTER CELL" "EXAMINE TORCHES" "EXAMINE TORCHES")
+  (assert-msg "A row of flickering torches."))

@@ -199,9 +199,21 @@
 ;;
 (defvmop vm-del (format nil "VM-DEL") ()
 	 ()
-	 ((PLA)
-	  (PLA)	  
+	 ((dc "Pop so we are out of the VM loop.")
+	  (PLA)
+	  (PLA)
 	  (JMP '(:dispatcher . :generic-only))))
+
+;;;
+;;; VM-DELO Delegate to generic verb handler, if one applies
+;;;
+(defvmop vm-delo (format nil "VM-DELO") ()
+	 ()
+	 ((dc "Pop so we are out of the VM loop.")
+	  (PLA)
+	  (PLA)
+	  (LDX 1)
+	  (JMP '(:verb-handler . :generic-only))))
 
 (defun forward-branch-offset (label)
   (if *compiler-final-pass*

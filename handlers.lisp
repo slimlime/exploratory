@@ -19,10 +19,11 @@
 (defparameter *you-take-a-look* "You take a look around and see...")
 (defparameter *you-have* "You have...")
 (defparameter *nothing* "Nothing.")
-(defparameter *it-is-nothing* "What indeed.")
+(defparameter *it-is-nothing* "Nothing.")
 (defparameter *dont-understand* "I don't understand.")
 (defparameter *cant-go-that-way* "You can't go that way.")
 (defparameter *something* "Something something...")
+(defparameter *not-here* "That isn't here!")
   
 (defun generic-generic-handlers ()
 
@@ -37,15 +38,15 @@
 	(with-namespace :what
 	  (dc "What is IT?")
 	  (LDY.AB '(:object-table . :it))
+	  ;;(dbg (format t "OBJECT=~a~%" y))
 	  (BNE :something)
 	  (respond-raw *it-is-nothing*)
 	  (RTS)
 	  (label :something)
-	  (dc "Now print the object name")
+	  (dc "Now print the object name, if it has one")
 	  (LDX.ABY (1- (resolve '(:object-table . :name-lo))))
 	  (LDA.ABY (1- (resolve '(:object-table . :name-hi))))
 	  (BNE :print)
-	  (dc "The object is missing a name")
 	  (respond-raw *something*)
 	  (RTS)
 	  (label :print)
@@ -114,15 +115,31 @@
 	(db :object-count 0)))
 
     ;; Note, generic verbs are implemented in 6502 rather than VM
+
+    (label :check-object-here)
+    (dc "Check the object is here. Return to gp if not.")
+    (dc "It is a bug to reach here")
+    (dc "as the object parser shouldn't have found the object")
+    (dc "in the first place. It is unlikely custom verbs will")
+    (LDA.ABY (1- (resolve '(:object-table . :places))))
+    (CMP 1)
+    (BEQ :ok)
+    (CMP.ZP :current-place)
+    (BEQ :ok)
+    (respond-raw *not-here*)
+    (dbg (error "Attempting to do something to object ~a which isn't here." y))
+    (PLA)
+    (PLA)
+    (label :ok)
+    (RTS)
     
     (with-namespace :take
       (label :doit)
       (dc "Do we already have this?")
       (LDA 1)
       (CMP.ABY (1- (resolve '(:object-table . :places))))
-      (BNE :can-take-it?)
-      (respond-raw *already-have*)
-      (RTS)
+      (BEQ :already-have)
+      (JSR '(:generic . :check-object-here))
       (label :can-take-it?)
       (LDA *object-take*)
       (AND.ABY (1- (resolve '(:object-table . :properties))))
@@ -133,6 +150,12 @@
       (dc "Set the place to inventory")
       (STA.ABY (1- (resolve '(:object-table . :places))))
       (respond-raw *you-took-it*)
+      (RTS)
+      (label :already-have)
+      (respond-raw *already-have*)
+      (RTS)
+      (label :not-here)
+      (respond-raw *not-here*)
       (RTS))
 
     (with-namespace :drop
@@ -153,6 +176,7 @@
 
     (with-namespace :examine
       (label :doit)
+      (JSR '(:generic . :check-object-here))
       (dc "Print the description")
       (LDA.ABY (1- (resolve '(:object-table . :description-hi))))
       (LDX.ABY (1- (resolve '(:object-table . :description-lo))))

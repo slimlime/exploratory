@@ -65,6 +65,12 @@
   (assert-msg *do-not-have*))
 
 (test "Do something weird to an object"
+  (test-input "TAKE BONE" "KILL BONE")
+  (assert-msg *cant-do-that*))
+
+(test "Do something weird to it"
+  ;;this was failing because IT was defined in the place nowhere
+  ;;so wasn't being matched
   (test-input "TAKE BONE" "KILL IT")
   (assert-msg *cant-do-that*))
 
@@ -330,3 +336,26 @@ Human? YOU decide."))
   (restore-game *corridor-state* :print nil)
   (test-input "EXAMINE TORCHES" "EXAMINE TORCHES")
   (assert-msg "A row of flickering torches."))
+
+(deferred-test "When IT is nil, give a better message than I don't see that"
+  (restore-game *corridor-state* :print nil)
+  (test-input "LOOK" "TAKE IT")
+  (assert-msg "Take what?"))
+
+(deferred-test "Empty it object, TAKE"
+  (test-input "EXAMINE FLIB" "TAKE IT")
+  (assert-msg "Take what?"))
+
+(deferred-test "Empty it object, EXAMINE"
+  (test-input "EXAMINE FLIB" "EXAMINE IT")
+  (assert-msg "Examine what?"))
+
+(deferred-test "Empty it object, DROP"
+  (test-input "EXAMINE FLIB" "DROP IT")
+  (assert-msg "Drop what?"))
+
+(deferred-test "IT doesn't follow you around"
+  (test-input "LICK SLIME" "EXAMINE FLOOR" "EXAMINE CRACK"
+	      "TAKE KEY" "TAKE BONE" "POKE IT IN KEYHOLE"
+	      "UNLOCK DOOR" "OPEN IT" "DROP KEY" "EXIT" "TAKE IT")
+  (assert-object-in "SHINY KEY" :dungeon-cell))

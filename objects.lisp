@@ -14,6 +14,7 @@
 ;; if the there is a duplicate
 ;; TODO The show property can be inferred and doesn't need to be a bit
 ;;      as if the name is null then it can't be shown.
+;; TODO empty strings should not be inlined, see the description for CELL FLOOR
 
 (defparameter here nil "The current location")
 (defparameter this nil "The current object")
@@ -180,6 +181,7 @@ all of which will refer to the same object."
   (nil->0 id)))
 
 (defun object-table ()
+
   ;;return values - Y = index of matching item
   ;;                C = Set if not unique
   ;;                Z = Set if not found
@@ -216,9 +218,15 @@ all of which will refer to the same object."
 	(CPY 6)
 	(BGE :done)
 	(JSR :find-object)
+	(LDA.AB :it)
+	(dc "When IT is currently nothing, we keep the IT object ID")
+	(dc "this means that further down the stack we can add handlers")
+	(dc "for the actual IT object to show better error messages")
+	;;(BEQ :not-it)	
 	(CPY (object-id "IT"))
+	(dc "If the object is IT, then replace with the object")
 	(BNE :not-it)
-	(LDY.AB :it)
+	(TAY)
 	(label :not-it)
 	(LDA.AB :object1)
 	(BNE :set-object2)
@@ -340,7 +348,8 @@ all of which will refer to the same object."
 				0)
 			    index)
 		      names)))
-	  (incf index)))
+	    (incf index)))
+	
 	;;reverse the objects as they were pushed in
 	(setf objects (nreverse objects))
 	;;now sort as the searching algorithm expects them to be in
@@ -427,7 +436,8 @@ all of which will refer to the same object."
   (defplace :nippur)
   (defplace :babylon)
 
-  (fixture "IT" (:place :inventory))
+  (fixture "IT" (:place :nowhere))
+
   (object "MARDUK STATUE" (:description "A bronze statue" :place :ur))
   (object "STONE STATUE" (:description "A stone statue" :place :ur))
   (object "GINGER BISCUIT" (:description "A tasty snack" :place :ur))
@@ -511,7 +521,7 @@ all of which will refer to the same object."
 (reset-parser)
 
 (test-object-definitions)
-
+  
 (test-object-find "MARDUK" "STATUE" :ur :found :unique)
 (test-object-find "STONE" "STATUE" :ur :found :unique)
 (test-object-find "GINGER" "BISCUIT" :ur :found :unique)

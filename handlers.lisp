@@ -5,9 +5,7 @@
 ;; inventory, there is no point in saying "Be more specific"
 ;; we should only find the objects which are in the inventory
 
-;; Test-game stuff also in here
-
-;; TODO Better error reporting could be done.
+(defvar *what-enabled* t "What is a testing thing")
 
 (defparameter *be-more-specific* "You'll have to be more specific...")
 (defparameter *unknown-word* "I don't know that word.")
@@ -21,9 +19,10 @@
 (defparameter *you-take-a-look* "You take a look around and see...")
 (defparameter *you-have* "You have...")
 (defparameter *nothing* "Nothing.")
-(defparameter *it-is-nothing* "Nothing.")
+(defparameter *it-is-nothing* "What indeed.")
 (defparameter *dont-understand* "I don't understand.")
 (defparameter *cant-go-that-way* "You can't go that way.")
+(defparameter *something* "Something something...")
   
 (defun generic-generic-handlers ()
 
@@ -32,18 +31,25 @@
   (with-location :generic
     (defword :INVENTORY :I)
 
-    (custom-action '(WHAT)
-      (with-namespace :what
-	(dc "What is IT?")
-	(LDY.AB '(:object-table . :it))
-	(BNE :something)
-	(respond-raw *it-is-nothing*)
-	(RTS)
-	(label :something)
-	(dc "Now print the object name")
-	(LDA.ABY (1- (resolve '(:object-table . :name-hi))))
-	(LDX.ABY (1- (resolve '(:object-table . :name-lo))))
-	(JMP :print-message)))
+    (when *what-enabled*
+      (custom-action '(WHAT)
+	;;Print the name or description of the IT object
+	(with-namespace :what
+	  (dc "What is IT?")
+	  (LDY.AB '(:object-table . :it))
+	  (BNE :something)
+	  (respond-raw *it-is-nothing*)
+	  (RTS)
+	  (label :something)
+	  (dc "Now print the object name")
+	  (LDX.ABY (1- (resolve '(:object-table . :name-lo))))
+	  (LDA.ABY (1- (resolve '(:object-table . :name-hi))))
+	  (BNE :print)
+	  (dc "The object is missing a name")
+	  (respond-raw *something*)
+	  (RTS)
+	  (label :print)
+	  (JMP :print-message))))
     
     (custom-action '(LOOK)
       (with-namespace :look
@@ -150,10 +156,11 @@
       (dc "Print the description")
       (LDA.ABY (1- (resolve '(:object-table . :description-hi))))
       (LDX.ABY (1- (resolve '(:object-table . :description-lo))))
-      (JSR :print-message)
-      (RTS))
+      (JMP :print-message))
 
     (with-namespace :verb-handler
+      ;; make a vtable for a generic object. each generic
+      ;; verb needs an entry label called :doit
       (label :generic-vtable)
       (flet ((entry (verb ns);
 	       ;;TODO Make defword idempotent and remove this check
@@ -164,7 +171,9 @@
 	       (dw nil (cons ns :doit))))
 	(entry 'EXAMINE :examine)
 	(entry 'TAKE :take)
-	(entry 'DROP :drop)))
+	(entry 'DROP :drop)
+	(dc "End marker")
+	(db nil 0)))
 
     (when (> (hash-table-count *exit-words*) 0)
       (apply #'db :exit-words (mapcar #'word-id (hash-keys *exit-words*))))

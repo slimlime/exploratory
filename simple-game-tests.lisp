@@ -148,12 +148,30 @@ Human? YOU decide."))
       (assert-object-in "SHINY KEY" :dungeon-cell)
       (test-input "LOOK")
       (assert-object-in "FINGER BONE" :dungeon-cell)
-      (assert-object-in "SHINY KEY" :dungeon-cell))
+      (assert-object-in "SHINY KEY" :dungeon-cell)
+      (test-input "WHAT")
+      (assert-msg *it-is-nothing*))
 
 (test "Examining something sets it"
       (assert-object-in "FINGER BONE" :dungeon-cell)
       (test-input "LOOK" "EXAMINE SLIME" "TAKE IT")
       (assert-object-in "FINGER BONE" :dungeon-cell))
+
+(test "Examining the floor crack sets it to be the key"
+  ;;this is to test (set-it this)
+  ;;and it really blew up!
+  (test-input "LICK SLIME" "EXAMINE FLOOR" "EXAMINE CRACK" "WHAT")
+  (assert-msg "A shiny key."))
+
+(test "Examining the floor it"
+  ;;was some corruption doing this- because the object it was
+  ;;being set to the floor which doesn't have a what description
+  (test-input "EXAMINE FLOOR" "WHAT")
+  (assert-msg *something*))
+
+(test "Examining the floor crack doesn't mess up it"
+  (test-input "EXAMINE FLOOR" "EXAMINE CRACK" "WHAT")
+  (assert-msg *something*))
 
 (test "Unique inventory item sets it"
       (assert-object-in "FINGER BONE" :dungeon-cell)
@@ -279,12 +297,16 @@ Human? YOU decide."))
       (test-input "BANG DOOR" "EAT SLOP")
       (assert-object-in "INEDIBLE SLOP" :nowhere))
 
+(test "Knocking on door doesn blow up"
+  ;;was a missing 0 vtable terminator
+  (test-input "KNOCK DOOR"))
+
 (defparameter *corridor-state* nil)
 
 (test "Can escape"
   (test-input "LICK SLIME" "EXAMINE FLOOR" "EXAMINE CRACK"
 	      "TAKE KEY" "TAKE FINGER BONE" "POKE BONE IN LOCK"
-	      "KNOCK DOOR" "UNLOCK DOOR" "OPEN DOOR" "USE DOOR")
+	      "UNLOCK DOOR" "OPEN DOOR" "USE DOOR")
   (assert-location :corridor)
   (setf *corridor-state* (dump-state-base64)))
 
@@ -306,5 +328,5 @@ Human? YOU decide."))
 (test "Second examine action is delegated"
   ;;testing whether a verb-action can be delegated.
   (restore-game *corridor-state* :print nil)
-  (test-input "ENTER CELL" "EXAMINE TORCHES" "EXAMINE TORCHES")
+  (test-input "EXAMINE TORCHES" "EXAMINE TORCHES")
   (assert-msg "A row of flickering torches."))

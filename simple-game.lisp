@@ -33,8 +33,6 @@
 (defparameter *whatyoutalkingabout* "I am sure YOU know what you are talking about.")
 (defparameter *cantdoit* "You can't do that!")
 
-(defparameter *exit-words* (make-hash-table :test 'equal))
-
 (defun synonyms ()
   (defexit-word :EXIT :OUT :GO)
   (defexit-word :N :NORTH)
@@ -56,7 +54,6 @@
     (object "SHINY KEY" (:description "It's a key, man."
 				      :place :nowhere)
       (action '(TAKE KEY)
-	(format t "~a~%" *action-context*)
 	(if-in-place "SHINY KEY" :nowhere
 	  (respond *whatyoutalkingabout*)
 	  (delegate-action)))
@@ -284,22 +281,15 @@ preventing closed-minded mortals from seeing what is really there."))))
     (object "RED BALL" (:description "Just an unimportant red ball."))
     (object "GREEN BALL" (:description "Just an unimportant green ball."))
     
-    (object "IMAGINARY BISCUIT"
-	(:description "A biscuit that exists only in your head."
-		      :place :nowhere)
-      (verb 'EAT
-	(respond "Mmmm! Satisfying.")
-	(move-object this :nowhere)))
-
     (fixture "FLICKERING TORCHES" (:description "A row of flickering torches.")
       (verb 'EXAMINE
 	(if-bit :torches-examined
-		(delegate-action))
+		(delegate-action)
 		(progn
 		  (setbit :torches-examined)
 		  (respond "The flickering shadows make you think of something profound, like a packet of Cheezows caught in the wind."))))
       (verb 'TAKE
-	(respond "Don't be greedy."))
+	(respond "What, all of them?!")))
  
     ;; this is for an object which is hidden from look initially, but we can just
     ;; take it as its presence is implied by the row of torches.
@@ -321,7 +311,13 @@ preventing closed-minded mortals from seeing what is really there."))))
       (setbit :metaphor-examined)
       (respond "That really is taking the biscuit."))
     
-    (with-object "IMAGINARY BISCUIT"
+    (object "IMAGINARY BISCUIT"
+	(:description "A biscuit that exists only in your head."
+		      :place :nowhere)
+      (verb 'EAT
+	(respond "Mmmm! Satisfying.")
+	(move-object this :nowhere))
+      
       (action '(EXAMINE BISCUIT)
 	;;TODO has and here combined seems useful, since it is similar to
 	;;find object.
@@ -331,49 +327,40 @@ preventing closed-minded mortals from seeing what is really there."))))
 		(respond "There is no biscuit, man!")
 		(respond *whatyoutalkingabout*)))
       (action '(TAKE BISCUIT)
-	(when-has this (delegate-action))
-	(when-in-place this here (delegate-action))
-	(when-bit :metaphor-examined
+	(if-bit :metaphor-examined
 	  (if-in-place this :nowhere
 	    (progn
 	      (respond "Fine. You take the imaginary biscuit. Happy now?")
-	      (move-object this :inventory))
+	      (move-object this :inventory)
+	      (vm-done))
 	    (respond "Ha! You lost your imaginary biscuit.")))))
     
-    (action '(ENTER CELL)
-      (respond "You enter your cell."))
+    (action '((ENTER CELL) (ENTER CELL DOOR))
+      (navigate :dungeon-cell "You enter your cell."))
     
     (action '(ENTER GREEN DOOR)
       (if-bit :green-door-open
 	      (navigate :frazbolgs-closet "You go through the green door.")
 	      (respond "The green door is closed.")))
+        
+    (fixture "MYSTERIOUS WALL" ()
+      (verb 'EXAMINE
+	(if-has "FEEBLE TORCH"
+		(progn
+		  (respond *far-out*)
+		  (respond "Etched on the wall is a diagram. A triangle sits inside a circle, surrounded by flames. A spell perhaps?"))
+		(respond "It is too dark at this end of the corridor to see much of anything."))))
     
-    (action '(ENTER CELL DOOR)
-      (navigate :dungeon-cell "You go through the cell door."))
-    
-    (action '(EXAMINE WALL)
-      (if-bit :torch-carried
-	      (progn
-		(respond *far-out*)
-		(respond "Etched on the wall is a diagram. A triangle sits inside a circle, surrounded by flames. A spell perhaps?"))
-	      (respond "It is too dark at this end of the corridor to see anything.")))
-    
-    (action '(ENTER DOOR)
-      (respond "You will need to be more specific."))
-    
-    (action '(EXAMINE GREEN DOOR)
-      (respond "You hear mumbling and sighing from behind the door."))
-    
-    (action '(KNOCK GREEN DOOR)
-      (if-bit :green-door-open
-	      (respond "Politely, you knock on the already open green door, but there is no answer.")
-	      (progn
-		(setbit :green-door-open)
-		(respond "You knock on the door and wait patiently.")
-		(respond "Presently, it swings open. There appears to be some sort of lodging beyond the threshold."))))
-    
-    (action '(KNOCK DOOR)
-      (respond "Which one?"))))
+    (fixture "GREEN DOOR" (:description "A faded green door.")
+      (verb 'LISTEN
+	(respond "You hear mumbling and sighing from behind the door."))
+      (verb 'KNOCK
+	(if-bit :green-door-open
+		(respond "Politely, you knock on the already open green door, but there is no answer.")
+		(progn
+		  (setbit :green-door-open)
+		  (respond "You knock on the door and wait patiently.")
+		  (respond "Presently, it swings open. There appears to be some sort of lodging beyond the threshold.")))))))
 
 (defun frazbolgs-closet ()
   (dloc :frazbolgs-closet "FRAZBOLG'S CLOSET" "/home/dan/exploratory/images/porsche.bmp"

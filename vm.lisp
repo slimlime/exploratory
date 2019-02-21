@@ -368,7 +368,7 @@ incorrect branch offsets elsewhere
 ;;;
 ;;; VM-PRI - Print string with the string data inlined after the op-code
 ;;;
-(defvmop vm-pri (format nil "VM-PRI1 '~a'" str) (str)
+(defvmop vm-pri (format nil "VM-PRI '~a'" str) (str)
 	 ((dcs nil str))
 	 ((label :print-inline)
 	  (dc "The string to print is right after the VM-PR instruction.")
@@ -384,7 +384,7 @@ incorrect branch offsets elsewhere
 ;;;
 ;;; VM-PR - Print a string with the address inlined after the op-code
 ;;;
-(defvmop vm-pr (format nil "VM-PR1 '~a'" str) (addr str)
+(defvmop vm-pr (format nil "VM-PR '~a'" str) (addr str)
 	 ((dw nil addr))
 	 ((label :print)
 	  (dc "The address of the string is directly after the instruction")

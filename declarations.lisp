@@ -8,6 +8,7 @@
 (defparameter *donothave* "You don't have that.")
 
 (defparameter *action-context* nil "This is either :generic or :object")
+(defparameter *exit-words* (make-hash-table :test 'equal))
 
 (defun defbits (initially-set &rest bits)
   (dolist (bit bits)
@@ -271,7 +272,7 @@
 
 (defun set-it (object)
   "Set the it object, for instance if it was mentioned explicitly."
-  `(vm-it ,object))
+  (vm-it object))
 
 (defun goto (label)
   (vm-jmp label))

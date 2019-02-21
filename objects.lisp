@@ -372,21 +372,15 @@ all of which will refer to the same object."
 	  (apply #'db :initial-places places))
 	;; object name strings
 	(hilo-table :name-hi :name-lo (mapcar #'(lambda (o) (nil->0 (second o))) objects))
-	
-	;;(apply #'db :name-hi (mapcar #'(lambda (o) (hi (nil->0 (second o)))) objects))
-	;;(apply #'db :name-lo (mapcar #'(lambda (o) (lo (nil->0 (second o)))) objects))
-	;; object verb handlers
+	;; object verb handlers (a table of vtables)
 	(labels ((verb-addr (o)
 		   (let ((name (caar o)))
 		     (if (gethash name *object->vtable*) 
 			 (cons :vtable name)
 			 0))))
-	  (apply #'db :verb-hi (mapcar #'(lambda (o) (hi (verb-addr o))) objects))
-	  (apply #'db :verb-lo (mapcar #'(lambda (o) (lo (verb-addr o))) objects)))
+	  (hilo-table :verb-hi :verb-lo (mapcar #'(lambda (o) (verb-addr o)) objects)))
 	;; object descriptions
-	
-	(apply #'db :description-hi (mapcar #'(lambda (o) (hi (third o))) objects))
-	(apply #'db :description-lo (mapcar #'(lambda (o) (lo (third o))) objects))
+	(hilo-table :description-hi :description-lo (mapcar #'third objects))
 	;; object properties
 	(apply #'db :properties
 	       (mapcar #'(lambda (o) (object-properties (fifth o) (sixth o))) objects))

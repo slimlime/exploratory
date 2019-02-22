@@ -60,7 +60,7 @@
 
 (log-line "Loading project done.")
 
-;; testsa
+;; tests
 
 (log-line "Starting tests...")
 

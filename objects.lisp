@@ -15,6 +15,7 @@
 ;; TODO The show property can be inferred and doesn't need to be a bit
 ;;      as if the name is null then it can't be shown.
 ;; TODO empty strings should not be inlined, see the description for CELL FLOOR
+;; TODO There is a CPY 6, what is the 6, I forget
 
 (defparameter here nil "The current location")
 (defparameter this nil "The current object")
@@ -182,6 +183,8 @@ all of which will refer to the same object."
 
 (defun object-table ()
 
+  (defword "IT")
+  
   ;;return values - Y = index of matching item
   ;;                C = Set if not unique
   ;;                Z = Set if not found
@@ -218,16 +221,6 @@ all of which will refer to the same object."
 	(CPY 6)
 	(BGE :done)
 	(JSR :find-object)
-	(LDA.AB :it)
-	(dc "When IT is currently nothing, we keep the IT object ID")
-	(dc "this means that further down the stack we can add handlers")
-	(dc "for the actual IT object to show better error messages")
-	;;(BEQ :not-it)	
-	(CPY (object-id "IT"))
-	(dc "If the object is IT, then replace with the object")
-	(BNE :not-it)
-	(TAY)
-	(label :not-it)
 	(LDA.AB :object1)
 	(BNE :set-object2)
 	(STY.AB :object1)
@@ -281,9 +274,31 @@ all of which will refer to the same object."
 	(PLA)
 	(PLA)
 	(RTS))
+
+      (label :is-it)
+      (dc "The word is IT")
+      (LDY.AB :it)
+      (dc "TODO- set a flag to indicate IT was not defined.")
+      (BEQ :dont-have-it)
+      (label :it-exists)
+      (LDA.ABY (1- (resolve :places)))
+      (CMP 1)
+      (BEQ :have-it "IT is in the inventory")
+      (CMP.ZP :current-place)
+      (BEQ :have-it "IT is here")
+      (label :dont-have-it)
+      (LDY 0)
+      (SEC "Pretend that IT is a duplicate, triggering message to be more specific.")
+      (RTS)
+      (label :have-it)
+      (CLC)
+      (RTS)
       
       (label :find-object-index nil)
       (dc "Linear search for the noun")
+      (LDA.ZP :noun)
+      (CMP (word-id 'IT))
+      (BEQ :is-it)
       (LDY 0)
       (STY.ZP :found-index)
       (label :next-noun)
@@ -435,8 +450,6 @@ all of which will refer to the same object."
   (defplace :ur)
   (defplace :nippur)
   (defplace :babylon)
-
-  (fixture "IT" (:place :nowhere))
 
   (object "MARDUK STATUE" (:description "A bronze statue" :place :ur))
   (object "STONE STATUE" (:description "A stone statue" :place :ur))

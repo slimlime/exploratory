@@ -11,18 +11,17 @@
   ;;is set to true.
   (monitor-reset :start)
   (monitor-run :break-on 'BRK :print nil)
-  (let ((result t))
+  (let ((msg nil))
     (handler-case
 	(funcall body-fn)
       (error (e)
-	(progn
-	  (setf result nil)
-	  (let ((msg (format nil "~a FAILED~%~t'~a'" description e)))
-	    (if (or *tests-warn-only* deferred)
-		(format t "~a~%" msg)
-		(error "~S" msg))))))
-    (when (and result deferred)
-      (error "The deferred test '~S' actually passed. Undefer it." description)))
+	(setf msg (format nil "~a FAILED~%~t'~a'" description e))))
+    (when (and (null msg) deferred)
+      (setf msg (format nil "The deferred test '~a' actually passed. Undefer it." description)))
+    (when msg
+      (if (or *tests-warn-only*)
+	  (format t "WARNING: ~a~%" msg)
+	  (error "ERROR: ~a" msg))))	
   (values))
 
 (defmacro test (description &body body)
@@ -109,19 +108,12 @@
 departed previous occupant of your cell.
 Human? YOU decide."))
 
-;;The reason this doesn't pass is that the object IT is always replaced by
-;;either an actual single object or a 0.
-;;
-;;Perhaps we shouldn't replace IT with 0, but leave it as is if it cannot
-;;be unambiguously identified, that way we could modulate the message to
-;;make more sense.
-;;
-;;(test "With more than one object in inventory, be more specific than IT"
-;;  (test-input "LICK SLIME" "EXAMINE FLOOR" "EXAMINE CRACK"
-;;		"TAKE KEY" "TAKE FINGER BONE" "I" "EXAMINE IT")
-;;  (assert-object-in "SHINY KEY" :inventory)
-;;  (assert-object-in "FINGER BONE" :inventory)
-;;  (assert-msg *be-more-specific*) ))
+(test "With more than one object in inventory, be more specific than IT"
+  (test-input "LICK SLIME" "EXAMINE FLOOR" "EXAMINE CRACK"
+	      "TAKE KEY" "TAKE FINGER BONE" "I" "EXAMINE IT")
+  (assert-object-in "SHINY KEY" :inventory)
+  (assert-object-in "FINGER BONE" :inventory)
+  (assert-msg *be-more-specific*))
 
 (test "Examining slime"
       (assert-clr :slime-examined)
@@ -337,24 +329,16 @@ Human? YOU decide."))
   (test-input "EXAMINE TORCHES" "EXAMINE TORCHES")
   (assert-msg "A row of flickering torches."))
 
-(deferred-test "When IT is nil, give a better message than I don't see that"
+(test "When IT is nil, give a better message than I don't see that"
   (restore-game *corridor-state* :print nil)
   (test-input "LOOK" "TAKE IT")
-  (assert-msg "Take what?"))
+  (assert-msg *be-more-specific*))
 
-(deferred-test "Empty it object, TAKE"
+(test "Empty it object, TAKE"
   (test-input "EXAMINE FLIB" "TAKE IT")
-  (assert-msg "Take what?"))
+  (assert-msg *be-more-specific*))
 
-(deferred-test "Empty it object, EXAMINE"
-  (test-input "EXAMINE FLIB" "EXAMINE IT")
-  (assert-msg "Examine what?"))
-
-(deferred-test "Empty it object, DROP"
-  (test-input "EXAMINE FLIB" "DROP IT")
-  (assert-msg "Drop what?"))
-
-(deferred-test "IT doesn't follow you around"
+(test "IT doesn't follow you around"
   (test-input "LICK SLIME" "EXAMINE FLOOR" "EXAMINE CRACK"
 	      "TAKE KEY" "TAKE BONE" "POKE IT IN KEYHOLE"
 	      "UNLOCK DOOR" "OPEN IT" "DROP KEY" "EXIT" "TAKE IT")

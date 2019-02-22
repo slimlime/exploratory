@@ -26,9 +26,7 @@
 (defparameter *not-here* "That isn't here!")
   
 (defun generic-generic-handlers ()
-
-  (fixture "IT" (:place :inventory))
-  
+ 
   (with-location :generic
     (defword :INVENTORY :I)
 
@@ -72,10 +70,7 @@
 	(dc "Reset matching object count to 0")
 	(LDX 0)
 	(STX.AB :object-count)
-	;;Assume that IT is the last entry in the list
-	(assert (string= (cadar (sort (mapcar #'(lambda (v) (list (object-id (caar v)) (caar v)))
-					      (hash-values *object-name->data*)) #'> :key #'first)) "IT") nil "IT was not the last thing in the object list")
-	(LDY (1- (hash-table-count *object-name->data*)))
+	(LDY (hash-table-count *object-name->data*))
 	(label :next-object)
 	(dc "List the object in the place in A")
 	(dc "Look in one-based object places table")

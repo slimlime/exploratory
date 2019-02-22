@@ -67,3 +67,6 @@
 (load "simple-game-tests.lisp")
 
 (log-line "Tests complete.")
+
+(if (> (failing-tests) 0)
+    (error "Failed tests:~a" (failing-tests)))

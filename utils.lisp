@@ -32,3 +32,33 @@
   `(aif ,value
 	it
 	(assert nil nil ,(format nil "~s was nil" value))))
+
+(defparameter *failing-tests* (make-hash-table :test 'equal))
+
+(defun test-fn (description body-fn deferred)
+  (let ((msg nil))
+    (handler-case
+	(funcall body-fn)
+      (error (e)
+	(setf msg (format nil "~a FAILED~%~t'~a'" description e))))
+    (when (and (null msg) deferred)
+      (setf msg (format nil "The deferred test '~a' actually passed. Undefer it." description))
+      (setf deferred nil))
+    (when msg
+      (format t (if deferred "WARNING: ~a~%" "ERROR : ~a~%")
+	      msg)
+      (setf (gethash description *failing-tests*) t))
+    (values)))
+
+(defmacro test (description &body body)
+  `(test-fn ,description #'(lambda () ,@body) nil))
+
+(defmacro deferred-test (description &body body)
+  `(test-fn ,description #'(lambda () ,@body) t))
+
+(defun clear-test-results ()
+  (clrhash *failing-tests*))
+
+(defun failing-tests ()
+  (hash-table-count *failing-tests*))
+

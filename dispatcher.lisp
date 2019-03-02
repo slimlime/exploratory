@@ -97,7 +97,7 @@
     ;;now build the tables
 
     (maphash
-     #'(lambda (location entry-list)
+     (λ (location entry-list)
 	 (dc (format nil "~a dispatch table" location))
 	 (label location)
 	 (dolist (entry (reverse entry-list))
@@ -110,7 +110,7 @@
 		 (handler (cdr entry)))
 	     (dc (format nil "~{~a ~} -> ~a" words (fmt-label handler t)))
 	     (apply 'db nil (append
-			     (mapcar #'(lambda (word)
+			     (mapcar (λ (word)
 					 (let* ((symb (symbol-name word))
 					    (id (if (equal "?" symb) 0
 						    (gethash symb *word->meaning*))))
@@ -125,7 +125,7 @@
     *handlers*)))
 
 (defun dump-handlers ()
-  (maphash #'(lambda (k v)
+  (maphash (λ (k v)
 	       (format t "In ~a~%" k)
 	       (dolist (entry v)
 		 (format t "  ~a -> ~a~%"

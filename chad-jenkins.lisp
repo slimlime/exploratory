@@ -202,7 +202,7 @@
 
 (defun run-chad-jenkins (&key (break-on 'BRK) (print t))
   (run-game :basement-stairs
-	    #'(lambda ()
+	    (λ ()
 		(chad-synonyms)
 		(act1)
 		(generic-handlers))

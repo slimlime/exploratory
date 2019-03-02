@@ -1,6 +1,6 @@
 (defun test-input (&rest commands)
   "Feed in some commands to the game"
-  (mapc #'(lambda (s) (enter-input s :print nil)) commands))		    
+  (mapc (λ (s) (enter-input s :print nil)) commands))		    
 
 (defun assert-location (location)
    (assert (= (resolve location)

@@ -81,13 +81,13 @@
     
     ;; Let's inline all the opcode functions
 
-    (mapc #'(lambda (vmop) (funcall (second vmop))) *vmops*)
+    (mapc (λ (vmop) (funcall (second vmop))) *vmops*)
         
     (label :op-hi)
-    (mapc #'(lambda (vmop) (db nil (rts-jmp-hi (first vmop)))) *vmops*)
+    (mapc (λ (vmop) (db nil (rts-jmp-hi (first vmop)))) *vmops*)
     
     (label :op-lo)
-    (mapc #'(lambda (vmop) (db nil (rts-jmp-lo (first vmop)))) *vmops*)
+    (mapc (λ (vmop) (db nil (rts-jmp-lo (first vmop)))) *vmops*)
 
     ;; And some stuff those functions need
     ;; Like this bit mask table
@@ -136,7 +136,7 @@
 	(start-ptr (gensym)))
     `(progn
        (push (list ,(intern (symbol-name `,name) :keyword)
-		   #'(lambda ()
+		   (λ ()
 		       (label ,(intern (symbol-name `,name) :keyword) :vm)
 		       ,@definition))
 	     *vmops*)

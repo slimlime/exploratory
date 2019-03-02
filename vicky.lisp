@@ -33,7 +33,7 @@
 				       *render-height*
 				       :bpp 24)))
       (let* ((redraw nil)
-	     (timer (make-timer #'(lambda () (setf redraw t)))))
+	     (timer (make-timer (λ () (setf redraw t)))))
 	(schedule-timer timer 0 :repeat-interval 1)
 	
 	(sdl:with-events ()

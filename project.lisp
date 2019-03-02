@@ -71,7 +71,7 @@
 (flet ((dump-test-results (table name)
 	 (format t "~a ~a~%" name (hash-table-count table))
 	 (when (> (hash-table-count table) 0)
-	   (maphash #'(lambda (test msg)
+	   (maphash (λ (test msg)
 			(format t  "~a -> ~a~%" test msg))
 		    table))))
   (dump-test-results *failing-tests* "Failed :")

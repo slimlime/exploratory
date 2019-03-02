@@ -36,7 +36,7 @@
 	(setf (gethash (cons namespace bit) *bits*) initially-set))))
 
 (defun dump-bits ()
-  (maphash #'(lambda (k v)
+  (maphash (λ (k v)
 	       (if (consp k)
 		   (format t "~a ~a:~a~%" v (car k) (cdr k))
 		   (format t "~a ~a~%" v k)))
@@ -92,7 +92,7 @@ bits will only match at the location they are defined."
       (unless (gethash bit *bits-read*)
 	(format t "WARNING Bit ~a is modified, but never read.~%" bit))))
   (let ((bits nil))
-    (maphash #'(lambda (bit initially-set)
+    (maphash (λ (bit initially-set)
 		 (push (list
 			bit
 			(if (eq initially-set :not-specified) nil initially-set)

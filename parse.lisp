@@ -274,7 +274,7 @@
 	  (string-count nil))
       
       (let ((all-strings nil))
-	(maphash #'(lambda (k v)
+	(maphash (λ (k v)
 		     (declare (ignorable v))
 		     (push k all-strings))
 		 *word->meaning*)
@@ -296,10 +296,10 @@
             
       (dc "Word tables, by character position")
 	  
-      (apply #'db :tbl1 (mapcar #'(lambda (s) (char-or-space s 0)) strings))
-      (apply #'db :tbl2 (mapcar #'(lambda (s) (char-or-space s 1)) strings))
-      (apply #'db :tbl3 (mapcar #'(lambda (s) (char-or-space s 2)) strings))
-      (apply #'db :tbl4 (mapcar #'(lambda (s) (char-or-space s 3)) strings))
+      (apply #'db :tbl1 (mapcar (λ (s) (char-or-space s 0)) strings))
+      (apply #'db :tbl2 (mapcar (λ (s) (char-or-space s 1)) strings))
+      (apply #'db :tbl3 (mapcar (λ (s) (char-or-space s 2)) strings))
+      (apply #'db :tbl4 (mapcar (λ (s) (char-or-space s 3)) strings))
       
       (dc "Table of word meanings")
 
@@ -316,7 +316,7 @@
 
       (setf *word-collisions* nil)
 
-      (maphash #'(lambda (k v) (declare (ignore v))
+      (maphash (λ (k v) (declare (ignore v))
 			 (push k *word-collisions*))
 	       collisions)
       
@@ -325,7 +325,7 @@
 (defun dump-words ()
   (let ((i 0)
 	(sorted nil))
-    (maphash #'(lambda (k v)
+    (maphash (λ (k v)
 		 (push (cons k v) sorted)
 		 (format t "~a=~a " k v)
 		 (when (zerop (mod (incf i) 5))
@@ -429,7 +429,7 @@
 (defword :DROP)
 (defword :WITH :USING)
 
-(maphash #'(lambda (k v) (test-parse-word k v :debug nil)) *word->meaning*)
+(maphash (λ (k v) (test-parse-word k v :debug nil)) *word->meaning*)
 
 (test-parse-word " OPEN" (gethash "OPEN" *word->meaning*))
 

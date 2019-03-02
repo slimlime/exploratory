@@ -19,7 +19,7 @@
 	w))
 
 (defun font-width (font)
-  #'(lambda (word) (measure-word word font)))
+  (λ (word) (measure-word word font)))
 
 (defun last-char (str)
   (let ((len (1- (length str))))
@@ -87,7 +87,7 @@
 	  js))))
 
 (defun justify-with-image (s imgw imgh font)
-  (justify s :sw #'(lambda (y)
+  (justify s :sw (λ (y)
 		     (- +screen-width+ (if (<= y (1+ imgh)) imgw 0)))
 	   :width (font-width font)))
 
@@ -102,7 +102,7 @@ about all these things, O daughter of Jove, from whatsoever source you may know 
 
 (defun justify-test (string expected)
   (assert (string= (justify string
-			    :sw #'(lambda (x) (declare (ignorable x)) 64))
+			    :sw (λ (x) (declare (ignorable x)) 64))
 		   expected)))
 
 (justify-test "Hy-phen" "Hy-phen")

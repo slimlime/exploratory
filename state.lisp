@@ -42,11 +42,11 @@
     (add-to-state-addresses name is-bits start *compiler-ptr*)))
 
 (defmacro game-state-bytes (name &body body)
-  `(game-state-fn ,name nil #'(lambda () ,@body)))
+  `(game-state-fn ,name nil (λ () ,@body)))
 
 ;; NOT CLEAR IF THIS IS NECESSARY!!
 (defmacro game-state-bits (name &body body)
-  `(game-state-fn ,name t #'(lambda () ,@body)))
+  `(game-state-fn ,name t (λ () ,@body)))
 
 (defun reset-game-state-ranges ()
   (setf *game-state-addresses* (make-hash-table :test 'equal)))
@@ -56,7 +56,7 @@
 (defun game-state-ranges ()
   "Return the state ranges ordered by address"
   (let ((ranges nil))
-    (maphash #'(lambda (name range)
+    (maphash (λ (name range)
 		 (declare (ignorable name))
 		 (push range ranges))
 	     *game-state-addresses*)
@@ -64,7 +64,7 @@
 
 (defun dump-state-ranges ()
   (let ((ranges nil))
-    (maphash #'(lambda (name range)
+    (maphash (λ (name range)
 		 (push (cons range name) ranges))
 	     *game-state-addresses*)
     (dolist (range (sort ranges #'< :key #'caar))
@@ -132,10 +132,10 @@
 
 (let* ((src #(97 98 99 0 97 98))
        (dst (make-array 6))
-       (enc (dump-state-base64 :peek-fn #'(lambda (address)
+       (enc (dump-state-base64 :peek-fn (λ (address)
 					    (elt src address)))))
   (assert (string= enc "YWJjYWI="))
-  (restore-state-base64 enc :poke-fn #'(lambda (address byte)
+  (restore-state-base64 enc :poke-fn (λ (address byte)
 					 (setf (elt dst address) byte)))
   (assert (equalp dst src)))
 
@@ -148,10 +148,10 @@
 
 (let* ((src #(128 0 128 0 128 128))
        (dst (make-array 6))
-       (enc (dump-state-base64 :peek-fn #'(lambda (address)
+       (enc (dump-state-base64 :peek-fn (λ (address)
 					    (elt src address)))))
   (assert (string= enc "oMA="))
-  (restore-state-base64 enc :poke-fn #'(lambda (address byte)
+  (restore-state-base64 enc :poke-fn (λ (address byte)
 					 (setf (elt dst address) byte)))
   (assert (equalp dst src)))
 
@@ -163,9 +163,9 @@
 
 (let* ((src #(128 128 0 128 0 0 128 128))
        (dst (make-array (length src)))
-       (enc (dump-state-base64 :peek-fn #'(lambda (address)
+       (enc (dump-state-base64 :peek-fn (λ (address)
 					    (elt src address)))))
-  (restore-state-base64 enc :poke-fn #'(lambda (address byte)
+  (restore-state-base64 enc :poke-fn (λ (address byte)
 					 (setf (elt dst address) byte)))
   (assert (equalp dst src)))
 
@@ -177,9 +177,9 @@
 
 (let* ((src #(128 128 0 128 0 0 128 128 0 128))
        (dst (make-array (length src)))
-       (enc (dump-state-base64 :peek-fn #'(lambda (address)
+       (enc (dump-state-base64 :peek-fn (λ (address)
 					    (elt src address)))))
-  (restore-state-base64 enc :poke-fn #'(lambda (address byte)
+  (restore-state-base64 enc :poke-fn (λ (address byte)
 					 (setf (elt dst address) byte)))
   (assert (equalp dst src)))
 

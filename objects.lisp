@@ -386,7 +386,7 @@ all of which will refer to the same object."
 
 	;; now we can generate the object data tables
 	(let ((places (mapcar
-		       #'(lambda (o)
+		       (λ (o)
 			   (aif (gethash (fourth o) *place->id*)
 				it
 				(assert nil nil "Place ~a was not defined" (fourth o))))
@@ -395,21 +395,21 @@ all of which will refer to the same object."
 	    (apply #'db :places places))
 	  (apply #'db :initial-places places))
 	;; object name strings
-	(hilo-table :name-hi :name-lo (mapcar #'(lambda (o) (nil->0 (second o))) objects))
+	(hilo-table :name-hi :name-lo (mapcar (λ (o) (nil->0 (second o))) objects))
 	;; object verb handlers (a table of vtables)
 	(labels ((verb-addr (o)
 		   (let ((name (caar o)))
 		     (if (gethash name *object->vtable*) 
 			 (cons :vtable name)
 			 0))))
-	  (hilo-table :verb-hi :verb-lo (mapcar #'(lambda (o) (verb-addr o)) objects)))
+	  (hilo-table :verb-hi :verb-lo (mapcar (λ (o) (verb-addr o)) objects)))
 	;; object descriptions
 	(hilo-table :description-hi :description-lo (mapcar #'third objects))
 	;; object properties
 	(apply #'db :properties
-	       (mapcar #'(lambda (o) (object-properties (fifth o) (sixth o))) objects))
+	       (mapcar (λ (o) (object-properties (fifth o) (sixth o))) objects))
 
-	(maphash #'(lambda (object verb-handlers)
+	(maphash (λ (object verb-handlers)
 		     (label object :vtable)
 		     (dolist (verb-handler verb-handlers)
 		       (dc (format nil "~a" (car verb-handler)) t)
@@ -431,7 +431,7 @@ all of which will refer to the same object."
 	    (cdar data))))
 
 (defun dump-places ()
-  (maphash #'(lambda (k v) (format t "~a -> ~a~%" k v)) *place->id*))
+  (maphash (λ (k v) (format t "~a -> ~a~%" k v)) *place->id*))
 
 (defun place-id (place)
   "Get the id for a place, e.g. :dungeon"

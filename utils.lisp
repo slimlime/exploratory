@@ -1,3 +1,13 @@
+(defmacro eval-always (&body body)
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     ,@body))
+
+(eval-always
+  (defun lambda-reader (stream char)
+    (declare (ignore stream char))
+    'lambda)
+(set-macro-character #\λ #'lambda-reader))
+
 (defun nil->0 (value)
   (if value value 0))
 
@@ -6,15 +16,15 @@
      (if it ,then ,else)))
 
 (defmacro do-hashtable ((k v table) &body body)
-  `(maphash #'(lambda (,k ,v) ,@body) ,table))
+  `(maphash (λ (,k ,v) ,@body) ,table))
 
 (defmacro do-hash-keys ((k table) &body body)
   (let ((v (gensym)))
-    `(maphash #'(lambda (,k ,v) (declare (ignore ,v)) ,@body) ,table)))
+    `(maphash (λ (,k ,v) (declare (ignore ,v)) ,@body) ,table)))
 
 (defmacro do-hash-values ((v table) &body body)
   (let ((k (gensym)))
-    `(maphash #'(lambda (,k ,v) (declare (ignore ,k)) ,@body) ,table)))
+    `(maphash (λ (,k ,v) (declare (ignore ,k)) ,@body) ,table)))
 
 (defun hash-values (table)
   (let ((values nil))
@@ -56,10 +66,10 @@
     (values)))
 
 (defmacro test (description &body body)
-  `(test-fn ,description #'(lambda () ,@body) nil))
+  `(test-fn ,description (λ () ,@body) nil))
 
 (defmacro deferred-test (description &body body)
-  `(test-fn ,description #'(lambda () ,@body) t))
+  `(test-fn ,description (λ () ,@body) t))
 
 (defun clear-test-results ()
   (clrhash *failing-tests*))

@@ -33,7 +33,7 @@
   
 (defun build-huffman-string-table (freqs)
   (let ((l))
-    (maphash #'(lambda (c f)
+    (maphash (λ (c f)
 		 (when (> f 0)
 		   (push (list c f) l)))
 	     freqs)
@@ -157,7 +157,7 @@ is replaced with replacement."
 
 (defmacro do-subsequences ((var str min max) &body body)
   `(subsequences ,str ,min ,max
-		    #'(lambda (,var)
+		    (λ (,var)
 			,@body)))
 
 (defun count-frequencies (str freqs)
@@ -328,7 +328,7 @@ the source as it breaks them for grep and git"
     ;;  (dc "A lookup of first letters to general letter index")
     ;;  (apply #'db :first-letter-indexes
     ;;	 (if *huffman-table*
-    ;;	     (mapcar #'(lambda (e) (position (car e) *huffman-table* :key #'car))
+    ;;	     (mapcar (λ (e) (position (car e) *huffman-table* :key #'car))
     ;;		     *first-letter-huffman-table*)
     ;;	     (list 0))))
     
@@ -401,7 +401,7 @@ the source as it breaks them for grep and git"
   
   ;; define some encoded strings, labelled with themselves
 
-  (mapc #'(lambda (s) (dcs s s)) *test-strings*)
+  (mapc (λ (s) (dcs s s)) *test-strings*)
 
   (dbs :str-buffer 256 #xff)
        

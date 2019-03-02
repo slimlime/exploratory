@@ -440,7 +440,7 @@
 
 (defun dump-namespaces ()
   (let ((entries nil))
-  (maphash #'(lambda (namespace bytes)
+  (maphash (λ (namespace bytes)
 	       (push (cons namespace bytes) entries))
 	   *compiler-namespace-sizes*)
   (dolist (entry (sort entries #'> :key #'cdr))
@@ -493,7 +493,7 @@
   (let ((labels (make-hash-table))
 	(labels-list nil))
     (dolist (namespace namespaces)
-      (maphash #'(lambda (k v)
+      (maphash (λ (k v)
 		   (when (equal (label-namespace k)
 				namespace)
 		     (unless (gethash v labels)
@@ -503,10 +503,10 @@
     labels-list))
 
 (defun dump-aliases ()
-  (maphash #'(lambda (k v) (format t "~a -> ~a~%" (fmt-label k t) v)) *compiler-aliases*))
+  (maphash (λ (k v) (format t "~a -> ~a~%" (fmt-label k t) v)) *compiler-aliases*))
 
 (defun dump-labels (&optional (namespace nil namespace-p))  
-  (maphash #'(lambda (k v)
+  (maphash (λ (k v)
 	       (when (or (not namespace-p)
 			 (equal (label-namespace k)
 				namespace))
@@ -682,7 +682,7 @@
 			  (let ((label (gethash addr *compiler-address-labels*)))
 			    (when label
 			      (format t "~45,1T;~{~a ~}"
-				      (mapcar #'(lambda (l) (fmt-label l t)) label)))))
+				      (mapcar (λ (l) (fmt-label l t)) label)))))
 			(format-cur-label ()
 			  (format-label (logior arg1 (ash arg2 8))))
 			(format-1 (fmt) (format t fmt arg1 op arg1)

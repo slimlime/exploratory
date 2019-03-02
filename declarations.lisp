@@ -108,58 +108,58 @@
 
 (defmacro if-object (object then &optional (else nil else-supplied-p))
   `(if-object-fn ,object
-		 #'(lambda () ,then)
-		 (if ,else-supplied-p #'(lambda () ,else) nil)))
+		 (λ () ,then)
+		 (if ,else-supplied-p (λ () ,else) nil)))
 
 (defmacro when-object (object &body then)
   `(if-object-fn ,object
-		 #'(lambda () ,then)
+		 (λ () ,then)
 		 nil))
 
 (defmacro if-bit (bit then &optional (else nil else-supplied-p))
   `(if-bit-fn ,bit
-	      #'(lambda () ,then)
-	      (if ,else-supplied-p #'(lambda () ,else) nil)))
+	      (λ () ,then)
+	      (if ,else-supplied-p (λ () ,else) nil)))
 
 (defmacro when-bit (bit &body then)
   `(if-bit-fn ,bit
-	      #'(lambda () ,@then)
+	      (λ () ,@then)
 	      nil))
 
 (defmacro unless-bit (bit &body then)
   `(if-bit-fn ,bit
 	      nil
-	      #'(lambda () ,@then)))
+	      (λ () ,@then)))
 
 (defmacro if-not-bit (bit then &optional (else nil else-supplied-p))
   `(if-bit-fn ,bit
-	     (if ,else-supplied-p #'(lambda () ,else) nil)
-	     #'(lambda () ,then)))
+	     (if ,else-supplied-p (λ () ,else) nil)
+	     (λ () ,then)))
 
 (defmacro if-has (object-name then &optional (else nil else-supplied-p))
   `(if-in-place-fn ,object-name :inventory
-		   #'(lambda () ,then)
-		   (if ,else-supplied-p #'(lambda () ,else) nil)))
+		   (λ () ,then)
+		   (if ,else-supplied-p (λ () ,else) nil)))
 
 (defmacro when-has (object-name &body body)
   `(if-in-place-fn ,object-name :inventory
-		   #'(lambda () ,@body)
+		   (λ () ,@body)
 		   nil))
 
 (defmacro if-in-place (object-name place then &optional (else nil else-supplied-p))
   `(if-in-place-fn ,object-name ,place
-		   #'(lambda () ,then)
-		   (if ,else-supplied-p #'(lambda () ,else) nil)))
+		   (λ () ,then)
+		   (if ,else-supplied-p (λ () ,else) nil)))
 
 (defmacro when-in-place (object-name place &body then)
   `(if-in-place-fn ,object-name ,place
-		   #'(lambda () ,@then)
+		   (λ () ,@then)
 		   nil))
 
 (defmacro if-not-in-place (object-name place then &optional (else nil else-supplied-p))
   `(if-in-place-fn ,object-name ,place
-		   (if ,else-supplied-p #'(lambda () ,else) nil)
-		   #'(lambda () ,then)))
+		   (if ,else-supplied-p (λ () ,else) nil)
+		   (λ () ,then)))
 
 ;;todo make justification work with the - at the beginning without actually
 ;;puting it into the string table
@@ -240,11 +240,11 @@
 
 (defmacro action (words &body body)
   "An action which is executed by the VM."
-  `(action-fn t ,words #'(lambda () ,@body)))
+  `(action-fn t ,words (λ () ,@body)))
 
 (defmacro custom-action (words &body body)
   "An action which drops into 6502"
-  `(action-fn nil ,words #'(lambda () ,@body)))
+  `(action-fn nil ,words (λ () ,@body)))
 
 (defun verb-fn (vm object verbs fn)
   (assert object nil (format nil "~a has no object context" verbs))
@@ -268,7 +268,7 @@
 
 (defmacro verb (verb-or-verbs &body body)
   "An action for a verb associated with this object"
-  `(verb-fn t this ,verb-or-verbs #'(lambda () ,@body)))
+  `(verb-fn t this ,verb-or-verbs (λ () ,@body)))
 
 (defun set-it (object)
   "Set the it object, for instance if it was mentioned explicitly."

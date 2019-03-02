@@ -34,7 +34,7 @@
   "Execute the body of the hook when the address is reached
    The following variables are bound buffer, pc, sp, sr, a, x, y and cc"
   `(monitor-add-debug-hook-fn *compiler-ptr*
-     #'(lambda (buffer pc sp sr a x y cc)
+     (λ (buffer pc sp sr a x y cc)
 	 (declare (ignorable buffer pc sp sr a x y cc))
 	 ,@body)))
 
@@ -56,7 +56,7 @@
 
 (defun monitor-dump-profile (&optional (top 4) (context 5))
   (let ((profile nil))
-    (maphash #'(lambda (addr cycles) (push (cons addr cycles) profile))
+    (maphash (λ (addr cycles) (push (cons addr cycles) profile))
 	     *monitor-profile*)
     (loop for e in (sort profile #'> :key #'cdr)
 	 for _ from 1 to top do
@@ -132,7 +132,7 @@
 	    *monitor-label-watches*)))
 
 (defun monitor-watch-namespace (namespace)
-  (maphash #'(lambda (k v) (declare (ignore v))
+  (maphash (λ (k v) (declare (ignore v))
 	       (when (equal (label-namespace k) namespace)
 		 (monitor-watch k)
 		 (format t "Watched ~a~%" (fmt-label k t))))
@@ -224,26 +224,26 @@
     (format t "Cycles:~d~%" (- (monitor-cc) cc))))
 
 (defmacro monitor-time (&body body)
-  `(monitor-time-fn #'(lambda () ,@body)))
+  `(monitor-time-fn (λ () ,@body)))
 
 (defun monitor-setup-for-cl-6502 (buffer org)
   ;temporary binding to cl-6502
-  (setf *monitor-buffer* #'(lambda () (cl-6502:get-range 0)))
+  (setf *monitor-buffer* (λ () (cl-6502:get-range 0)))
   (setf (cl-6502:get-range 0) buffer)
   (setf (6502:cpu-pc cl-6502:*cpu*) org)
-  (setf *monitor-peek-fn* #'(lambda (address)
+  (setf *monitor-peek-fn* (λ (address)
 			      (cl-6502:get-byte address)))
-  (setf *monitor-poke-fn* #'(lambda (address byte)
+  (setf *monitor-poke-fn* (λ (address byte)
 			      (setf (cl-6502:get-byte address) byte)))
   (setf *monitor-step*
-	#'(lambda ()
+	(λ ()
 	    (let ((byte (cl-6502:get-byte (6502:cpu-pc cl-6502:*cpu*))))
 	      ; BRK seems to fubar cl-6502 next time it is called
 	      ; can't be bothered to fix it
 	      (unless (zerop byte)
 		(cl-6502:step-cpu cl-6502:*cpu* byte)))))
   (setf *monitor-get-state* 
-	#'(lambda (&optional (slow-get-buffer t)) (values
+	(λ (&optional (slow-get-buffer t)) (values
 					(if slow-get-buffer (cl-6502:get-range 0) nil)
 					(6502:cpu-pc cl-6502:*cpu*)
 					(6502:cpu-sp cl-6502:*cpu*)

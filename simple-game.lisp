@@ -381,7 +381,7 @@ preventing closed-minded mortals from seeing what is really there."))))
 
 (defun run-simple-game (&key (break-on 'BRK) (print t))
   (run-game :dungeon-cell
-	    #'(lambda ()
+	    (λ ()
 		(synonyms)
 		(dungeon-cell)
 		(corridor)

@@ -75,10 +75,10 @@
     (setf strings (sort (copy-list strings) #'string<))
     ;;TODO ensure that duplicates only appear once
     ;;they will resolve to something so we can check them with the tree parser
-    (apply #'db :tbl1 (mapcar #'(lambda (s) (char-or-space s 0)) strings))
-    (apply #'db :tbl2 (mapcar #'(lambda (s) (char-or-space s 1)) strings))
-    (apply #'db :tbl3 (mapcar #'(lambda (s) (char-or-space s 2)) strings))
-    (apply #'db :tbl4 (mapcar #'(lambda (s) (char-or-space s 3)) strings))))
+    (apply #'db :tbl1 (mapcar (λ (s) (char-or-space s 0)) strings))
+    (apply #'db :tbl2 (mapcar (λ (s) (char-or-space s 1)) strings))
+    (apply #'db :tbl3 (mapcar (λ (s) (char-or-space s 2)) strings))
+    (apply #'db :tbl4 (mapcar (λ (s) (char-or-space s 3)) strings))))
     
 (defun test-binary-search (strings input)
   (reset-compiler)

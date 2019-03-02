@@ -361,8 +361,8 @@
       (huffman-pop-table :pixel-population tbl "Pixel Huffman Table")
       ;;now we have to be able to translate from indices to bytes
       ;;using the amazing tables
-      (apply #'db :even-bytes (mapcar #'(lambda (e) (aref *even-bytes* (first e))) tbl))
-      (apply #'db :odd-bytes (mapcar #'(lambda (e) (aref *odd-bytes* (first e))) tbl)))))
+      (apply #'db :even-bytes (mapcar (λ (e) (aref *even-bytes* (first e))) tbl))
+      (apply #'db :odd-bytes (mapcar (λ (e) (aref *odd-bytes* (first e))) tbl)))))
 
 (defun set-colours (colour)
   (call-memset colour *char-memory-address* +char-memory-length+))

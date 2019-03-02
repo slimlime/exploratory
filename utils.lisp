@@ -34,6 +34,7 @@
 	(assert nil nil ,(format nil "~s was nil" value))))
 
 (defparameter *failing-tests* (make-hash-table :test 'equal))
+(defparameter *warning-tests* (make-hash-table :test 'equal))
 
 (defun test-fn (description body-fn deferred)
   (let ((msg nil))
@@ -45,9 +46,13 @@
       (setf msg (format nil "The deferred test '~a' actually passed. Undefer it." description))
       (setf deferred nil))
     (when msg
-      (format t (if deferred "WARNING: ~a~%" "ERROR : ~a~%")
+      (format t "~a: ~a~%"
+	      (if deferred "WARNING:" "ERROR :")
 	      msg)
-      (setf (gethash description *failing-tests*) t))
+      (setf (gethash description (if deferred
+				     *warning-tests*
+				     *failing-tests*))
+	    msg))
     (values)))
 
 (defmacro test (description &body body)
@@ -61,4 +66,3 @@
 
 (defun failing-tests ()
   (hash-table-count *failing-tests*))
-

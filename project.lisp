@@ -68,5 +68,15 @@
 
 (log-line "Tests complete.")
 
-(if (> (failing-tests) 0)
-    (error "Failed tests:~a" (failing-tests)))
+(flet ((dump-test-results (table name)
+	 (format t "~a ~a~%" name (hash-table-count table))
+	 (when (> (hash-table-count table) 0)
+	   (maphash #'(lambda (test msg)
+			(format t  "~a -> ~a~%" test msg))
+		    table))))
+  (dump-test-results *failing-tests* "Failed :")
+  (terpri)
+  (dump-test-results *warning-tests* "Warning:"))
+
+(when (> (hash-table-count *failing-tests*) 0)
+  (error "Failing tests; build failed"))

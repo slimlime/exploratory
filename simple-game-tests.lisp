@@ -5,10 +5,18 @@
 ;; this compiles the game, each time a test is run it resets the monitor
 ;; by copying the compile buffer into the monitor buffer so each test is independent.
 
+(defun init-game ()
+  (monitor-reset :start)
+  (monitor-run :break-on 'BRK :print nil))
+
 (defmacro game-test (description &body body)
   `(test ,description
-     (monitor-reset :start)
-     (monitor-run :break-on 'BRK :print nil)
+     (init-game)
+     ,@body))
+
+(defmacro deferred-game-test (description &body body)
+  `(deferred-test ,description
+     (init-game)
      ,@body))
      
 (run-simple-game :print nil)
@@ -50,6 +58,14 @@
   ;;so wasn't being matched
   (test-input "TAKE BONE" "KILL IT")
   (assert-msg *cant-do-that*))
+
+(deferred-game-test "IT is cleared after something without an object"
+  (test-input "EXAMINE BONE" "EXIT" "TAKE IT")
+  (assert-msg *be-more-specific*))
+
+(game-test "Two objects dont make an IT"
+  (test-input "POKE BONE IN KEYHOLE" "TAKE IT")
+  (assert-msg *be-more-specific*))
 
 (game-test "Do something weird to an object, with an override"
   (test-input "TAKE BONE" "EAT IT")

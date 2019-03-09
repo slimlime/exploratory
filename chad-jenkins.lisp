@@ -74,7 +74,7 @@
 |#
 
 (defun act1 ()
-  (location :basement-stairs "BASEMENT STAIRS" "/home/dan/Downloads/cellardoor.bmp"
+  (location :basement-stairs "BASEMENT STAIRS" "images/cellardoor.bmp"
       "You are in a grim passageway at the bottom of a dank, evil flight of stairs. Wafting through an alcove to the right you hear the sound of polyhedral dice being rolled, goblins being slain and fizzy pop being guzzled. The sound of fun. To the left a mysterious passage disappears round a dark corner, to who knows where?"
     (action '((LEFT) (SOUTH))
       (navigate :garage "You go round the dark corner."))
@@ -96,12 +96,12 @@
 	(goto :go-right)))
     (fixture "ALCOVE PENTAGRAM" (:description "Underneath the badly drawn pentagram the word 'SATON' has been inscribed.")))
 
-  (location :garage "GARAGE" "/home/dan/Downloads/porsche.bmp"
+  (location :garage "GARAGE" "images/porsche.bmp"
       "Red porsche. Paint can, etc."
     (action '(NORTH)
       (navigate :basement-stairs "You leave the garage by the North passage.")))
   
-  (location :basement "BASEMENT ANNEX" "/home/dan/Downloads/porsche.bmp"
+  (location :basement "BASEMENT ANNEX" "images/porsche.bmp"
       "Nerds' basement"
     (action '((SOUTH) (OUT))
       (navigate :basement-stairs "You leave the nerds to their game."))
@@ -140,7 +140,7 @@
 	  (move-object "KAZOW BOTTLE" :inventory))
 	(respond "They sit back down and continue their game as if nothing unusual had happened."))))
 
-  (location :kitchen "KITCHEN" "/home/dan/Downloads/porsche.bmp"
+  (location :kitchen "KITCHEN" "images/porsche.bmp"
       "Suburban kitchen"
     (on-entry
       (when-in-place "LITTLE DOG" here
@@ -172,7 +172,7 @@
       (verb 'ENTER
 	(respond "Cereberus growls. He is very protective of his den. He is a very good boy."))))
   
-  (location :upstairs-landing "UPSTAIRS LANDING" "/home/dan/Downloads/porsche.bmp"
+  (location :upstairs-landing "UPSTAIRS LANDING" "images/porsche.bmp"
       "Landing"
     (action '(DOWN)
       (navigate :kitchen "You go down the stairs."))
@@ -181,12 +181,12 @@
     (action '(EAST)
       (navigate :maxines-bedroom "You go into Maxine's bedroom.")))
   
-  (location :bathroom "BATHROOM" "/home/dan/Downloads/porsche.bmp"
+  (location :bathroom "BATHROOM" "images/porsche.bmp"
       "Bathroom"
     (action '(OUT)
       (navigate :upstairs-landing "You go back onto the landing.")))
   
-  (location :maxines-bedroom "MAXINE'S BEDROOM" "/home/dan/Downloads/porsche.bmp"
+  (location :maxines-bedroom "MAXINE'S BEDROOM" "images/porsche.bmp"
       "Bedroom"
     (action '((OUT) (WEST))
       (navigate :upstairs-landing "You go back onto the landing."))))

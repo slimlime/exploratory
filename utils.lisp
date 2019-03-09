@@ -3,10 +3,10 @@
      ,@body))
 
 (eval-always
-  (defun lambda-reader (stream char)
-    (declare (ignore stream char))
-    'lambda)
-(set-macro-character #\λ #'lambda-reader))
+ (defun lambda-reader (stream char)
+   (declare (ignore stream char))
+   'lambda)
+ (set-macro-character #\λ #'lambda-reader))
 
 (defun nil->0 (value)
   (if value value 0))
@@ -46,7 +46,7 @@
 (defparameter *failing-tests* (make-hash-table :test 'equal))
 (defparameter *warning-tests* (make-hash-table :test 'equal))
 
-(defun test-fn (description body-fn deferred)
+(defun test-fn (description body-fn &optional (deferred nil))
   (let ((msg nil))
     (handler-case
 	(funcall body-fn)
@@ -66,7 +66,7 @@
     (values)))
 
 (defmacro test (description &body body)
-  `(test-fn ,description (λ () ,@body) nil))
+  `(test-fn ,description (λ () ,@body)))
 
 (defmacro deferred-test (description &body body)
   `(test-fn ,description (λ () ,@body) t))

@@ -45,7 +45,7 @@
   (defword :LOCK :KEYHOLE))
 
 (defun dungeon-cell ()
-  (dloc :dungeon-cell "DUNGEON CELL" "/home/dan/exploratory/images/cell.bmp"
+  (dloc :dungeon-cell "DUNGEON CELL" "images/cell.bmp"
 	"You are in the dungeon prison of Wangband under the fortress of the Black Wizard, Gordon. Home to stench-rats, were-toads, sniveling goblins and you. Of the current denizens, you are currently the most wretched. A lime-green slime oozes out of the wall, making a rasping, wheezing sound. You must escape... Perhaps you could try the door?")
   (with-location :dungeon-cell
     (defbits t :door-locked)
@@ -273,7 +273,7 @@ Eugh! The slime is looking at you!")
 preventing closed-minded mortals from seeing what is really there."))))
 
 (defun corridor ()
-  (dloc :corridor "CORRIDOR" "/home/dan/exploratory/images/corridor.bmp"
+  (dloc :corridor "CORRIDOR" "images/corridor.bmp"
 	"A torch-lit corridor. You see a row of cell doors, identical to your own. Moans and pleas waft through the bars- sounds which you are not entirely certain are human in origin. At one end, a brick wall, at the other a green door, different than all the rest.")
   
   (with-location :corridor
@@ -363,7 +363,7 @@ preventing closed-minded mortals from seeing what is really there."))))
 		  (respond "Presently, it swings open. There appears to be some sort of lodging beyond the threshold.")))))))
 
 (defun frazbolgs-closet ()
-  (dloc :frazbolgs-closet "FRAZBOLG'S CLOSET" "/home/dan/exploratory/images/porsche.bmp"
+  (dloc :frazbolgs-closet "FRAZBOLG'S CLOSET" "images/porsche.bmp"
 	"You are in the well-appointed closet of the goblin Frazbolg. Over centuries of guarding his prisoners he has amassed an impressive collection of posessions, a spare loin cloth- tattered, a toaster and a hundred-year-old copy of Modern Necromancer magazine.")
   ;;I need to summon the shade of Wazbolg, my predecessor.
   (with-location :frazbolgs-closet
